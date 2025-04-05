@@ -6,11 +6,11 @@ import { TaskCard } from '@/components/task-card';
 import { 
   Card, 
   CardContent, 
-  CardDescription, 
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { 
   Select, 
   SelectContent, 
@@ -18,16 +18,12 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Clock, 
   Search, 
   Users, 
   ClipboardCheck, 
   ShieldCheck 
-} from "lucide-react";
+} from 'lucide-react';
 
 // Mock tasks data
 const allTasks = [
@@ -130,96 +126,18 @@ export default function DashboardPage() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // Summary counters
-  const totalTasks = allTasks.length;
-  const pendingTasks = allTasks.filter(task => task.status === 'pending').length;
-  const inProgressTasks = allTasks.filter(task => task.status === 'in-progress').length;
-  const completedTasks = allTasks.filter(task => task.status === 'completed').length;
-  const overdueTasks = allTasks.filter(task => task.status === 'overdue').length;
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Welcome to your Dashboard</h1>
       
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Tasks</p>
-                <p className="text-3xl font-bold">{totalTasks}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <ClipboardCheck className="h-6 w-6 text-blue-800" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-500">In Progress</p>
-                <p className="text-3xl font-bold">{inProgressTasks}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-blue-800" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Completed</p>
-                <p className="text-3xl font-bold">{completedTasks}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-800" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Overdue</p>
-                <p className="text-3xl font-bold">{overdueTasks}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-red-800" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-          <TabsList>
-            <TabsTrigger value="all">All Tasks</TabsTrigger>
-            <TabsTrigger value="pm">
-              <Users className="h-4 w-4 mr-2" />
-              PM Tasks
-            </TabsTrigger>
-            <TabsTrigger value="qc">
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              QC Tasks
-            </TabsTrigger>
-            <TabsTrigger value="qa">
-              <ShieldCheck className="h-4 w-4 mr-2" />
-              QA Tasks
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-            <div className="relative w-full md:w-64">
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Filter Tasks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative w-full md:w-2/5">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Search tasks..."
@@ -230,7 +148,7 @@ export default function DashboardPage() {
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-40">
+              <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -243,7 +161,7 @@ export default function DashboardPage() {
             </Select>
             
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-40">
+              <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by priority" />
               </SelectTrigger>
               <SelectContent>
@@ -255,7 +173,25 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All Tasks</TabsTrigger>
+          <TabsTrigger value="pm">
+            <Users className="h-4 w-4 mr-2" />
+            PM Tasks
+          </TabsTrigger>
+          <TabsTrigger value="qc">
+            <ClipboardCheck className="h-4 w-4 mr-2" />
+            QC Tasks
+          </TabsTrigger>
+          <TabsTrigger value="qa">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            QA Tasks
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value="all" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

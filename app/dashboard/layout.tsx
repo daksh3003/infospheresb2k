@@ -5,7 +5,6 @@ import { useState, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, 
   ClipboardCheck, 
   ShieldCheck, 
   Users, 
@@ -35,7 +34,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Project Manager', href: '/dashboard/pm', icon: Users },
     { name: 'QC Team', href: '/dashboard/qc', icon: ClipboardCheck },
     { name: 'QA Team', href: '/dashboard/qa', icon: ShieldCheck },
