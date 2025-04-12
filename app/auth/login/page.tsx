@@ -1,23 +1,95 @@
-// pages/login.js
 'use client';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../../../utils/supabase';
 
 export default function Login() {
-  const [userType, setUserType] = useState({
-    projectManager: false,
-    qcTeam: false,
-    qaTeam: false
+  const router = useRouter();
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
   });
 
-  const handleUserTypeChange = (type: any) => {
-    if(type in userType){
-    setUserType(prev => ({
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
       ...prev,
-      [type]: !prev[type]
+      [name]: value
     }));
-    }   
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Return early if already loading
+    if (loading) return;
+    
+    setLoading(true);
+    setError(null);
+
+    try {
+      const loginPromise = supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 10000);
+      });
+
+      const { data, error } = await Promise.race([
+        loginPromise,
+        timeoutPromise
+      ]) as any;
+
+      if (error) throw error;
+      
+      if (!data || !data.user) {
+        throw new Error('Authentication failed. Please try again.');
+      }
+
+      if (!data.user.email_confirmed_at) {
+        router.push('/auth/verify-email');
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      
+      let redirectPath = '/dashboard';
+      
+      if (profileData) {
+        switch (profileData.role) {
+          case 'projectManager':
+            redirectPath = '/dashboard/pm';
+            break;
+          case 'qcTeam':
+            redirectPath = '/dashboard/qc';
+            break;
+          case 'qaTeam':
+            redirectPath = '/dashboard/qa';
+            break;
+        }
+      }
+      router.prefetch(redirectPath);
+      router.push(redirectPath);
+      
+    } catch (error: any) {
+      console.error('Error logging in:', error.message);
+      setError(error.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,17 +130,26 @@ export default function Login() {
                 <h3 className="text-2xl font-bold text-blue-800 mb-6">Login</h3>
                 <p className="text-gray-500 mb-8">Login to your account.</p>
 
-                <form className="space-y-6">
+                {error && (
+                  <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                    {error}
+                  </div>
+                )}
+
+                <form className="space-y-6" onSubmit={handleLogin}>
                   <div>
-                    <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                      User Name
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      Email Address
                     </label>
                     <input
-                      id="username"
-                      name="username"
-                      type="text"
+                      id="email"
+                      name="email"
+                      type="email"
                       required
+                      value={formData.email}
+                      onChange={handleInputChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      disabled={loading}
                     />
                   </div>
 
@@ -81,60 +162,30 @@ export default function Login() {
                       name="password"
                       type="password"
                       required
+                      value={formData.password}
+                      onChange={handleInputChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      disabled={loading}
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <input
-                        id="projectManager"
-                        name="projectManager"
-                        type="checkbox"
-                        checked={userType.projectManager}
-                        onChange={() => handleUserTypeChange('projectManager')}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="projectManager" className="ml-2 block text-sm text-gray-700">
-                        Project Manager?
-                      </label>
-                    </div>
-                    
-                    <div className="flex items-center">
-                      <input
-                        id="qcTeam"
-                        name="qcTeam"
-                        type="checkbox"
-                        checked={userType.qcTeam}
-                        onChange={() => handleUserTypeChange('qcTeam')}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="qcTeam" className="ml-2 block text-sm text-gray-700">
-                        QC Team?
-                      </label>
-                    </div>
-                    
-                    <div className="flex items-center">
-                      <input
-                        id="qaTeam"
-                        name="qaTeam"
-                        type="checkbox"
-                        checked={userType.qaTeam}
-                        onChange={() => handleUserTypeChange('qaTeam')}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="qaTeam" className="ml-2 block text-sm text-gray-700">
-                        QA Team?
-                      </label>
-                    </div>
                   </div>
 
                   <div>
                     <button
                       type="submit"
-                      className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      disabled={loading}
+                      className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     >
-                      Sign In
+                      {loading ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Signing In...
+                        </span>
+                      ) : (
+                        'Sign In'
+                      )}
                     </button>
                   </div>
                 </form>
@@ -142,7 +193,7 @@ export default function Login() {
                 <div className="mt-6 text-center">
                   <p className="text-sm text-gray-500">
                     Not a member yet?{' '}
-                    <Link href="./signup" className="font-medium text-blue-700 hover:text-blue-800">
+                    <Link href="/auth/signup" className="font-medium text-blue-700 hover:text-blue-800">
                       Create your account
                     </Link>
                   </p>
