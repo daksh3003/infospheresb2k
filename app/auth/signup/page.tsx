@@ -16,8 +16,7 @@ export default function Signup() {
     password: ''
   });
   
-  // Single role selection instead of multiple booleans
-  const [role, setRole] = useState<string>('user');
+  const [role, setRole] = useState<string>('projectManager');
   
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setRole(e.target.value);
@@ -36,13 +35,24 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
+    const emailRegex = /^[A-Za-z0-9._+%-]+@[A-Za-z0-9.-]+\.[A-Za-z]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Create user with Supabase auth
+      //usage of metadata in case of new user to handle the requests.
       const { data, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/login`,
+          data: {
+            name: formData.name,
+            role: role, 
+          }
         }
       });
 
@@ -50,21 +60,8 @@ export default function Signup() {
 
       const user = data.user;
       if (!user) throw new Error("User not returned from signup.");
-
-      // Insert profile data into 'profiles' table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: user.id,
-          name: formData.name,
-          email: formData.email,
-          role: role, // Store a single role instead of multiple booleans
-          created_at: new Date()
-        }]);
-
-      if (profileError) throw profileError;
-
-      // Redirect user to verify email page
+      
+      //profile created by the db trigger.
       router.push('/auth/verify-email');
     } catch (error: any) {
       console.error('Error signing up:', error.message);
@@ -154,7 +151,6 @@ export default function Signup() {
                       onChange={handleRoleChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     >
-                      {/* <option value="user">Regular User</option> */}
                       <option value="projectManager">Project Manager</option>
                       <option value="qcTeam">QC Team</option>
                       <option value="qaTeam">QA Team</option>
@@ -182,8 +178,6 @@ export default function Signup() {
                 </div>
               </div>
             </div>
-
-            {/* Right Side - Image with Text Overlay */}
             <div className="hidden md:block md:w-1/2 relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-900 to-blue-800 opacity-90"></div>
               <img

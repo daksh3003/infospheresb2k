@@ -9,16 +9,13 @@ export default function VerifyEmail() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Extract email from URL parameters if available
   const emailFromUrl = searchParams?.get('email') || '';
   
-  // Function to open user's email client
+  //to redirect to the mail from a static verify
   const openEmailClient = () => {
     if (emailFromUrl) {
-      // This will attempt to open the user's default email client
       window.location.href = `mailto:${emailFromUrl}`;
     } else {
-      // If we don't have their email, try to open a common webmail service
       window.open('https://mail.google.com', '_blank');
     }
   };

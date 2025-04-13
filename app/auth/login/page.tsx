@@ -25,25 +25,22 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Return early if already loading
     if (loading) return;
     
     setLoading(true);
     setError(null);
 
     try {
-      const loginPromise = supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
-      });
-      
+      // Timeout to handle login requests upto 2s
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 10000);
+        setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 2000);
       });
 
       const { data, error } = await Promise.race([
-        loginPromise,
+        supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password
+        }),
         timeoutPromise
       ]) as any;
 
@@ -58,18 +55,25 @@ export default function Login() {
         return;
       }
 
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
+      // Try to get role from user metadata first (faster)
+      let userRole = data.user.user_metadata?.role;
+      
+      // Only fetch profile if role isn't in metadata
+      if (!userRole) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
 
-      if (profileError) throw profileError;
+        if (profileError) throw profileError;
+        userRole = profileData?.role;
+      }
       
+      // Determine redirect path based on role
       let redirectPath = '/dashboard';
-      
-      if (profileData) {
-        switch (profileData.role) {
+      if (userRole) {
+        switch (userRole) {
           case 'projectManager':
             redirectPath = '/dashboard/pm';
             break;
@@ -81,7 +85,8 @@ export default function Login() {
             break;
         }
       }
-      router.prefetch(redirectPath);
+      
+      // Direct redirect without prefetch for faster response
       router.push(redirectPath);
       
     } catch (error: any) {
