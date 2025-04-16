@@ -1,4 +1,5 @@
 // components/task-card.tsx
+"use client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -17,6 +18,7 @@ import {
   CheckCircle2, 
   CircleDashed 
 } from "lucide-react";
+import { useRouter } from "next/navigation"; // Import the router
 
 type TaskStatus = "pending" | "in-progress" | "completed" | "overdue";
 type TaskPriority = "low" | "medium" | "high" | "critical";
@@ -44,6 +46,8 @@ export function TaskCard({
   assignedAvatar,
   onClick
 }: TaskCardProps) {
+  const router = useRouter(); // Initialize the router
+
   // Status icon mapping
   const statusIcon = {
     "pending": <CircleDashed className="h-4 w-4" />,
@@ -66,6 +70,17 @@ export function TaskCard({
     "medium": "bg-yellow-100 text-yellow-800",
     "high": "bg-orange-100 text-orange-800",
     "critical": "bg-red-100 text-red-800"
+  };
+
+  // Handle view details click - navigate to task detail page
+  const handleViewDetails = () => {
+    if (onClick) {
+      // Use custom onClick handler if provided
+      onClick();
+    } else {
+      // Otherwise use default routing
+      router.push(`/tasks/${id}`);
+    }
   };
 
   return (
@@ -110,7 +125,7 @@ export function TaskCard({
         <Button 
           variant="ghost" 
           className="w-full justify-between text-blue-800 hover:text-blue-900 hover:bg-blue-50"
-          onClick={onClick}
+          onClick={handleViewDetails}
         >
           <span>View Details</span>
           <ArrowRight className="h-4 w-4" />
