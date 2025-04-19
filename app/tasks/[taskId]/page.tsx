@@ -274,12 +274,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Back button and task ID */}
       <div className="flex items-center justify-between mb-6">
-        <button 
+        {/* <button 
           className="flex items-center gap-2 px-3 py-1 text-gray-600 hover:text-gray-900"
           onClick={() => router.push('/dashboard')}
         >
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-        </button>
+        </button> */}
+        <TaskDetailBackButton/>
         <div className="text-sm text-gray-500">Task ID: {task.id}</div>
       </div>
       
