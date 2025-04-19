@@ -18,6 +18,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import TaskModal from '@/components/taskModal';
 
 // Mock PM-specific tasks
 const pmTasks = [
@@ -93,14 +95,29 @@ export default function PMDashboard() {
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
   
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Project Manager Dashboard</h1>
-        <p className="text-gray-500">Manage projects, teams, and tasks efficiently</p>
+      <div className='flex items-center justify-between w-full mb-6'>
+        <div>
+          <h1 className="text-2xl font-bold">Project Manager Dashboard</h1>
+          <p className="text-gray-500">Manage projects, teams, and tasks efficiently</p>
+        </div>
+        <div>
+          <Button variant={'default'} className='bg-blue-600 hover:bg-blue-300 cursor-pointer' onClick={openModal}>Add Task</Button>
+        </div>
+        <TaskModal isOpen={isModalOpen} onClose={closeModal} />
       </div>
-      
       {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
