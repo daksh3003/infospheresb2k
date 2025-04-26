@@ -1,7 +1,7 @@
 // app/dashboard/pm/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TaskCard } from '@/components/task-card';
 import { 
   Card, 
@@ -17,78 +17,138 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import TaskModal from '@/components/taskModal';
+import { createClient } from '@supabase/supabase-js';
 
-// Mock PM-specific tasks
-const pmTasks = [
-  {
-    id: "task-3",
-    title: "Update project timeline",
-    description: "Update the project timeline based on the latest sprint review and adjust resource allocation accordingly.",
-    dueDate: "2025-04-12",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Robert Johnson"
-  },
-  {
-    id: "task-4",
-    title: "Prepare customer demo",
-    description: "Create a demo for the upcoming client meeting showcasing the new features implemented in the latest sprint.",
-    dueDate: "2025-04-05",
-    status: "overdue",
-    priority: "high",
-    assignedTo: "John Doe"
-  },
-  {
-    id: "task-7",
-    title: "Sprint planning",
-    description: "Prepare for the upcoming sprint planning meeting by organizing backlog items and setting priorities.",
-    dueDate: "2025-04-07",
-    status: "completed",
-    priority: "high",
-    assignedTo: "Robert Johnson"
-  },
-  {
-    id: "task-9",
-    title: "Resource allocation review",
-    description: "Review the current resource allocation and make adjustments to optimize team productivity.",
-    dueDate: "2025-04-14",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Sarah Wilson"
-  },
-  {
-    id: "task-10",
-    title: "Client progress report",
-    description: "Prepare a detailed progress report for the client highlighting achievements and upcoming milestones.",
-    dueDate: "2025-04-11",
-    status: "in-progress",
-    priority: "high",
-    assignedTo: "Robert Johnson"
-  },
-  {
-    id: "task-11",
-    title: "Budget review",
-    description: "Review the project budget and update forecasts based on current spending patterns.",
-    dueDate: "2025-04-19",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "John Doe"
-  }
-];
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Define interface for Task data from Supabase
+interface Task {
+  id: string;
+  project_name: string;
+  task_id: string;
+  client_instruction: string;
+  delivery_date: string;
+  process_type: string;
+  serial_number: string;
+  po_hours: number;
+  created_at: string;
+  updated_at: string;
+  // Additional fields for status and priority calculation
+  status?: "pending" | "in-progress" | "completed" | "overdue";
+  priority?: "low" | "medium" | "high" | "critical";
+}
 
 export default function PMDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch tasks from Supabase
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+      }
+
+      if (data) {
+        // Process the data to add status and priority
+        const processedTasks = data.map(task => {
+          return {
+            ...task,
+            // Calculate status based on delivery date
+            status: calculateStatus(task.delivery_date),
+            // Calculate priority based on delivery date and po_hours
+            priority: calculatePriority(task.delivery_date, task.po_hours)
+          };
+        });
+        
+        setTasks(processedTasks);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to calculate status based on delivery date
+  const calculateStatus = (deliveryDate: string) => {
+    if (!deliveryDate) return "pending";
+    
+    const today = new Date();
+    const dueDate = new Date(deliveryDate);
+    
+    // Check if the delivery date has passed
+    if (dueDate < today) {
+      return "overdue";
+    }
+    
+    // Calculate days until delivery
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 2) {
+      return "in-progress";
+    } else if (diffDays > 2) {
+      return "pending";
+    }
+    
+    return "pending";
+  };
+
+  // Helper function to calculate priority based on delivery date and po_hours
+  const calculatePriority = (deliveryDate: string, poHours: number) => {
+    if (!deliveryDate) return "medium";
+    
+    const today = new Date();
+    const dueDate = new Date(deliveryDate);
+    
+    // Check if the delivery date has passed
+    if (dueDate < today) {
+      return "critical";
+    }
+    
+    // Calculate days until delivery
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 1) {
+      return "critical";
+    } else if (diffDays <= 3) {
+      return "high";
+    } else if (diffDays <= 7) {
+      return "medium";
+    } else {
+      return "low";
+    }
+  };
 
   // Filter tasks based on search and filters
-  const filteredTasks = pmTasks.filter(task => {
+  const filteredTasks = tasks.filter(task => {
     const matchesSearch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
+      task.project_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      task.task_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.client_instruction?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
@@ -96,14 +156,17 @@ export default function PMDashboard() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   const openModal = () => {
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
+  };
+  
+  // Function to handle task added event
+  const handleTaskAdded = () => {
+    fetchTasks(); // Refresh the task list
   };
   
   return (
@@ -114,10 +177,21 @@ export default function PMDashboard() {
           <p className="text-gray-500">Manage projects, teams, and tasks efficiently</p>
         </div>
         <div>
-          <Button variant={'default'} className='bg-blue-600 hover:bg-blue-300 cursor-pointer' onClick={openModal}>Add Task</Button>
+          <Button 
+            variant={'default'} 
+            className='bg-blue-600 hover:bg-blue-300 cursor-pointer' 
+            onClick={openModal}
+          >
+            Add Task
+          </Button>
         </div>
-        <TaskModal isOpen={isModalOpen} onClose={closeModal} />
+        <TaskModal 
+          isOpen={isModalOpen} 
+          onClose={closeModal} 
+          onTaskAdded={handleTaskAdded} 
+        />
       </div>
+      
       {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
@@ -165,26 +239,52 @@ export default function PMDashboard() {
       </Card>
       
       {/* Tasks Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              id={task.id}
-              title={task.title}
-              description={task.description}
-              dueDate={task.dueDate}
-              status={task.status as any}
-              priority={task.priority as any}
-              assignedTo={task.assignedTo}
-            />
-          ))
-        ) : (
-          <div className="col-span-3 py-8 text-center text-gray-500">
-            <p>No tasks found matching your filters.</p>
-          </div>
-        )}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-lg text-gray-700">Loading tasks...</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                id={task.id}
+                title={task.project_name || 'Untitled Project'}
+                description={task.client_instruction || 'No description available'}
+                dueDate={task.delivery_date || new Date().toISOString().split('T')[0]}
+                status={task.status as any}
+                priority={task.priority as any}
+                assignedTo={`Task ID: ${task.task_id}`}
+              />
+            ))
+          ) : (
+            <div className="col-span-3 py-8 text-center text-gray-500">
+              <p>No tasks found matching your filters.</p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Refresh button */}
+      <div className="flex justify-center mt-6">
+        <Button
+          variant="outline"
+          onClick={fetchTasks}
+          className="flex items-center gap-2"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            'Refresh Tasks'
+          )}
+        </Button>
       </div>
     </div>
   );
 }
+
+
+
