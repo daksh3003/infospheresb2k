@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TaskCard } from '@/components/task-card';
 import { 
   Card, 
@@ -22,103 +22,116 @@ import {
   Search, 
   Users, 
   ClipboardCheck, 
-  ShieldCheck 
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { createClient } from '@supabase/supabase-js';
 
-// Mock tasks data
-const allTasks = [
-  {
-    id: "task-1",
-    title: "Review latest code changes",
-    description: "Perform a code review for the new frontend features implemented by the development team.",
-    dueDate: "2025-04-10",
-    status: "pending",
-    priority: "high",
-    assignedTo: "John Doe",
-    type: "qa"
-  },
-  {
-    id: "task-2",
-    title: "Test payment integration",
-    description: "Verify that the payment gateway integration is working correctly with proper error handling and success flows.",
-    dueDate: "2025-04-08",
-    status: "in-progress",
-    priority: "critical",
-    assignedTo: "Alice Smith",
-    type: "qc"
-  },
-  {
-    id: "task-3",
-    title: "Update project timeline",
-    description: "Update the project timeline based on the latest sprint review and adjust resource allocation accordingly.",
-    dueDate: "2025-04-12",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Robert Johnson",
-    type: "pm"
-  },
-  {
-    id: "task-4",
-    title: "Prepare customer demo",
-    description: "Create a demo for the upcoming client meeting showcasing the new features implemented in the latest sprint.",
-    dueDate: "2025-04-05",
-    status: "overdue",
-    priority: "high",
-    assignedTo: "John Doe",
-    type: "pm"
-  },
-  {
-    id: "task-5",
-    title: "Performance testing",
-    description: "Run performance tests on the application to identify bottlenecks and optimize resource usage.",
-    dueDate: "2025-04-15",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Emily Chen",
-    type: "qa"
-  },
-  {
-    id: "task-6",
-    title: "Documentation review",
-    description: "Review and update the API documentation to ensure it matches the current implementation.",
-    dueDate: "2025-04-09",
-    status: "completed",
-    priority: "low",
-    assignedTo: "Alice Smith",
-    type: "qc"
-  },
-  {
-    id: "task-7",
-    title: "Sprint planning",
-    description: "Prepare for the upcoming sprint planning meeting by organizing backlog items and setting priorities.",
-    dueDate: "2025-04-07",
-    status: "completed",
-    priority: "high",
-    assignedTo: "Robert Johnson",
-    type: "pm"
-  },
-  {
-    id: "task-8",
-    title: "Security audit",
-    description: "Conduct a security audit of the application to identify and address potential vulnerabilities.",
-    dueDate: "2025-04-18",
-    status: "pending",
-    priority: "critical",
-    assignedTo: "Emily Chen",
-    type: "qa"
-  }
-];
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+interface ProjectTask {
+  id: string;
+  project_name: string;
+  task_id: string;
+  client_instruction: string;
+  delivery_date: string;
+  process_type: string;
+  serial_number: string;
+  po_hours: number;
+  created_at: string;
+  updated_at: string;
+  completion_status: boolean;
+  status?: "pending" | "in-progress" | "completed" | "overdue";
+  priority?: "low" | "medium" | "high" | "critical";
+  //addition of the type to ensure proper bucketing.
+  type: "pm" | "qc" | "qa"; 
+}
 
 export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Filter tasks based on search and filters
-  const filteredTasks = allTasks.filter(task => {
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const processedTasks = data.map(task => {
+          return {
+            ...task,
+            status: calculateStatus(task.delivery_date, task.completion_status),
+            priority: calculatePriority(task.delivery_date, task.po_hours),
+            type: getTaskType(task.process_type)
+          };
+        });
+        setTasks(processedTasks);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper functions (same as in PM dashboard)
+  const calculateStatus = (deliveryDate: string, isCompleted: boolean) => {
+    if (isCompleted) return "completed";
+    if (!deliveryDate) return "pending";
+    
+    const today = new Date();
+    const dueDate = new Date(deliveryDate);
+    
+    if (dueDate < today) return "overdue";
+    
+    const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays <= 2 ? "in-progress" : "pending";
+  };
+
+  const calculatePriority = (deliveryDate: string, poHours: number) => {
+    if (!deliveryDate) return "medium";
+    
+    const today = new Date();
+    const dueDate = new Date(deliveryDate);
+    
+    if (dueDate < today) return "critical";
+    
+    const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 1) return "critical";
+    if (diffDays <= 3) return "high";
+    if (diffDays <= 7) return "medium";
+    return "low";
+  };
+
+  const getTaskType = (processType: string): "pm" | "qc" | "qa" => {
+    if (!processType) return "pm";
+    const type = processType.toLowerCase();
+    if (type.includes('qc')) return "qc";
+    if (type.includes('qa')) return "qa";
+    return "pm";
+  };
+
+  const filteredTasks = tasks.filter(task => {
     const matchesSearch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
+      task.project_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      task.task_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.client_instruction?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
@@ -128,56 +141,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Welcome to your Dashboard</h1>
+      {/* ... (keep your existing header and filter UI) ... */}
       
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative w-full md:w-2/5">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search tasks..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-4">
+      <Tabs defaultValue="all">
+        <TabsList>
           <TabsTrigger value="all">All Tasks</TabsTrigger>
           <TabsTrigger value="pm">
             <Users className="h-4 w-4 mr-2" />
@@ -193,103 +160,82 @@ export default function DashboardPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="mt-0">
+        {/* All Tasks Tab */}
+        <TabsContent value="all">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => (
+            {filteredTasks.map(task => (
+              <TaskCard
+                key={task.id}
+                id={task.id}
+                title={task.project_name || 'Untitled Project'}
+                description={task.client_instruction || 'No description available'}
+                dueDate={task.delivery_date}
+                status={task.status || "pending"}
+                priority={task.priority || "medium"}
+                assignedTo={`Task ID: ${task.task_id || 'N/A'}`}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* PM Tasks Tab */}
+        <TabsContent value="pm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTasks
+              .map(task => (
                 <TaskCard
                   key={task.id}
                   id={task.id}
-                  title={task.title}
-                  description={task.description}
-                  dueDate={task.dueDate}
-                  status={task.status as any}
-                  priority={task.priority as any}
-                  assignedTo={task.assignedTo}
+                  title={task.project_name || 'Untitled Project'}
+                  description={task.client_instruction || 'No description available'}
+                  dueDate={task.delivery_date}
+                  status={task.status || "pending"}
+                  priority={task.priority || "medium"}
+                  assignedTo={`Task ID: ${task.task_id || 'N/A'}`}
                 />
-              ))
-            ) : (
-              <div className="col-span-3 py-8 text-center text-gray-500">
-                <p>No tasks found matching your filters.</p>
-              </div>
-            )}
+              ))}
           </div>
         </TabsContent>
         
-        <TabsContent value="pm" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.filter(task => task.type === 'pm').length > 0 ? (
-              filteredTasks
-                .filter(task => task.type === 'pm')
-                .map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    id={task.id}
-                    title={task.title}
-                    description={task.description}
-                    dueDate={task.dueDate}
-                    status={task.status as any}
-                    priority={task.priority as any}
-                    assignedTo={task.assignedTo}
-                  />
-                ))
-            ) : (
-              <div className="col-span-3 py-8 text-center text-gray-500">
-                <p>No Project Manager tasks found matching your filters.</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="qc" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.filter(task => task.type === 'qc').length > 0 ? (
-              filteredTasks
-                .filter(task => task.type === 'qc')
-                .map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    id={task.id}
-                    title={task.title}
-                    description={task.description}
-                    dueDate={task.dueDate}
-                    status={task.status as any}
-                    priority={task.priority as any}
-                    assignedTo={task.assignedTo}
-                  />
-                ))
-            ) : (
-              <div className="col-span-3 py-8 text-center text-gray-500">
-                <p>No QC Team tasks found matching your filters.</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="qa" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.filter(task => task.type === 'qa').length > 0 ? (
-              filteredTasks
-                .filter(task => task.type === 'qa')
-                .map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    id={task.id}
-                    title={task.title}
-                    description={task.description}
-                    dueDate={task.dueDate}
-                    status={task.status as any}
-                    priority={task.priority as any}
-                    assignedTo={task.assignedTo}
-                  />
-                ))
-            ) : (
-              <div className="col-span-3 py-8 text-center text-gray-500">
-                <p>No QA Team tasks found matching your filters.</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
+        {/* QC Tasks Tab  as of now set to PM , but will be shifted as soon as we include the flow concept.*/  }
+      <TabsContent value="qc">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTasks
+            .filter(task => task.type === "qc")
+            .map(task => (
+              <TaskCard
+                key={task.id}
+                id={task.id}
+                title={task.project_name || 'Untitled Project'}
+                description={task.client_instruction || 'No description available'}
+                dueDate={task.delivery_date}
+                status={task.status || "pending"}
+                priority={task.priority || "medium"}
+                assignedTo={`Task ID: ${task.task_id || 'N/A'}`}
+              />
+            ))}
+        </div>
+      </TabsContent>
+
+      {/* QA Tasks Tab */}
+      <TabsContent value="qa">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTasks
+            .filter(task => task.type === "qa")
+            .map(task => (
+              <TaskCard
+                key={task.id}
+                id={task.id}
+                title={task.project_name || 'Untitled Project'}
+                description={task.client_instruction || 'No description available'}
+                dueDate={task.delivery_date}
+                status={task.status || "pending"}
+                priority={task.priority || "medium"}
+                assignedTo={`Task ID: ${task.task_id || 'N/A'}`}
+              />
+            ))}
+        </div>
+      </TabsContent>
       </Tabs>
     </div>
   );

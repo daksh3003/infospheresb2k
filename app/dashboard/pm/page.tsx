@@ -60,27 +60,33 @@ export default function PMDashboard() {
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('*')
         .order('created_at', { ascending: false });
-
+  
+      // Only show completed tasks when that filter is explicitly selected
+      if (statusFilter === 'completed') {
+        query = query.eq('completion_status', true);
+      } else {
+        // For all other status filters, only show incomplete tasks
+        query = query.eq('completion_status', false);
+      }
+  
+      const { data, error } = await query;
+  
       if (error) {
         console.error('Error fetching tasks:', error);
         return;
       }
-
+  
       if (data) {
-        // Process the data to add status and priority
-        const processedTasks = data.map(task => {
-          return {
-            ...task,
-            // Calculate status based on delivery date
-            status: calculateStatus(task.delivery_date),
-            // Calculate priority based on delivery date and po_hours
-            priority: calculatePriority(task.delivery_date, task.po_hours)
-          };
-        });
+        const processedTasks = data.map(task => ({
+          ...task,
+          // Force status to "completed" if completion_status is true
+          status: task.completion_status ? 'completed' : calculateStatus(task.delivery_date),
+          priority: calculatePriority(task.delivery_date, task.po_hours)
+        }));
         
         setTasks(processedTasks);
       }

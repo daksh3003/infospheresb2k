@@ -1,6 +1,7 @@
 // app/tasks/[taskId]/page.tsx
 "use client";
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
+import { createClient } from "@supabase/supabase-js";
 import React, { useState, Fragment, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -16,6 +17,11 @@ import {
   CheckCircle2,
   X
 } from 'lucide-react';
+
+// Initialize Supabase client (add near top of file)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Define types for our task data
 interface Attachment {
@@ -180,6 +186,41 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
       e.target.value = '';
     }
   };
+
+  //handling the remove file case.
+  const handleRemoveFile = (index: number) => {
+    const newFiles = [...uploadedFiles];
+    newFiles.splice(index, 1);
+    setUploadedFiles(newFiles);
+  };
+
+  const handleSubmitComment = () => {
+    if (newComment.trim() === '') return;
+
+    const now = new Date();
+    const formattedTime = now.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    //to add new comment in the given task.
+    const newCommentObj : Comment = {
+      id: task.comments.length + 1,
+      user: task.assignedTo.name,
+      avatar: task.assignedTo.avatar,
+      text: newComment,
+      timestamp: formattedTime,
+    };
+
+    //to add a table called as tasks to handle the comments.
+    //tasks.comments.push(newCommentObj);
+
+    setNewComment('');
+  };
   
   // Handle task actions
   const handleStartTask = () => {
@@ -195,26 +236,34 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
     }
   };
   
-  const handleCompleteTask = () => {
-    setStatus('completed');
-    setProgress(100);
-    setShowCompleteDialog(false);
-  };
-  
-  const handleRemoveFile = (index: number) => {
-    const updatedFiles = [...uploadedFiles];
-    updatedFiles.splice(index, 1);
-    setUploadedFiles(updatedFiles);
-  };
-  
-  const handleSubmitComment = () => {
-    if (newComment.trim()) {
-      // In a real app, you would send this to your API
-      console.log("New comment:", newComment);
-      setNewComment('');
+  const handleCompleteTask = async () => {
+    try {
+      // Update the task in Supabase
+      const { error } = await supabase
+        .from('projects')
+        .update({ completion_status: true })
+        .eq('id', taskId);
+        
+      if (error) {
+        console.error('Error updating task:', error);
+        return;
+      }
+      
+      // Update local state
+      setStatus('completed');
+      setProgress(100);
+      setShowCompleteDialog(false);
+      
+      // Navigate back to dashboard after brief delay
+      setTimeout(() => {
+        router.push('/dashboard/pm');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error completing task:', error);
     }
   };
-  
+
   // Status UI helpers
   const getStatusBadge = () => {
     switch (status) {
@@ -269,6 +318,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
       </button>
     );
   };
+
+
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -540,6 +591,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
                     <img src={comment.avatar} alt={comment.user} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1">
+
                     <div className="flex justify-between">
                       <span className="font-medium">{comment.user}</span>
                       <span className="text-xs text-gray-500">{comment.timestamp}</span>
