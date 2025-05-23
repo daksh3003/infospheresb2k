@@ -16,23 +16,27 @@ import {
   ArrowRight, 
   AlertCircle, 
   CheckCircle2, 
-  CircleDashed 
+  CircleDashed,
+  AlertTriangle,
+  Send 
 } from "lucide-react";
-import { useRouter } from "next/navigation"; // Import the router
+import { useRouter } from "next/navigation"; 
 
-type TaskStatus = "pending" | "in-progress" | "completed" | "overdue";
+type TaskStatus = "pending" | "in-progress" | "completed" | "overdue" | "returned";
 type TaskPriority = "low" | "medium" | "high" | "critical";
 
 interface TaskCardProps {
-  id: string;
+  id: string; 
   title: string;
   description: string;
   dueDate: string;
-  status: TaskStatus;
+  status: TaskStatus; 
   priority: TaskPriority;
   assignedTo?: string;
   assignedAvatar?: string;
-  onClick?: () => void;
+  onClick?: () => void; 
+  onSendToQC?: (taskIterationId: string) => void; 
+  isActionableByPM?: boolean; 
 }
 
 export function TaskCard({
@@ -44,92 +48,112 @@ export function TaskCard({
   priority,
   assignedTo,
   assignedAvatar,
-  onClick
+  onClick,
+  onSendToQC,         
+  isActionableByPM    
 }: TaskCardProps) {
-  const router = useRouter(); // Initialize the router
+  const router = useRouter(); 
 
-  // Status icon mapping
   const statusIcon = {
     "pending": <CircleDashed className="h-4 w-4" />,
     "in-progress": <Clock className="h-4 w-4" />,
     "completed": <CheckCircle2 className="h-4 w-4" />,
-    "overdue": <AlertCircle className="h-4 w-4" />
+    "overdue": <AlertCircle className="h-4 w-4 text-red-600" />,
+    "returned": <AlertTriangle className="h-4 w-4 text-yellow-600" /> 
   };
 
-  // Status color mapping
   const statusColor = {
-    "pending": "bg-gray-100 text-gray-800",
-    "in-progress": "bg-blue-100 text-blue-800",
-    "completed": "bg-green-100 text-green-800",
-    "overdue": "bg-red-100 text-red-800"
+    "pending": "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+    "in-progress": "bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100",
+    "completed": "bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100",
+    "overdue": "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
+    "returned": "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50"
   };
 
-  // Priority color mapping
   const priorityColor = {
-    "low": "bg-gray-100 text-gray-800",
-    "medium": "bg-yellow-100 text-yellow-800",
-    "high": "bg-orange-100 text-orange-800",
-    "critical": "bg-red-100 text-red-800"
+    "low": "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+    "medium": "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50",
+    "high": "bg-orange-100 text-orange-800 dark:bg-orange-600 dark:text-orange-50",
+    "critical": "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100"
   };
 
-  // Handle view details click - navigate to task detail page
   const handleViewDetails = () => {
     if (onClick) {
-      // Use custom onClick handler if provided
       onClick();
     } else {
-      // Otherwise use default routing
-      router.push(`/tasks/${id}`);
+      router.push(`/tasks/${id}`); 
+    }
+  };
+
+  const handleSendToQCClick = () => {
+    if (onSendToQC) {
+      onSendToQC(id); 
     }
   };
 
   return (
-    <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="h-full flex flex-col overflow-hidden hover:shadow-lg transition-shadow dark:bg-gray-800 dark:border-gray-700">
       <CardHeader className="pb-3">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <Badge className={priorityColor[priority]}>
-            {priority.charAt(0).toUpperCase() + priority.slice(1)} Priority
+            {priority.charAt(0).toUpperCase() + priority.slice(1)}
           </Badge>
-          <Badge className={statusColor[status]} variant="outline">
+          <Badge className={`${statusColor[status] || statusColor["pending"]}`} variant="outline">
             <span className="flex items-center">
-              {statusIcon[status]}
-              <span className="ml-1 capitalize">{status}</span>
+              {statusIcon[status] || statusIcon["pending"]}
+              <span className="ml-1.5 capitalize">{status}</span>
             </span>
           </Badge>
         </div>
-        <CardTitle className="mt-2 text-lg">{title}</CardTitle>
-        <CardDescription className="line-clamp-2">{description}</CardDescription>
+        <CardTitle className="mt-2 text-lg dark:text-gray-100">{title}</CardTitle>
+        <CardDescription className="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{description}</CardDescription>
       </CardHeader>
-      <CardContent className="text-sm pb-2">
-        <div className="flex items-center text-gray-500 mb-2">
-          <Calendar className="h-4 w-4 mr-2" />
-          <span>Due: {new Date(dueDate).toLocaleDateString()}</span>
+      <CardContent className="text-sm pb-2 flex-grow">
+        <div className="flex items-center text-gray-500 dark:text-gray-400 mb-2">
+          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+          <span>Due: {new Date(dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
         </div>
         {assignedTo && (
           <div className="flex items-center justify-between mt-3">
-            <span className="text-gray-500 text-sm">Assigned to:</span>
+            <span className="text-gray-500 dark:text-gray-400 text-xs">Info:</span> 
             <div className="flex items-center">
-              <div className="w-6 h-6 rounded-full bg-blue-800 text-white flex items-center justify-center text-xs mr-2 overflow-hidden">
-                {assignedAvatar ? (
-                  <img src={assignedAvatar} alt={assignedTo} className="w-full h-full object-cover" />
-                ) : (
-                  assignedTo.charAt(0).toUpperCase()
-                )}
-              </div>
-              <span className="text-sm font-medium">{assignedTo}</span>
+              {assignedAvatar && (
+                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center justify-center text-xs mr-2 overflow-hidden">
+                    <img src={assignedAvatar} alt={assignedTo.substring(0, 15)} className="w-full h-full object-cover" />
+                </div>
+              )}
+              {!assignedAvatar && assignedTo.length <=2 && (
+                 <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 overflow-hidden">
+                    {assignedTo.charAt(0).toUpperCase()}
+                 </div>
+              )}
+              <span className="text-sm font-medium dark:text-gray-300 truncate" title={assignedTo}>{assignedTo}</span>
             </div>
           </div>
         )}
       </CardContent>
-      <CardFooter className="pt-2">
+      {/* MODIFIED CardFooter to be a flex column with a gap */}
+      <CardFooter className="pt-2 border-t dark:border-gray-700 flex flex-col space-y-2"> {}
         <Button 
           variant="ghost" 
-          className="w-full justify-between text-blue-800 hover:text-blue-900 hover:bg-blue-50"
+          className="w-full justify-between text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-gray-700"
           onClick={handleViewDetails}
         >
           <span>View Details</span>
           <ArrowRight className="h-4 w-4" />
         </Button>
+
+        {isActionableByPM && onSendToQC && ( 
+          <Button
+            variant="default" 
+            size="sm"
+            className="w-full bg-green-500 hover:bg-green-600 text-white dark:bg-green-600 dark:hover:bg-green-700" 
+            onClick={handleSendToQCClick}
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Send to QC
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

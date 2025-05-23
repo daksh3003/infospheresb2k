@@ -1,4 +1,4 @@
-// app/dashboard/pm/page.tsx
+// // app/dashboard/pm/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,164 +19,183 @@ import {
 } from "@/components/ui/select";
 import { Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import TaskModal from '@/components/taskModal';
+import TaskModal from '@/components/taskModal'; 
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Define interface for Task data from Supabase
-interface Task {
-  id: string;
-  project_name: string;
-  task_id: string;
-  client_instruction: string;
-  delivery_date: string;
-  process_type: string;
-  serial_number: string;
-  po_hours: number;
-  created_at: string;
-  updated_at: string;
-  // Additional fields for status and priority calculation
-  status?: "pending" | "in-progress" | "completed" | "overdue";
-  priority?: "low" | "medium" | "high" | "critical";
+interface PMDashboardTask {
+  // From projects table
+  projectId: string; 
+  projectName: string; 
+  projectTaskId: string | null; 
+  clientInstruction: string | null; 
+  deliveryDate: string | null; 
+  processType: string | null; 
+  poHours: number | null; 
+  isProjectOverallComplete: boolean; 
+
+  // From task_iterations table
+  taskIterationId: string; 
+  iterationNumber: number; 
+  currentStage: string; 
+  statusFlag: string | null;
+  iterationNotes: string | null; 
+  
+  // From file_versions table (via task_iterations.current_file_version_id)
+  currentFileVersionId: string | null; 
+  currentFileName: string | null; 
+  
+
+  calculatedStatus: "pending" | "in-progress" | "completed" | "overdue" | "returned";
+  calculatedPriority: "low" | "medium" | "high" | "critical";
+
+  displayId: string; 
+  displayTitle: string;
+  displayDescription: string | null;
+  displayDueDate: string | null;
+  displayAssignedTo: string; 
 }
+
+
+type DisplayStatus = "pending" | "in-progress" | "completed" | "overdue" | "returned";
+
 
 export default function PMDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<PMDashboardTask[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch tasks from Supabase
+  // Fetch tasks from Supabase when component mounts or filters change
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [statusFilter]); 
 
   const fetchTasks = async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
-        .from('projects')
-        .select('*')
-        .order('created_at', { ascending: false });
-  
-      // Only show completed tasks when that filter is explicitly selected
-      if (statusFilter === 'completed') {
-        query = query.eq('completion_status', true);
-      } else {
-        // For all other status filters, only show incomplete tasks
-        query = query.eq('completion_status', false);
-      }
-  
-      const { data, error } = await query;
-  
-      if (error) {
-        console.error('Error fetching tasks:', error);
-        return;
-      }
-  
-      if (data) {
-        const processedTasks = data.map(task => ({
-          ...task,
-          // Force status to "completed" if completion_status is true
-          status: task.completion_status ? 'completed' : calculateStatus(task.delivery_date),
-          priority: calculatePriority(task.delivery_date, task.po_hours)
-        }));
-        
-        setTasks(processedTasks);
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  setIsLoading(true);
+  console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
+  try {
+    const { data, error } = await supabase
+      .from('task_iterations')
+      .select(`
+        id, 
+        current_stage, 
+        status_flag, 
+        project_id, 
+        iteration_number, 
+        projects ( project_name, id ) // Minimal join
+      `)
+      .eq('current_stage', 'PM'); 
 
+    console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data); 
+    if (error && Object.keys(error).length > 0) { 
+      console.error("[PM Dashboard] ULTRA SIMPLE Query Error:", JSON.stringify(error, null, 2));
+      setTasks([]);
+    } else if (data && data.length > 0) {
+      console.log(`[PM Dashboard] ULTRA SIMPLE Query successful, ${data.length} items found. First item:`, data[0]);
+      const dummyTasks: PMDashboardTask[] = data.map((item: any) => ({
+        taskIterationId: item.id,
+        projectName: item.projects?.project_name || `Project (ID: ${item.project_id?.substring(0,8)})` || "No Project Name",
+        currentStage: item.current_stage,
+        calculatedStatus: 'pending', 
+        projectId: item.projects?.id || item.project_id || "dummy_project_id",
+        projectTaskId: null, clientInstruction: null, deliveryDate: null, processType: null, poHours: null, isProjectOverallComplete: false,
+        iterationNumber: item.iteration_number || 1, statusFlag: item.status_flag || null, iterationNotes: null, currentFileVersionId: null, currentFileName: null,
+        calculatedPriority: 'medium', displayId: item.id, displayTitle: item.projects?.project_name || `Project (ID: ${item.project_id?.substring(0,8)})` || "No Project Name",
+        displayDescription: `Status Flag: ${item.status_flag || 'N/A'}`, displayDueDate: null, displayAssignedTo: `Iter: ${item.iteration_number || 'N/A'}`
+      }));
+      setTasks(dummyTasks);
+    } else {
+      console.log("[PM Dashboard] ULTRA SIMPLE Query returned no data or data array is empty. Error (if any):", error ? JSON.stringify(error, null, 2) : "No error object");
+      setTasks([]);
+    }
+  } catch (err: any) {
+    console.error('[PM Dashboard] Catch block error during ULTRA SIMPLE fetch:', err.message ? err.message : err, err);
+    setTasks([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
   // Helper function to calculate status based on delivery date
-  const calculateStatus = (deliveryDate: string) => {
+  const calculateStatus = (deliveryDate: string | null | undefined): DisplayStatus => {
     if (!deliveryDate) return "pending";
     
     const today = new Date();
+    today.setHours(0,0,0,0); // Normalize to start of day
     const dueDate = new Date(deliveryDate);
-    
-    // Check if the delivery date has passed
-    if (dueDate < today) {
+    const normalizedDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+    if (normalizedDueDate < today) {
       return "overdue";
     }
     
-    // Calculate days until delivery
-    const diffTime = dueDate.getTime() - today.getTime();
+    const diffTime = normalizedDueDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays <= 2) {
       return "in-progress";
-    } else if (diffDays > 2) {
-      return "pending";
     }
-    
     return "pending";
   };
 
-  // Helper function to calculate priority based on delivery date and po_hours
-  const calculatePriority = (deliveryDate: string, poHours: number) => {
-    if (!deliveryDate) return "medium";
+  const calculatePriority = (deliveryDate: string | null | undefined, poHours: number): "low" | "medium" | "high" | "critical" => {
+    if (!deliveryDate) return "medium"; 
     
     const today = new Date();
+    today.setHours(0,0,0,0);
     const dueDate = new Date(deliveryDate);
-    
-    // Check if the delivery date has passed
-    if (dueDate < today) {
+    const normalizedDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+    if (normalizedDueDate < today) {
       return "critical";
     }
     
-    // Calculate days until delivery
-    const diffTime = dueDate.getTime() - today.getTime();
+    const diffTime = normalizedDueDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays <= 1) {
+    if (poHours > 20 && diffDays <= 7) return "critical"; 
+    if (poHours > 10 && diffDays <= 3) return "critical";
+
+    if (diffDays <= 1) { 
       return "critical";
-    } else if (diffDays <= 3) {
+    } else if (diffDays <= 3) { 
       return "high";
-    } else if (diffDays <= 7) {
+    } else if (diffDays <= 7) { 
       return "medium";
-    } else {
-      return "low";
     }
+    if (poHours > 15) return "medium";
+    return "low";
   };
 
-  // Filter tasks based on search and filters
   const filteredTasks = tasks.filter(task => {
+    const searchQueryLower = searchQuery.toLowerCase();
     const matchesSearch = 
-      task.project_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      task.task_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.client_instruction?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+      task.projectName?.toLowerCase().includes(searchQueryLower) || 
+      task.projectTaskId?.toLowerCase().includes(searchQueryLower) ||
+      task.clientInstruction?.toLowerCase().includes(searchQueryLower) ||
+      task.iterationNotes?.toLowerCase().includes(searchQueryLower) ||
+      task.currentFileName?.toLowerCase().includes(searchQueryLower);
+
+    const matchesStatus = statusFilter === 'all' || task.calculatedStatus === statusFilter;
+    const matchesPriority = priorityFilter === 'all' || task.calculatedPriority === priorityFilter;
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const openModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
   
-  // Function to handle task added event
   const handleTaskAdded = () => {
-    fetchTasks(); // Refresh the task list
+    fetchTasks(); 
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6"> {}
       <div className='flex items-center justify-between w-full mb-6'>
         <div>
           <h1 className="text-2xl font-bold">Project Manager Dashboard</h1>
@@ -185,18 +204,19 @@ export default function PMDashboard() {
         <div>
           <Button 
             variant={'default'} 
-            className='bg-blue-600 hover:bg-blue-300 cursor-pointer' 
+            className='bg-blue-600 hover:bg-blue-700 text-white' 
             onClick={openModal}
           >
             Add Task
           </Button>
         </div>
-        <TaskModal 
+        {}
+      </div>
+      <TaskModal 
           isOpen={isModalOpen} 
           onClose={closeModal} 
           onTaskAdded={handleTaskAdded} 
         />
-      </div>
       
       {/* Filters */}
       <Card>
@@ -206,9 +226,9 @@ export default function PMDashboard() {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative w-full md:w-2/5">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" /> {/* Centered icon */}
               <Input
-                placeholder="Search tasks..."
+                placeholder="Search by Project, Task ID, Instruction, Notes, File..."
                 className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -223,8 +243,9 @@ export default function PMDashboard() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="completed">Completed (Overall)</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="returned">Returned for Correction</SelectItem> 
               </SelectContent>
             </Select>
             
@@ -253,20 +274,20 @@ export default function PMDashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTasks.length > 0 ? (
-            filteredTasks.map((task) => (
+            filteredTasks.map((task) => ( 
               <TaskCard
-                key={task.id}
-                id={task.id}
-                title={task.project_name || 'Untitled Project'}
-                description={task.client_instruction || 'No description available'}
-                dueDate={task.delivery_date || new Date().toISOString().split('T')[0]}
-                status={task.status as any}
-                priority={task.priority as any}
-                assignedTo={`Task ID: ${task.task_id}`}
+                key={task.taskIterationId} 
+                id={task.taskIterationId}   
+                title={task.projectName}
+                description={task.displayDescription || 'No details'}
+                dueDate={task.deliveryDate || new Date().toISOString().split('T')[0]} 
+                status={task.calculatedStatus} 
+                priority={task.calculatedPriority}
+                assignedTo={task.displayAssignedTo} 
               />
             ))
           ) : (
-            <div className="col-span-3 py-8 text-center text-gray-500">
+            <div className="col-span-1 md:col-span-2 lg:col-span-3 py-8 text-center text-gray-500"> {/* Ensure full width */}
               <p>No tasks found matching your filters.</p>
             </div>
           )}
@@ -291,6 +312,3 @@ export default function PMDashboard() {
     </div>
   );
 }
-
-
-
