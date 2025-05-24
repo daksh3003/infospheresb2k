@@ -15,7 +15,8 @@ import {
   Share2, 
   Upload,
   CheckCircle2,
-  X
+  X,
+  ArrowBigUpDashIcon
 } from 'lucide-react';
 
 // Initialize Supabase client (add near top of file)
@@ -461,6 +462,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ taskId: s
                 <CheckCircle2 className="h-4 w-4" /> Mark Complete
               </button>
             )}
+            <button 
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                
+              >
+                <ArrowBigUpDashIcon className="h-4 w-4" /> Send To QC
+              </button>
           </div>
         </div>
       </div>
