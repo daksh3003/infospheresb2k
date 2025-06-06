@@ -236,8 +236,6 @@
 //   );
 // }
 
-
-
 // app/dashboard/layout.tsx
 "use client";
 
@@ -274,39 +272,41 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  
+
   const handleLogout = async () => {
     try {
       // Get the current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) {
         // Update the most recent session with logout time
         const { error: sessionError } = await supabase
-          .from('user_sessions')
-          .update({ 
-            logout_time: new Date().toISOString() 
+          .from("user_sessions")
+          .update({
+            logout_time: new Date().toISOString(),
           })
-          .eq('user_id', user.id)
-          .is('logout_time', null);
-        
+          .eq("user_id", user.id)
+          .is("logout_time", null);
+
         if (sessionError) {
           console.error("Error updating logout time:", sessionError);
         }
       }
-      
+
       // Sign out from Supabase auth
       await supabase.auth.signOut();
-      
+
       // Clear local storage and session storage as in your original code
-      localStorage.removeItem('userRole');
+      localStorage.removeItem("userRole");
       sessionStorage.clear();
       // Navigate to login page
-      router.push('/auth/login');
+      router.push("/auth/login");
     } catch (error) {
       console.error("Error during logout:", error);
       // If there's an error, still redirect to login page
-      router.push('/auth/login');
+      router.push("/auth/login");
     }
   };
 
@@ -341,7 +341,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Bell size={20} />
           </button>
           <Avatar>
-            <AvatarImage src="/avatars/user.png" />
+            {/* <AvatarImage src="/avatars/user.png" /> */}
             <AvatarFallback className="bg-blue-800 text-white">
               US
             </AvatarFallback>
@@ -425,7 +425,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <div className="flex items-center">
                     <Avatar className="h-8 w-8 mr-3">
-                      <AvatarImage src="/avatars/user.png" />
+                      {/* <AvatarImage src="/avatars/user.png" /> */}
                       <AvatarFallback className="bg-blue-900 text-white">
                         US
                       </AvatarFallback>
@@ -443,8 +443,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-500" onClick={handleLogout} >
-                  <LogOut className="mr-2 h-4 w-4"/>
+                <DropdownMenuItem
+                  className="text-red-500"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -469,7 +472,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   className="relative h-8 w-8 rounded-full"
                 >
                   <Avatar>
-                    <AvatarImage src="/avatars/user.png" alt="User" />
+                    {/* <AvatarImage src="/avatars/user.png" alt="User" /> */}
                     <AvatarFallback className="bg-blue-800 text-white">
                       US
                     </AvatarFallback>
@@ -482,8 +485,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-500" onClick={handleLogout} >
-                  <LogOut className="mr-2 h-4 w-4"/>
+                <DropdownMenuItem
+                  className="text-red-500"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

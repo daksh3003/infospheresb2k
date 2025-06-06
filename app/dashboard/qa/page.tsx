@@ -1,106 +1,121 @@
 // app/dashboard/qa/page.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { TaskCard } from '@/components/task-card';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { useState } from "react";
+import { TaskCard } from "@/components/task-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Search } from 'lucide-react';
+import { Search } from "lucide-react";
+import { useEffect } from "react";
 
 // Mock QA-specific tasks
 const qaTasks = [
   {
     id: "task-1",
     title: "Review latest code changes",
-    description: "Perform a code review for the new frontend features implemented by the development team.",
+    description:
+      "Perform a code review for the new frontend features implemented by the development team.",
     dueDate: "2025-04-10",
     status: "pending",
     priority: "high",
-    assignedTo: "John Doe"
+    assignedTo: "John Doe",
   },
   {
     id: "task-5",
     title: "Performance testing",
-    description: "Run performance tests on the application to identify bottlenecks and optimize resource usage.",
+    description:
+      "Run performance tests on the application to identify bottlenecks and optimize resource usage.",
     dueDate: "2025-04-15",
     status: "pending",
     priority: "medium",
-    assignedTo: "Emily Chen"
+    assignedTo: "Emily Chen",
   },
   {
     id: "task-8",
     title: "Security audit",
-    description: "Conduct a security audit of the application to identify and address potential vulnerabilities.",
+    description:
+      "Conduct a security audit of the application to identify and address potential vulnerabilities.",
     dueDate: "2025-04-18",
     status: "pending",
     priority: "critical",
-    assignedTo: "Emily Chen"
+    assignedTo: "Emily Chen",
   },
   {
     id: "task-16",
     title: "User acceptance testing",
-    description: "Coordinate UAT with stakeholders to ensure the application meets business requirements.",
+    description:
+      "Coordinate UAT with stakeholders to ensure the application meets business requirements.",
     dueDate: "2025-04-22",
     status: "pending",
     priority: "high",
-    assignedTo: "John Doe"
+    assignedTo: "John Doe",
   },
   {
     id: "task-17",
     title: "Regression testing",
-    description: "Perform regression testing to ensure new changes don't negatively impact existing functionality.",
+    description:
+      "Perform regression testing to ensure new changes don't negatively impact existing functionality.",
     dueDate: "2025-04-09",
     status: "in-progress",
     priority: "medium",
-    assignedTo: "Emily Chen"
+    assignedTo: "Emily Chen",
   },
   {
     id: "task-18",
     title: "Bug verification",
-    description: "Verify fixed bugs to ensure they have been properly resolved before release.",
+    description:
+      "Verify fixed bugs to ensure they have been properly resolved before release.",
     dueDate: "2025-04-07",
     status: "completed",
     priority: "high",
-    assignedTo: "David Lee"
-  }
+    assignedTo: "David Lee",
+  },
 ];
 
 export default function QADashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null; // Prevents hydration mismatch
+  }
 
   // Filter tasks based on search and filters
-  const filteredTasks = qaTasks.filter(task => {
-    const matchesSearch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredTasks = qaTasks.filter((task) => {
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-    
+
+    const matchesStatus =
+      statusFilter === "all" || task.status === statusFilter;
+    const matchesPriority =
+      priorityFilter === "all" || task.priority === priorityFilter;
+
     return matchesSearch && matchesStatus && matchesPriority;
   });
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Quality Assurance Dashboard</h1>
-        <p className="text-gray-500">Track bugs, monitor quality, and ensure application readiness</p>
+        <p className="text-gray-500">
+          Track bugs, monitor quality, and ensure application readiness
+        </p>
       </div>
-      
+
       {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
@@ -117,7 +132,7 @@ export default function QADashboard() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by status" />
@@ -130,7 +145,7 @@ export default function QADashboard() {
                 <SelectItem value="overdue">Overdue</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by priority" />
@@ -146,7 +161,7 @@ export default function QADashboard() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Tasks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTasks.length > 0 ? (

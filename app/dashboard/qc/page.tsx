@@ -1,106 +1,119 @@
 // app/dashboard/qc/page.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { TaskCard } from '@/components/task-card';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { use, useEffect, useState } from "react";
+import { TaskCard } from "@/components/task-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Search } from 'lucide-react';
+import { Search } from "lucide-react";
 
 // Mock QC-specific tasks
 const qcTasks = [
   {
     id: "task-2",
     title: "Test payment integration",
-    description: "Verify that the payment gateway integration is working correctly with proper error handling and success flows.",
+    description:
+      "Verify that the payment gateway integration is working correctly with proper error handling and success flows.",
     dueDate: "2025-04-08",
     status: "in-progress",
     priority: "critical",
-    assignedTo: "Alice Smith"
+    assignedTo: "Alice Smith",
   },
   {
     id: "task-6",
     title: "Documentation review",
-    description: "Review and update the API documentation to ensure it matches the current implementation.",
+    description:
+      "Review and update the API documentation to ensure it matches the current implementation.",
     dueDate: "2025-04-09",
     status: "completed",
     priority: "low",
-    assignedTo: "Alice Smith"
+    assignedTo: "Alice Smith",
   },
   {
     id: "task-12",
     title: "Database schema validation",
-    description: "Validate the new database schema changes against the requirements document.",
+    description:
+      "Validate the new database schema changes against the requirements document.",
     dueDate: "2025-04-10",
     status: "pending",
     priority: "medium",
-    assignedTo: "Tom Richards"
+    assignedTo: "Tom Richards",
   },
   {
     id: "task-13",
     title: "UI component library testing",
-    description: "Test all components in the new UI component library for consistency and accessibility compliance.",
+    description:
+      "Test all components in the new UI component library for consistency and accessibility compliance.",
     dueDate: "2025-04-15",
     status: "pending",
     priority: "high",
-    assignedTo: "Alice Smith"
+    assignedTo: "Alice Smith",
   },
   {
     id: "task-14",
     title: "API integration tests",
-    description: "Write and execute integration tests for the newly developed APIs to ensure they meet specifications.",
+    description:
+      "Write and execute integration tests for the newly developed APIs to ensure they meet specifications.",
     dueDate: "2025-04-07",
     status: "overdue",
     priority: "high",
-    assignedTo: "Michael Brown"
+    assignedTo: "Michael Brown",
   },
   {
     id: "task-15",
     title: "Code review for frontend modules",
-    description: "Perform a detailed code review of the frontend modules developed in the last sprint.",
+    description:
+      "Perform a detailed code review of the frontend modules developed in the last sprint.",
     dueDate: "2025-04-11",
     status: "in-progress",
     priority: "medium",
-    assignedTo: "Tom Richards"
-  }
+    assignedTo: "Tom Richards",
+  },
 ];
 
 export default function QCDashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Ensure the component is mounted before rendering
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null; // Prevents hydration mismatch
+  }
 
   // Filter tasks based on search and filters
-  const filteredTasks = qcTasks.filter(task => {
-    const matchesSearch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredTasks = qcTasks.filter((task) => {
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-    
+
+    const matchesStatus =
+      statusFilter === "all" || task.status === statusFilter;
+    const matchesPriority =
+      priorityFilter === "all" || task.priority === priorityFilter;
+
     return matchesSearch && matchesStatus && matchesPriority;
   });
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Quality Control Dashboard</h1>
         <p className="text-gray-500">Monitor, test, and ensure code quality</p>
       </div>
-      
+
       {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
@@ -117,7 +130,7 @@ export default function QCDashboard() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by status" />
@@ -130,7 +143,7 @@ export default function QCDashboard() {
                 <SelectItem value="overdue">Overdue</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-full md:w-1/3">
                 <SelectValue placeholder="Filter by priority" />
@@ -146,7 +159,7 @@ export default function QCDashboard() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Tasks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTasks.length > 0 ? (
