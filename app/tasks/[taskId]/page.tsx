@@ -1,8 +1,7 @@
 // app/tasks/[taskId]/page.tsx
 "use client";
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
-import { createClient } from "@supabase/supabase-js";
-import React, { useState, Fragment, use } from "react";
+import React, { useState, Fragment, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -18,11 +17,7 @@ import {
   X,
   ArrowBigUpDashIcon,
 } from "lucide-react";
-
-// Initialize Supabase client (add near top of file)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from "@/utils/supabase";
 
 // Define types for our task data
 interface Attachment {
@@ -51,10 +46,10 @@ interface TaskData {
   description: string;
   priority: string;
   dueDate: string;
-  assignedTo: Person;
-  createdBy: Person;
-  attachments: Attachment[];
-  comments: Comment[];
+  assignedTo: "";
+  createdBy: "";
+  attachments: [];
+  comments: [];
   createdDate: string;
   estimatedHours: number;
   tags: string[];
@@ -65,52 +60,6 @@ interface UploadedFile {
   size: string;
   type?: string;
 }
-
-// Mock task data - in a real app, you would fetch this based on the taskId parameter
-const getTaskData = (taskId: string) => {
-  // This would be replaced with an API call in a real application
-  return {
-    id: taskId,
-    title: "Quarterly Financial Report Analysis",
-    description:
-      "Complete the in-depth analysis of Q1 financial performance and prepare insights for stakeholder presentation.",
-    priority: "high",
-    dueDate: "2025-04-25",
-    assignedTo: {
-      name: "Alex Morgan",
-      avatar: "/api/placeholder/32/32",
-      department: "Finance",
-    },
-    createdBy: {
-      name: "Jamie Rodriguez",
-      avatar: "/api/placeholder/32/32",
-      department: "Operations",
-    },
-    attachments: [
-      { id: 1, name: "Q1_Financial_Data.xlsx", size: "2.3 MB" },
-      { id: 2, name: "Analysis_Template.docx", size: "1.1 MB" },
-    ],
-    comments: [
-      {
-        id: 1,
-        user: "Jamie Rodriguez",
-        avatar: "/api/placeholder/32/32",
-        text: "Please ensure you use the updated template for this analysis.",
-        timestamp: "2025-04-14 10:23 AM",
-      },
-      {
-        id: 2,
-        user: "Alex Morgan",
-        avatar: "/api/placeholder/32/32",
-        text: "I'll review the requirements and get started today.",
-        timestamp: "2025-04-14 11:05 AM",
-      },
-    ],
-    createdDate: "2025-04-14",
-    estimatedHours: 8,
-    tags: ["finance", "quarterly", "analysis"],
-  };
-};
 
 // Simple dialog component
 const Dialog = ({
@@ -165,7 +114,6 @@ export default function TaskDetailPage({
   const { taskId } = use(params);
 
   const router = useRouter();
-  const task: TaskData = getTaskData(taskId);
 
   const [status, setStatus] = useState<
     "pending" | "in-progress" | "paused" | "completed"
@@ -178,6 +126,68 @@ export default function TaskDetailPage({
   // Dialog states
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [task, setTask] = useState<any>({
+    id: taskId,
+    title: "",
+    description: "",
+    priority: "low",
+    dueDate: "",
+    assignedTo: "",
+    createdBy: "",
+    attachments: [],
+    comments: [],
+    createdDate: "",
+    estimatedHours: 0,
+    tags: [],
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Step 1: Fetch files first
+      const { data: fileData, error: fileError } = await supabase.storage
+        .from("task-files")
+        .list(taskId);
+
+      if (fileError) {
+        console.error("Error fetching task files:", fileError);
+        return;
+      }
+
+      // Set attachments after getting files
+      setTask((prev: any) => ({
+        ...prev,
+        attachments: fileData.map((file) => file.name),
+      }));
+
+      // Step 2: Then fetch task data
+      const { data: taskData, error: taskError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", taskId)
+        .single();
+
+      if (taskError) {
+        console.error("Error fetching task data:", taskError);
+        return;
+      }
+
+      // Merge in the task data without touching attachments
+      setTask((prev: any) => ({
+        ...prev,
+        id: taskData.id,
+        title: taskData.project_name,
+        description: taskData.description,
+        priority: taskData.priority || "low",
+        dueDate: taskData.due_date || "",
+        assignedTo: "",
+        createdBy: "",
+        comments: taskData.comments || [],
+        createdDate: taskData.created_at,
+      }));
+    };
+
+    fetchData();
+  }, [taskId]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,18 +224,6 @@ export default function TaskDetailPage({
       minute: "2-digit",
       hour12: true,
     });
-
-    //to add new comment in the given task.
-    const newCommentObj: Comment = {
-      id: task.comments.length + 1,
-      user: task.assignedTo.name,
-      avatar: task.assignedTo.avatar,
-      text: newComment,
-      timestamp: formattedTime,
-    };
-
-    //to add a table called as tasks to handle the comments.
-    //tasks.comments.push(newCommentObj);
 
     setNewComment("");
   };
@@ -354,6 +352,28 @@ export default function TaskDetailPage({
     );
   };
 
+  const handleDownload = async (fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("task-files")
+        .download(`${taskId}/${fileName}`);
+
+      if (error) throw new Error("Download failed: " + error.message);
+      if (!data) throw new Error("No file data found");
+
+      const url = URL.createObjectURL(data); // `data` is a Blob
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || "downloaded_file";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Back button and task ID */}
@@ -419,14 +439,14 @@ export default function TaskDetailPage({
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">Tags</h3>
                 <div className="flex flex-wrap gap-2">
-                  {task.tags.map((tag, index) => (
+                  {/* {task.tags.map((tag, index) => (
                     <span
                       key={index}
                       className="px-2 py-1 text-xs bg-gray-100 rounded-full"
                     >
                       {tag}
                     </span>
-                  ))}
+                  ))} */}
                 </div>
               </div>
             </div>
@@ -571,19 +591,21 @@ export default function TaskDetailPage({
             </div>
             <div className="p-6">
               <div className="space-y-2">
-                {task.attachments.map((file) => (
+                {task.attachments.map((item: string) => (
                   <div
-                    key={file.id}
+                    key={item}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
                     <div className="flex items-center gap-3">
                       <Paperclip className="h-4 w-4 text-gray-500" />
                       <div>
-                        <p className="font-medium">{file.name}</p>
-                        <p className="text-xs text-gray-500">{file.size}</p>
+                        <p className="font-medium">{item.split("/").pop()}</p>
                       </div>
                     </div>
-                    <button className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900">
+                    <button
+                      onClick={() => handleDownload(item)}
+                      className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                    >
                       <DownloadCloud className="h-4 w-4" /> Download
                     </button>
                   </div>
@@ -671,7 +693,7 @@ export default function TaskDetailPage({
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {task.comments.map((comment) => (
+              {/* {task.comments.map((comment) => (
                 <div
                   key={comment.id}
                   className="flex gap-3 p-3 rounded-md bg-gray-50"
@@ -693,7 +715,7 @@ export default function TaskDetailPage({
                     <p className="text-sm mt-1">{comment.text}</p>
                   </div>
                 </div>
-              ))}
+              ))} */}
             </div>
 
             {/* Add comment form */}

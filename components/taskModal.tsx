@@ -1,7 +1,14 @@
 // File: components/task-card.tsx
 
 import React, { useState } from "react";
-import { X, ChevronRight, ChevronLeft, Save, Upload } from "lucide-react";
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Save,
+  Upload,
+  Languages,
+} from "lucide-react";
 
 import { supabase } from "../utils/supabase";
 
@@ -103,14 +110,37 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     try {
       // 1. Insert into 'projects' table
+      const file_names = [];
+      if (formData.uploadedFiles && formData.uploadedFiles.length > 0) {
+        for (let i = 0; i < formData.uploadedFiles.length; i++) {
+          file_names.push(formData.uploadedFiles[i].name);
+        }
+      }
+
       const projectCoreData = {
         project_name: formData.projectName,
         task_id: formData.taskId,
-        client_instruction: formData.clientInstruction,
-        delivery_date: formData.deliveryDate || null,
-        process_type: formData.processType,
-        language: formData.language,
         po_hours: parseFloat(formData.estimatePOHours) || 0,
+        mail_instruction: formData.mailInstruction,
+        file_count: formData.numberOfFiles,
+        page_count: formData.numberOfPages,
+        language: formData.language,
+        process_type: formData.processType,
+        delivery_date: formData.deliveryDate || null,
+        serial_number: formData.serialNumber,
+        client_instruction: formData.clientInstruction,
+        list_of_files: file_names,
+        reference_file_name: formData.fileName || null,
+        estimated_hours_ocr: parseFloat(formData.estimatedHoursOCR) || 0,
+        estimated_hours_qc: parseFloat(formData.estimatedHoursQC) || 0,
+        estimated_hours_qa: parseFloat(formData.estimatedHoursQA) || 0,
+        created_by: currentUserId,
+        created_at: new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
+        updated_at: new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
       };
 
       const { data: projectData, error: projectError } = await supabase
@@ -141,22 +171,32 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
       // 2. Handle File Upload
       if (formData.uploadedFiles && formData.uploadedFiles.length > 0) {
-        const fileToUpload = formData.uploadedFiles[0];
-        originalFileName = fileToUpload.name;
-        fileSize = fileToUpload.size;
-        const filePathInStorage = `${newProjectId}/${Date.now()}_${originalFileName}`;
+        for (let i = 0; i < formData.uploadedFiles.length; i++) {
+          const fileToUpload = formData.uploadedFiles[i];
+          originalFileName = fileToUpload.name;
+          fileSize = fileToUpload.size;
+          let date = new Date().toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+          });
+          date = date.replaceAll("/", "-");
+          const filePathInStorage = `${newProjectId}/${date}_${originalFileName}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("task-files")
-          .upload(filePathInStorage, fileToUpload);
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("task-files")
+              .upload(filePathInStorage, fileToUpload, {
+                contentType: fileToUpload.type,
+                upsert: true,
+              });
 
-        if (uploadError) {
-          console.error("Error uploading file:", uploadError);
-          alert(`Failed to upload file: ${uploadError.message}`);
-          setIsSubmitting(false);
-          return;
+          if (uploadError) {
+            console.error("Error uploading file:", uploadError);
+            alert(`Failed to upload file: ${uploadError.message}`);
+            setIsSubmitting(false);
+            return;
+          }
+          uploadedFilePath = uploadData.path;
         }
-        uploadedFilePath = uploadData.path;
       }
 
       // 3. Insert into 'file_versions' table (if a file was uploaded)
@@ -491,7 +531,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 />
               </div>
 
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700">
                   List of Files (Informational)
                 </label>
@@ -503,7 +543,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter file names separated by commas"
                 />
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">

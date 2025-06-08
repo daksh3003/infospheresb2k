@@ -16,11 +16,6 @@ import { Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
 import { supabase } from "@/utils/supabase"; // Adjust the import path as needed
-// import { createClient } from "@supabase/supabase-js";
-
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-// const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-// const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface PMDashboardTask {
   // From projects table
@@ -91,7 +86,7 @@ export default function PMDashboard() {
 
   const fetchTasks = async () => {
     setIsLoading(true);
-    console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
+    // console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
     try {
       const { data, error } = await supabase
         .from("task_iterations")
@@ -344,7 +339,7 @@ export default function PMDashboard() {
             filteredTasks.map((task) => (
               <TaskCard
                 key={task.taskIterationId}
-                id={task.taskIterationId}
+                id={task.projectId}
                 title={task.projectName}
                 description={task.displayDescription || "No details"}
                 dueDate={
