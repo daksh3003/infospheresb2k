@@ -127,6 +127,8 @@ export default function TaskDetailPage({
   // Dialog states
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showSubmitToButton, setShowSubmitToButton] = useState(false);
+  const [SubmitTo, setSubmitTo] = useState("QC");
   const [task, setTask] = useState<any>({
     id: taskId,
     title: "",
@@ -259,6 +261,30 @@ export default function TaskDetailPage({
         return;
       }
 
+      const { data, error: iterationError } = await supabase
+        .from("task_iterations")
+        .select("sent_by")
+        .eq("project_id", taskId)
+        .single();
+
+      if (iterationError) {
+        console.error("Error fetching task iteration:", iterationError);
+        return;
+      }
+
+      if (data.sent_by === "PM") {
+        setSubmitTo("Send to QC");
+        setShowSubmitToButton(true);
+      } else if (data.sent_by === "QC") {
+        setSubmitTo("Send to QA");
+        setShowSubmitToButton(true);
+      } else if (data.sent_by === "QA") {
+        setSubmitTo("Send to Delivery");
+        setShowSubmitToButton(true);
+      } else {
+        setShowSubmitToButton(false);
+      }
+
       // Update local state
       setStatus("completed");
       setProgress(100);
@@ -273,10 +299,10 @@ export default function TaskDetailPage({
     }
   };
 
-  const handleSendToQC = async () => {
+  const handleSendTo = async () => {
     const { data, error } = await supabase
       .from("task_iterations")
-      .update({ current_stage: "QC" })
+      .update({ current_stage: "QC", sent_by: "Processor" })
       .eq("project_id", taskId);
 
     if (error) {
@@ -631,12 +657,20 @@ export default function TaskDetailPage({
                 <CheckCircle2 className="h-4 w-4" /> Mark Complete
               </button>
             )}
-            <button
+            {showSubmitToButton && status === "completed" && (
+              <button
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                onClick={() => handleSendTo()}
+              >
+                <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
+              </button>
+            )}
+            {/* <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               onClick={handleSendToQC}
             >
               <ArrowBigUpDashIcon className="h-4 w-4" /> Send To QC
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

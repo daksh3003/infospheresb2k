@@ -235,9 +235,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         iteration_number: 1,
         current_stage: "PM",
         status_flag: "pending_action",
-        current_file_version_id: newFileId,
-        assigned_to_pm_user_id: currentUserId,
+        // current_file_version_id: newFileId,
+        assigned_to_processor_user_id: currentUserId,
         notes: "Task created.",
+        sent_by: "PM",
       };
 
       const { data: iteration, error: iterationError } = await supabase
