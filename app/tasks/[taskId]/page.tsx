@@ -3,6 +3,7 @@
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, Fragment, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 import {
   Calendar,
   Clock,
@@ -119,7 +120,7 @@ export default function TaskDetailPage({
     "pending" | "in-progress" | "paused" | "completed"
   >("pending");
   const [progress, setProgress] = useState<number>(0);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
 
@@ -192,11 +193,13 @@ export default function TaskDetailPage({
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).map((file) => ({
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        type: file.type,
-      }));
+      // const newFiles = Array.from(e.target.files).map((file) => ({
+      //   name: file.name,
+      //   size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+      //   type: file.type,
+      // }));
+
+      const newFiles = Array.from(e.target.files).map((file) => file);
 
       setUploadedFiles([...uploadedFiles, ...newFiles]);
 
@@ -243,6 +246,7 @@ export default function TaskDetailPage({
   };
 
   const handleCompleteTask = async () => {
+    console.log("Completing task:", taskId);
     try {
       // Update the task in Supabase
       const { error } = await supabase
@@ -261,11 +265,42 @@ export default function TaskDetailPage({
       setShowCompleteDialog(false);
 
       // Navigate back to dashboard after brief delay
-      setTimeout(() => {
-        router.push("/dashboard/pm");
-      }, 1500);
+      // setTimeout(() => {
+      //   router.push("/dashboard/pm");
+      // }, 1500);
     } catch (error) {
       console.error("Error completing task:", error);
+    }
+  };
+
+  const handleSendToQC = async () => {
+    const { data, error } = await supabase
+      .from("task_iterations")
+      .update({ current_stage: "QC" })
+      .eq("project_id", taskId);
+
+    if (error) {
+      console.error("Error updating task iteration:", error);
+      toast("Failed to send task to QC", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    if (status !== "completed") {
+      toast("Task not completed", {
+        type: "error",
+        position: "top-right",
+      });
+    } else {
+      toast("Task sent to QC", {
+        type: "success",
+        position: "top-right",
+      });
+      setTimeout(() => {
+        router.push(`/dashboard/pm`);
+      }, 4000);
     }
   };
 
@@ -371,6 +406,57 @@ export default function TaskDetailPage({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading file:", error);
+    }
+  };
+
+  const handleSubmitFileUpload = async () => {
+    if (!taskId) {
+      alert("Task ID is not available.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("task_iterations")
+      .select("current_stage")
+      .eq("project_id", taskId)
+      .single();
+    console.log("Task Iteration Data:", data);
+    if (error) {
+      console.error("Error fetching task iteration data:", error);
+      return;
+    }
+
+    if (uploadedFiles.length === 0) {
+      alert("Please select files to upload.");
+      return;
+    }
+    try {
+      uploadedFiles.map(async (file) => {
+        let date = new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        });
+        date = date.replaceAll("/", "-");
+
+        const filePath = `${data.current_stage}_${taskId}/${date}_${file.name}`;
+
+        const { data: StoreFiles, error } = await supabase.storage
+          .from("processor-files")
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: true,
+          });
+        if (error) {
+          console.error("Error uploading file:", error);
+          return;
+        }
+      });
+      toast("All files uploaded successfully!", {
+        type: "success",
+        position: "top-right",
+      });
+      setUploadedFiles([]);
+    } catch (error) {
+      console.error("Error uploading files:", error);
     }
   };
 
@@ -545,7 +631,10 @@ export default function TaskDetailPage({
                 <CheckCircle2 className="h-4 w-4" /> Mark Complete
               </button>
             )}
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={handleSendToQC}
+            >
               <ArrowBigUpDashIcon className="h-4 w-4" /> Send To QC
             </button>
           </div>
@@ -675,7 +764,10 @@ export default function TaskDetailPage({
               )}
             </div>
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto"
+                onClick={handleSubmitFileUpload}
+              >
                 Submit Files
               </button>
             </div>
