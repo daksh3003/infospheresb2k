@@ -1,6 +1,6 @@
 // File: components/task-card.tsx
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   X,
   ChevronRight,
@@ -33,7 +33,7 @@ interface FormData {
   deliveryDate: string;
   estimatePOHours: string;
   listOfFiles: string;
-  uploadedFiles: FileList | null;
+  selectedFiles: File[];
 
   // Form2 Fields
   fileName: string;
@@ -41,6 +41,26 @@ interface FormData {
   estimatedHoursQC: string;
   estimatedHoursQA: string;
 }
+
+type FormRefs = {
+  serialNumber: React.RefObject<HTMLInputElement | null>;
+  taskId: React.RefObject<HTMLInputElement | null>;
+  clientInstruction: React.RefObject<HTMLTextAreaElement | null>;
+  mailInstruction: React.RefObject<HTMLTextAreaElement | null>;
+  projectName: React.RefObject<HTMLInputElement | null>;
+  numberOfFiles: React.RefObject<HTMLInputElement | null>;
+  numberOfPages: React.RefObject<HTMLInputElement | null>;
+  language: React.RefObject<HTMLInputElement | null>;
+  processType: React.RefObject<HTMLSelectElement | null>;
+  deliveryDate: React.RefObject<HTMLInputElement | null>;
+  estimatePOHours: React.RefObject<HTMLInputElement | null>;
+  selectedFiles: React.RefObject<HTMLInputElement | null>;
+  listOfFiles: React.RefObject<HTMLInputElement | null>;
+  fileName: React.RefObject<HTMLInputElement | null>;
+  estimatedHoursOCR: React.RefObject<HTMLInputElement | null>;
+  estimatedHoursQC: React.RefObject<HTMLInputElement | null>;
+  estimatedHoursQA: React.RefObject<HTMLInputElement | null>;
+};
 
 const TaskModal: React.FC<TaskModalProps> = ({
   isOpen,
@@ -63,7 +83,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     deliveryDate: "",
     estimatePOHours: "",
     listOfFiles: "",
-    uploadedFiles: null,
+    selectedFiles: [],
 
     // Form2 Fields
     fileName: "",
@@ -72,19 +92,123 @@ const TaskModal: React.FC<TaskModalProps> = ({
     estimatedHoursQA: "",
   });
 
-  if (!isOpen) return null;
+  // Create refs for each input field
+  const refs: FormRefs = {
+    serialNumber: useRef<HTMLInputElement | null>(null),
+    taskId: useRef<HTMLInputElement | null>(null),
+    clientInstruction: useRef<HTMLTextAreaElement | null>(null),
+    mailInstruction: useRef<HTMLTextAreaElement | null>(null),
+    projectName: useRef<HTMLInputElement | null>(null),
+    numberOfFiles: useRef<HTMLInputElement | null>(null),
+    numberOfPages: useRef<HTMLInputElement | null>(null),
+    language: useRef<HTMLInputElement | null>(null),
+    processType: useRef<HTMLSelectElement | null>(null),
+    deliveryDate: useRef<HTMLInputElement | null>(null),
+    estimatePOHours: useRef<HTMLInputElement | null>(null),
+    selectedFiles: useRef<HTMLInputElement | null>(null),
+    listOfFiles: useRef<HTMLInputElement | null>(null),
+    // Form 2 refs
+    fileName: useRef<HTMLInputElement | null>(null),
+    estimatedHoursOCR: useRef<HTMLInputElement | null>(null),
+    estimatedHoursQC: useRef<HTMLInputElement | null>(null),
+    estimatedHoursQA: useRef<HTMLInputElement | null>(null),
+  };
+
+  // Define the order of fields for each form
+  const form1Fields = [
+    'serialNumber',
+    'taskId',
+    'clientInstruction',
+    'mailInstruction',
+    'projectName',
+    'numberOfFiles',
+    'numberOfPages',
+    'language',
+    'processType',
+    'deliveryDate',
+    'estimatePOHours'  // This will be the last field for Enter key navigation
+  ];
+
+  const form2Fields = [
+    'fileName',
+    'estimatedHoursOCR',
+    'estimatedHoursQC',
+    'estimatedHoursQA',
+  ];
+
+  const handleKeyDown = (e: React.KeyboardEvent, currentField: keyof FormRefs) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent form submission
+      
+      // Don't proceed if we're at estimatePOHours - let user handle file upload manually
+      if (currentField === 'estimatePOHours') {
+        return;
+      }
+
+      const currentFormFields = currentPage === 1 ? form1Fields : form2Fields;
+      const currentIndex = currentFormFields.indexOf(currentField);
+      
+      // If it's the last field in Form 2, submit the form
+      if (currentPage === 2 && currentIndex === currentFormFields.length - 1) {
+        handleSubmit(e as any);
+        return;
+      }
+
+      // Move to next field
+      const nextField = currentFormFields[currentIndex + 1] as keyof FormRefs;
+      if (nextField && refs[nextField]?.current) {
+        refs[nextField].current?.focus();
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    console.log('Files selected:', files);
+    if (files) {
+      // Add new files to existing selection
+      const newFiles = Array.from(files);
+      console.log('New files to add:', newFiles.map(f => f.name));
+      setFormData(prevData => {
+        const updatedData = {
+          ...prevData,
+          selectedFiles: [...prevData.selectedFiles, ...newFiles],
+          numberOfFiles: (prevData.selectedFiles.length + files.length).toString()
+        };
+        console.log('Updated selected files:', updatedData.selectedFiles.map(f => f.name));
+        return updatedData;
+      });
+    }
+    // Reset the input value so the same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    console.log('Removing file at index:', indexToRemove);
+    setFormData(prevData => {
+      const updatedFiles = prevData.selectedFiles.filter((_, index) => index !== indexToRemove);
+      console.log('Files after removal:', updatedFiles.map(f => f.name));
+      return {
+        ...prevData,
+        selectedFiles: updatedFiles,
+        numberOfFiles: updatedFiles.length.toString()
+      };
+    });
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setFormData((prevData) => ({
       ...prevData,
-      [name]: type === "file" ? (e.target as HTMLInputElement).files : value,
+      [name]: value,
     }));
   };
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,8 +222,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       currentUserId = user?.id || null;
       if (
         !currentUserId &&
-        formData.uploadedFiles &&
-        formData.uploadedFiles.length > 0
+        formData.selectedFiles.length > 0
       ) {
         console.warn(
           "Attempting to upload file without an authenticated user. This might be restricted by RLS."
@@ -112,9 +235,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
     try {
       // 1. Insert into 'projects' table
       const file_names = [];
-      if (formData.uploadedFiles && formData.uploadedFiles.length > 0) {
-        for (let i = 0; i < formData.uploadedFiles.length; i++) {
-          file_names.push(formData.uploadedFiles[i].name);
+      if (formData.selectedFiles.length > 0) {
+        for (let i = 0; i < formData.selectedFiles.length; i++) {
+          file_names.push(formData.selectedFiles[i].name);
         }
       }
 
@@ -171,9 +294,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
       let fileSize: number | null = null;
 
       // 2. Handle File Upload
-      if (formData.uploadedFiles && formData.uploadedFiles.length > 0) {
-        for (let i = 0; i < formData.uploadedFiles.length; i++) {
-          const fileToUpload = formData.uploadedFiles[i];
+      if (formData.selectedFiles.length > 0) {
+        for (let i = 0; i < formData.selectedFiles.length; i++) {
+          const fileToUpload = formData.selectedFiles[i];
           originalFileName = fileToUpload.name;
           fileSize = fileToUpload.size;
           let date = new Date().toLocaleString("en-IN", {
@@ -324,7 +447,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         deliveryDate: "",
         estimatePOHours: "",
         listOfFiles: "",
-        uploadedFiles: null,
+        selectedFiles: [],
         fileName: "",
         estimatedHoursOCR: "",
         estimatedHoursQC: "",
@@ -386,10 +509,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Serial Number
                   </label>
                   <input
+                    ref={refs.serialNumber}
                     type="text"
                     name="serialNumber"
                     value={formData.serialNumber}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'serialNumber')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -399,10 +524,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Task ID
                   </label>
                   <input
+                    ref={refs.taskId}
                     type="text"
                     name="taskId"
                     value={formData.taskId}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'taskId')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -413,9 +540,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Client Instruction
                 </label>
                 <textarea
+                  ref={refs.clientInstruction}
                   name="clientInstruction"
                   value={formData.clientInstruction}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'clientInstruction')}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -426,9 +555,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Mail Instruction
                 </label>
                 <textarea
+                  ref={refs.mailInstruction}
                   name="mailInstruction"
                   value={formData.mailInstruction}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'mailInstruction')}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -440,10 +571,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Project Name
                   </label>
                   <input
+                    ref={refs.projectName}
                     type="text"
                     name="projectName"
                     value={formData.projectName}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'projectName')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -454,10 +587,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Number of Files (Informational)
                   </label>
                   <input
+                    ref={refs.numberOfFiles}
                     type="number"
                     name="numberOfFiles"
                     value={formData.numberOfFiles}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'numberOfFiles')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -469,10 +604,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Number of Pages
                   </label>
                   <input
+                    ref={refs.numberOfPages}
                     type="number"
                     name="numberOfPages"
                     value={formData.numberOfPages}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'numberOfPages')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -482,10 +619,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     Language
                   </label>
                   <input
+                    ref={refs.language}
                     type="text"
                     name="language"
                     value={formData.language}
                     onChange={handleChange}
+                    onKeyDown={(e) => handleKeyDown(e, 'language')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -496,9 +635,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Process Type
                 </label>
                 <select
+                  ref={refs.processType}
                   name="processType"
                   value={formData.processType}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'processType')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select Process Type</option>
@@ -515,10 +656,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Delivery Date
                 </label>
                 <input
+                  ref={refs.deliveryDate}
                   type="date"
                   name="deliveryDate"
                   value={formData.deliveryDate}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'deliveryDate')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -528,10 +671,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Estimate PO Hours
                 </label>
                 <input
+                  ref={refs.estimatePOHours}
                   type="number"
                   name="estimatePOHours"
                   value={formData.estimatePOHours}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'estimatePOHours')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -566,17 +711,43 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     </div>
                     <input
                       type="file"
-                      name="uploadedFiles"
-                      onChange={handleChange}
+                      name="selectedFiles"
+                      onChange={handleFileChange}
                       className="hidden"
                       multiple
                     />
                   </label>
                 </div>
-                {formData.uploadedFiles && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {formData.uploadedFiles.length} file(s) selected
-                  </p>
+                {formData.selectedFiles.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Selected Files ({formData.selectedFiles.length}):
+                    </p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {formData.selectedFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                              {file.name}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              ({(file.size / 1024).toFixed(2)} KB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -610,10 +781,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Reference File Name (Optional)
                 </label>
                 <input
+                  ref={refs.fileName}
                   type="text"
                   name="fileName"
                   value={formData.fileName}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'fileName')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -623,10 +796,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Estimated Working Hours for OCR
                 </label>
                 <input
+                  ref={refs.estimatedHoursOCR}
                   type="number"
                   name="estimatedHoursOCR"
                   value={formData.estimatedHoursOCR}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursOCR')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -637,10 +812,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Estimated Working Hours for QC
                 </label>
                 <input
+                  ref={refs.estimatedHoursQC}
                   type="number"
                   name="estimatedHoursQC"
                   value={formData.estimatedHoursQC}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursQC')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -651,10 +828,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   Estimated Working Hours for QA
                 </label>
                 <input
+                  ref={refs.estimatedHoursQA}
                   type="number"
                   name="estimatedHoursQA"
                   value={formData.estimatedHoursQA}
                   onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursQA')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
