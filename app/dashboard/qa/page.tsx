@@ -14,79 +14,106 @@ import {
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
 import { useEffect } from "react";
-
-// Mock QA-specific tasks
-const qaTasks = [
-  {
-    id: "task-1",
-    title: "Review latest code changes",
-    description:
-      "Perform a code review for the new frontend features implemented by the development team.",
-    dueDate: "2025-04-10",
-    status: "pending",
-    priority: "high",
-    assignedTo: "John Doe",
-  },
-  {
-    id: "task-5",
-    title: "Performance testing",
-    description:
-      "Run performance tests on the application to identify bottlenecks and optimize resource usage.",
-    dueDate: "2025-04-15",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Emily Chen",
-  },
-  {
-    id: "task-8",
-    title: "Security audit",
-    description:
-      "Conduct a security audit of the application to identify and address potential vulnerabilities.",
-    dueDate: "2025-04-18",
-    status: "pending",
-    priority: "critical",
-    assignedTo: "Emily Chen",
-  },
-  {
-    id: "task-16",
-    title: "User acceptance testing",
-    description:
-      "Coordinate UAT with stakeholders to ensure the application meets business requirements.",
-    dueDate: "2025-04-22",
-    status: "pending",
-    priority: "high",
-    assignedTo: "John Doe",
-  },
-  {
-    id: "task-17",
-    title: "Regression testing",
-    description:
-      "Perform regression testing to ensure new changes don't negatively impact existing functionality.",
-    dueDate: "2025-04-09",
-    status: "in-progress",
-    priority: "medium",
-    assignedTo: "Emily Chen",
-  },
-  {
-    id: "task-18",
-    title: "Bug verification",
-    description:
-      "Verify fixed bugs to ensure they have been properly resolved before release.",
-    dueDate: "2025-04-07",
-    status: "completed",
-    priority: "high",
-    assignedTo: "David Lee",
-  },
-];
+import { supabase } from "@/utils/supabase";
 
 export default function QADashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  const fetchTasks = async () => {
+    // setIsLoading(true);
+    // console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
+    try {
+      const { data, error } = await supabase
+        .from("task_iterations")
+        .select(
+          `
+          id, 
+          current_stage, 
+          status_flag, 
+          project_id, 
+          iteration_number, 
+          projects ( project_name, id ) // Minimal join
+        `
+        )
+        .eq("current_stage", "QA");
+
+      console.log(data);
+
+      console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data);
+      if (error && Object.keys(error).length > 0) {
+        console.error(
+          "[PM Dashboard] ULTRA SIMPLE Query Error:",
+          JSON.stringify(error, null, 2)
+        );
+        setTasks([]);
+      } else if (data && data.length > 0) {
+        console.log(
+          `[PM Dashboard] ULTRA SIMPLE Query successful, ${data.length} items found. First item:`,
+          data[0]
+        );
+        const dummyTasks: any[] = data.map((item: any) => ({
+          status: "pending", // Default status, can be updated later
+          priority: "medium", // Default priority, can be updated later
+          dueDate: "2025-04-11", // Default due date, can be updated later
+          assignedTo: `QC Iteration ${item.iteration_number || "N/A"}`, // Default assigned to, can be updated later
+          description: "No Decription ",
+          title: "No Project Name",
+          taskIterationId: item.id,
+          projectName:
+            item.projects?.project_name ||
+            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            "No Project Name",
+          currentStage: item.current_stage,
+          calculatedStatus: "pending",
+          projectId: item.projects?.id || item.project_id || "dummy_project_id",
+          projectTaskId: null,
+          clientInstruction: null,
+          deliveryDate: null,
+          processType: null,
+          poHours: null,
+          isProjectOverallComplete: false,
+          iterationNumber: item.iteration_number || 1,
+          statusFlag: item.status_flag || null,
+          iterationNotes: null,
+          currentFileVersionId: null,
+          currentFileName: null,
+          calculatedPriority: "medium",
+          displayId: item.id,
+          displayTitle:
+            item.projects?.project_name ||
+            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            "No Project Name",
+          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+          displayDueDate: null,
+          displayAssignedTo: `Iter: ${item.iteration_number || "N/A"}`,
+        }));
+        setTasks(dummyTasks);
+      } else {
+        console.log(
+          "[PM Dashboard] ULTRA SIMPLE Query returned no data or data array is empty. Error (if any):",
+          error ? JSON.stringify(error, null, 2) : "No error object"
+        );
+        setTasks([]);
+      }
+    } catch (err: any) {
+      console.error(
+        "[PM Dashboard] Catch block error during ULTRA SIMPLE fetch:",
+        err.message ? err.message : err,
+        err
+      );
+      setTasks([]);
+    } finally {
+      // setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+    fetchTasks();
   }, []);
 
   if (!mounted) {
@@ -94,7 +121,7 @@ export default function QADashboard() {
   }
 
   // Filter tasks based on search and filters
-  const filteredTasks = qaTasks.filter((task) => {
+  const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -167,9 +194,9 @@ export default function QADashboard() {
         {filteredTasks.length > 0 ? (
           filteredTasks.map((task) => (
             <TaskCard
-              key={task.id}
-              id={task.id}
-              title={task.title}
+              key={task.taskIterationId}
+              id={task.projectId}
+              title={task.projectName}
               description={task.description}
               dueDate={task.dueDate}
               status={task.status as any}

@@ -305,7 +305,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         "Iteration ID:",
         newTaskIterationId
       );
-      
+
       toast("Task successfully added ", {
         type: "success",
         position: "top-right",

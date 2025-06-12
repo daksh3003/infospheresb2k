@@ -20,48 +20,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 
-// Define types for our task data
-interface Attachment {
-  id: number;
-  name: string;
-  size: string;
-}
-
-interface Comment {
-  id: number;
-  user: string;
-  avatar: string;
-  text: string;
-  timestamp: string;
-}
-
-interface Person {
-  name: string;
-  avatar: string;
-  department: string;
-}
-
-interface TaskData {
-  id: string;
-  title: string;
-  description: string;
-  priority: string;
-  dueDate: string;
-  assignedTo: "";
-  createdBy: "";
-  attachments: [];
-  comments: [];
-  createdDate: string;
-  estimatedHours: number;
-  tags: string[];
-}
-
-interface UploadedFile {
-  name: string;
-  size: string;
-  type?: string;
-}
-
 // Simple dialog component
 const Dialog = ({
   isOpen,
@@ -120,13 +78,12 @@ export default function TaskDetailPage({
     "pending" | "in-progress" | "paused" | "completed"
   >("pending");
   const [progress, setProgress] = useState<number>(0);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [filesToBeUploaded, setfilesToBeUploaded] = useState<File[]>([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
-  const [processorUploadedFiles, setProcessorUploadedFiles] = useState<
-    string[] | null
-  >([]);
+  const [uploadedFiles, setuploadedFiles] = useState<string[] | null>([]);
   const [currentStage, setCurrentStage] = useState<string>("");
+  const [sentBy, setSentBy] = useState<string>("");
 
   // Dialog states
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
@@ -148,12 +105,14 @@ export default function TaskDetailPage({
     tags: [],
   });
 
+  const [PMFiles, setPMFiles] = useState<string[]>([]);
+
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files).map((file) => file);
 
-      setUploadedFiles([...uploadedFiles, ...newFiles]);
+      setfilesToBeUploaded([...filesToBeUploaded, ...newFiles]);
 
       // Reset file input
       e.target.value = "";
@@ -162,9 +121,9 @@ export default function TaskDetailPage({
 
   //handling the remove file case.
   const handleRemoveFile = (index: number) => {
-    const newFiles = [...uploadedFiles];
+    const newFiles = [...filesToBeUploaded];
     newFiles.splice(index, 1);
-    setUploadedFiles(newFiles);
+    setfilesToBeUploaded(newFiles);
   };
 
   const handleSubmitComment = () => {
@@ -222,18 +181,54 @@ export default function TaskDetailPage({
         return;
       }
 
+      if (filesToBeUploaded && filesToBeUploaded.length > 0) {
+        toast("Failed to complete task. Files are added but not uploaded", {
+          type: "warning",
+          position: "top-right",
+        });
+
+        return;
+      }
+
       if (data.sent_by === "PM") {
         setSubmitTo("Send to QC");
         setShowSubmitToButton(true);
-      } else if (data.sent_by === "QC") {
+      } else if (
+        data.sent_by === "Processor" &&
+        currentStage === "PM" &&
+        uploadedFiles?.length === 0
+      ) {
         setSubmitTo("Send to QA");
         setShowSubmitToButton(true);
-      } else if (data.sent_by === "QA") {
+      } else if (
+        data.sent_by === "Processor" &&
+        currentStage === "PM" &&
+        uploadedFiles &&
+        uploadedFiles.length > 0
+      ) {
+        setSubmitTo("Send to Processor Team");
+        setShowSubmitToButton(true);
+      } else if (
+        data.sent_by === "QC" &&
+        currentStage === "QA" &&
+        uploadedFiles?.length === 0
+      ) {
         setSubmitTo("Send to Delivery");
+        setShowSubmitToButton(true);
+      } else if (
+        data.sent_by === "QC" &&
+        currentStage === "QA" &&
+        uploadedFiles &&
+        uploadedFiles.length > 0
+      ) {
+        setSubmitTo("Send to Processor Team");
         setShowSubmitToButton(true);
       } else {
         setShowSubmitToButton(false);
       }
+
+      setSentBy(data.sent_by);
+      // console.log(data.sent_by);
 
       // Update local state
       setStatus("completed");
@@ -250,9 +245,40 @@ export default function TaskDetailPage({
   };
 
   const handleSendTo = async () => {
+    let next_current_stage = "";
+    let next_sent_by = "";
+
+    // console.log(currentStage, sentBy);
+
+    if (SubmitTo === "Send to QC") {
+      next_current_stage = "QC";
+      next_sent_by = "Processor";
+    } else if (SubmitTo === "Send to QA" && currentStage === "Processor") {
+      next_current_stage = "QA";
+      next_sent_by = "Processor";
+    } else if (SubmitTo === "Send to QA" && currentStage === "QC") {
+      next_current_stage = "QA";
+      next_sent_by = "QC";
+    } else if (SubmitTo === "Send to Processor Team" && currentStage === "QC") {
+      next_current_stage = "Processor";
+      next_sent_by = "QC";
+    } else if (SubmitTo === "Send to Processor Team" && currentStage === "QA") {
+      next_current_stage = "Processor";
+      next_sent_by = "QA";
+    } else if (
+      SubmitTo === "Send to Delivery" &&
+      currentStage === "Processor"
+    ) {
+      next_current_stage = "Delivery";
+      next_sent_by = "Processor";
+    } else if (SubmitTo === "Send to Delivery" && currentStage === "QC") {
+      next_current_stage = "Delivery";
+      next_sent_by = "QC";
+    }
+
     const { data, error } = await supabase
       .from("task_iterations")
-      .update({ current_stage: "QC", sent_by: "Processor" })
+      .update({ current_stage: next_current_stage, sent_by: next_sent_by })
       .eq("project_id", taskId);
 
     if (error) {
@@ -363,7 +389,7 @@ export default function TaskDetailPage({
     );
   };
 
-  const handleDownloadOfUploadedFiles = async (fileName: string) => {
+  const handleDownloadOffilesToBeUploaded = async (fileName: string) => {
     try {
       const { data, error } = await supabase.storage
         .from("processor-files")
@@ -422,21 +448,35 @@ export default function TaskDetailPage({
       console.error("Error fetching current stage:", current_stageError);
       return;
     }
-
+    // console.log(current_stage.current_stage);
     setCurrentStage(current_stage.current_stage);
 
+    let storage_name = "";
+    let folder_path = "";
+
+    console.log(current_stage.current_stage, sentBy);
+
+    if (current_stage.current_stage === "PM") {
+      folder_path = `${current_stage.current_stage}_${taskId}`;
+      storage_name = "processor-files";
+    } else if (sentBy === "Processor" || current_stage.current_stage === "QC") {
+      folder_path = `${taskId}`;
+      storage_name = "qc-files";
+    } else if (current_stage.current_stage === "QA") {
+      folder_path = `${taskId}`;
+      storage_name = "qa-files";
+    }
+
     const { data: processorFiles, error: processorError } =
-      await supabase.storage
-        .from("processor-files")
-        .list(current_stage.current_stage + "_" + taskId);
+      await supabase.storage.from(storage_name).list(folder_path);
 
     if (processorFiles === null) {
       console.warn("No processor files found for this task.");
-      setProcessorUploadedFiles([]);
+      setfilesToBeUploaded([]);
       return;
     }
 
-    setProcessorUploadedFiles(processorFiles.map((file) => file.name));
+    setuploadedFiles(processorFiles.map((file) => file.name));
 
     if (processorError) {
       console.error("Error fetching processor files:", processorError);
@@ -462,22 +502,36 @@ export default function TaskDetailPage({
       return;
     }
 
-    if (uploadedFiles.length === 0) {
+    if (filesToBeUploaded.length === 0) {
       alert("Please select files to upload.");
       return;
     }
     try {
-      uploadedFiles.map(async (file) => {
+      filesToBeUploaded.map(async (file) => {
         let date = new Date().toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
         });
         date = date.replaceAll("/", "-");
 
-        const filePath = `${data.current_stage}_${taskId}/${date}_${file.name}`;
+        let file_path = `${data.current_stage}_${taskId}/${date}_${file.name}`;
+        let storage_name = "processor-files";
+
+        if (currentStage === "PM") {
+          file_path = `${data.current_stage}_${taskId}/${date}_${file.name}`;
+          storage_name = "processor-files";
+        } else if (sentBy === "Processor" || currentStage === "QC") {
+          file_path = `${taskId}/${date}_${file.name}`;
+          storage_name = "qc-files";
+        } else if (currentStage === "QA") {
+          file_path = `${taskId}/${date}_${file.name}`;
+          storage_name = "qa-files";
+        }
+
+        // const filePath = `${data.current_stage}_${taskId}/${date}_${file.name}`;
 
         const { data: StoreFiles, error } = await supabase.storage
-          .from("processor-files")
-          .upload(filePath, file, {
+          .from(storage_name)
+          .upload(file_path, file, {
             contentType: file.type,
             upsert: true,
           });
@@ -486,12 +540,12 @@ export default function TaskDetailPage({
           return;
         }
       });
-      toast("All files uploaded successfully!", {
+      fetchProcessorFiles();
+      toast("Selected files uploaded successfully!", {
         type: "success",
         position: "top-right",
       });
-      setUploadedFiles([]);
-      fetchProcessorFiles();
+      setfilesToBeUploaded([]);
     } catch (error) {
       console.error("Error uploading files:", error);
     }
@@ -508,20 +562,36 @@ export default function TaskDetailPage({
       console.log("Error while fetching 'sent_by' data");
     }
 
+    // console.log(storage_folder);
+    // console.log(data);
+    // Step 1: Fetch files first
+    // console.log(sent_by, folder_path);
+
+    const { data: PMFiles, error: PMError } = await supabase.storage
+      .from("task-files")
+      .list(taskId);
+    // console.log(PMFiles);
+
+    if (PMError) {
+      console.error("Error fetching PM files:", PMError);
+      return;
+    }
+
+    setPMFiles(PMFiles.map((file) => file.name));
+
     const sent_by = data?.sent_by;
     let folder_path = "";
     let storage_name = "";
-    if (sent_by == "Processor") {
+
+    if (sent_by == "Processor" || sent_by == "QC") {
       folder_path = "PM_" + taskId;
       storage_name = "processor-files";
     } else if (sent_by == "PM") {
       folder_path = taskId;
       storage_name = "task-files";
     }
-    // console.log(storage_folder);
-    // console.log(data);
-    // Step 1: Fetch files first
-    console.log(sent_by, folder_path);
+    // console.log(PMFiles);
+
     const { data: fileData, error: fileError } = await supabase.storage
       .from(storage_name)
       .list(folder_path);
@@ -790,32 +860,66 @@ export default function TaskDetailPage({
           {/* Downloadable task files */}
           <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
             <div className="p-6 pb-2">
-              <h2 className="text-lg font-medium">Task Attachments</h2>
+              <h2 className="text-xl font-medium">Task Attachments</h2>
               <p className="text-sm text-gray-500">
                 Files attached to this task by the creator
               </p>
             </div>
-            <div className="p-6">
-              <div className="space-y-2">
-                {task.attachments.map((item: string) => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="font-medium">{item.split("/").pop()}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDownload(item)}
-                      className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+            <div className="p-6 space-y-6">
+              {/* PM Files */}
+              <div>
+                <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
+                  Client Files
+                </h3>
+                <div className="space-y-2">
+                  {PMFiles.map((item: string) => (
+                    <div
+                      key={item}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
-                      <DownloadCloud className="h-4 w-4" /> Download
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{item.split("/").pop()}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(item)}
+                        className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                      >
+                        <DownloadCloud className="h-4 w-4" /> Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Processor Files */}
+              <div>
+                <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
+                  Processor Files
+                </h3>
+                <div className="space-y-2">
+                  {task.attachments.map((item: string) => (
+                    <div
+                      key={item}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{item.split("/").pop()}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(item)}
+                        className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                      >
+                        <DownloadCloud className="h-4 w-4" /> Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -853,8 +957,12 @@ export default function TaskDetailPage({
                 </label>
                 <div className="p-6">
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium mb-2">Files Uploaded</h3>
-                    {processorUploadedFiles?.map((item: string) => (
+                    {uploadedFiles && uploadedFiles.length > 0 && (
+                      <h3 className="text-sm font-medium mb-2">
+                        Files Uploaded
+                      </h3>
+                    )}
+                    {uploadedFiles?.map((item: string) => (
                       <div
                         key={item}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
@@ -868,7 +976,9 @@ export default function TaskDetailPage({
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDownloadOfUploadedFiles(item)}
+                          onClick={() =>
+                            handleDownloadOffilesToBeUploaded(item)
+                          }
                           className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                         >
                           <DownloadCloud className="h-4 w-4" /> Download
@@ -880,14 +990,14 @@ export default function TaskDetailPage({
               </div>
 
               {/* Uploaded files list */}
-              {uploadedFiles.length > 0 && (
+              {filesToBeUploaded.length > 0 && (
                 <div className="space-y-2 mt-4">
                   <h3 className="text-sm font-medium mb-2">
                     Files to be uploaded
                   </h3>
 
                   {/* <p> Harish </p> */}
-                  {uploadedFiles.map((file, idx) => (
+                  {filesToBeUploaded.map((file, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
