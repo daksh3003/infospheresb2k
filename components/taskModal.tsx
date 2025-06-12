@@ -9,6 +9,7 @@ import {
   Upload,
   Languages,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { supabase } from "../utils/supabase";
 
@@ -304,6 +305,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
         "Iteration ID:",
         newTaskIterationId
       );
+      
+      toast("Task successfully added ", {
+        type: "success",
+        position: "top-right",
+      });
 
       setFormData({
         serialNumber: "",
@@ -325,7 +331,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
         estimatedHoursQA: "",
       });
       setCurrentPage(1);
-
       if (onTaskAdded) {
         onTaskAdded();
       }

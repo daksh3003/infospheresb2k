@@ -13,88 +13,158 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { supabase } from "@/utils/supabase";
 
-// Mock QC-specific tasks
-const qcTasks = [
-  {
-    id: "task-2",
-    title: "Test payment integration",
-    description:
-      "Verify that the payment gateway integration is working correctly with proper error handling and success flows.",
-    dueDate: "2025-04-08",
-    status: "in-progress",
-    priority: "critical",
-    assignedTo: "Alice Smith",
-  },
-  {
-    id: "task-6",
-    title: "Documentation review",
-    description:
-      "Review and update the API documentation to ensure it matches the current implementation.",
-    dueDate: "2025-04-09",
-    status: "completed",
-    priority: "low",
-    assignedTo: "Alice Smith",
-  },
-  {
-    id: "task-12",
-    title: "Database schema validation",
-    description:
-      "Validate the new database schema changes against the requirements document.",
-    dueDate: "2025-04-10",
-    status: "pending",
-    priority: "medium",
-    assignedTo: "Tom Richards",
-  },
-  {
-    id: "task-13",
-    title: "UI component library testing",
-    description:
-      "Test all components in the new UI component library for consistency and accessibility compliance.",
-    dueDate: "2025-04-15",
-    status: "pending",
-    priority: "high",
-    assignedTo: "Alice Smith",
-  },
-  {
-    id: "task-14",
-    title: "API integration tests",
-    description:
-      "Write and execute integration tests for the newly developed APIs to ensure they meet specifications.",
-    dueDate: "2025-04-07",
-    status: "overdue",
-    priority: "high",
-    assignedTo: "Michael Brown",
-  },
-  {
-    id: "task-15",
-    title: "Code review for frontend modules",
-    description:
-      "Perform a detailed code review of the frontend modules developed in the last sprint.",
-    dueDate: "2025-04-11",
-    status: "in-progress",
-    priority: "medium",
-    assignedTo: "Tom Richards",
-  },
-];
+interface QCDashboardTask {
+  title: string;
+  description: string;
+  status: "pending" | "in-progress" | "completed" | "overdue" | "returned";
+  priority: "low" | "medium" | "high" | "critical";
+  // From projects table
+  projectId: string;
+  projectName: string;
+  projectTaskId: string | null;
+  clientInstruction: string | null;
+  deliveryDate: string | null;
+  processType: string | null;
+  poHours: number | null;
+  isProjectOverallComplete: boolean;
+
+  // From task_iterations table
+  taskIterationId: string;
+  iterationNumber: number;
+  currentStage: string;
+  statusFlag: string | null;
+  iterationNotes: string | null;
+
+  // From file_versions table (via task_iterations.current_file_version_id)
+  currentFileVersionId: string | null;
+  currentFileName: string | null;
+
+  calculatedStatus:
+    | "pending"
+    | "in-progress"
+    | "completed"
+    | "overdue"
+    | "returned";
+  calculatedPriority: "low" | "medium" | "high" | "critical";
+
+  displayId: string;
+  displayTitle: string;
+  displayDescription: string | null;
+  displayDueDate: string | null;
+  displayAssignedTo: string;
+  dueDate: string; // Optional for filtering
+  assignedTo: string; // Optional for filtering
+}
 
 export default function QCDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
+  const [tasks, setTasks] = useState<QCDashboardTask[]>([]);
 
   useEffect(() => {
     // Ensure the component is mounted before rendering
+
+    fetchTasks();
+
     setMounted(true);
   }, []);
+
+  const fetchTasks = async () => {
+    // setIsLoading(true);
+    // console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
+    try {
+      const { data, error } = await supabase
+        .from("task_iterations")
+        .select(
+          `
+          id, 
+          current_stage, 
+          status_flag, 
+          project_id, 
+          iteration_number, 
+          projects ( project_name, id ) // Minimal join
+        `
+        )
+        .eq("current_stage", "QC");
+
+      console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data);
+      if (error && Object.keys(error).length > 0) {
+        console.error(
+          "[PM Dashboard] ULTRA SIMPLE Query Error:",
+          JSON.stringify(error, null, 2)
+        );
+        setTasks([]);
+      } else if (data && data.length > 0) {
+        console.log(
+          `[PM Dashboard] ULTRA SIMPLE Query successful, ${data.length} items found. First item:`,
+          data[0]
+        );
+        const dummyTasks: QCDashboardTask[] = data.map((item: any) => ({
+          status: "pending", // Default status, can be updated later
+          priority: "medium", // Default priority, can be updated later
+          dueDate: "2025-04-11", // Default due date, can be updated later
+          assignedTo: `QC Iteration ${item.iteration_number || "N/A"}`, // Default assigned to, can be updated later
+          description: "No Decription ",
+          title: "No Project Name",
+          taskIterationId: item.id,
+          projectName:
+            item.projects?.project_name ||
+            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            "No Project Name",
+          currentStage: item.current_stage,
+          calculatedStatus: "pending",
+          projectId: item.projects?.id || item.project_id || "dummy_project_id",
+          projectTaskId: null,
+          clientInstruction: null,
+          deliveryDate: null,
+          processType: null,
+          poHours: null,
+          isProjectOverallComplete: false,
+          iterationNumber: item.iteration_number || 1,
+          statusFlag: item.status_flag || null,
+          iterationNotes: null,
+          currentFileVersionId: null,
+          currentFileName: null,
+          calculatedPriority: "medium",
+          displayId: item.id,
+          displayTitle:
+            item.projects?.project_name ||
+            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            "No Project Name",
+          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+          displayDueDate: null,
+          displayAssignedTo: `Iter: ${item.iteration_number || "N/A"}`,
+        }));
+        setTasks(dummyTasks);
+      } else {
+        console.log(
+          "[PM Dashboard] ULTRA SIMPLE Query returned no data or data array is empty. Error (if any):",
+          error ? JSON.stringify(error, null, 2) : "No error object"
+        );
+        setTasks([]);
+      }
+    } catch (err: any) {
+      console.error(
+        "[PM Dashboard] Catch block error during ULTRA SIMPLE fetch:",
+        err.message ? err.message : err,
+        err
+      );
+      setTasks([]);
+    } finally {
+      // setIsLoading(false);
+    }
+  };
 
   if (!mounted) {
     return null; // Prevents hydration mismatch
   }
 
   // Filter tasks based on search and filters
-  const filteredTasks = qcTasks.filter((task) => {
+  const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -165,9 +235,9 @@ export default function QCDashboard() {
         {filteredTasks.length > 0 ? (
           filteredTasks.map((task) => (
             <TaskCard
-              key={task.id}
-              id={task.id}
-              title={task.title}
+              key={task.projectId}
+              id={task.projectId}
+              title={task.projectName}
               description={task.description}
               dueDate={task.dueDate}
               status={task.status as any}

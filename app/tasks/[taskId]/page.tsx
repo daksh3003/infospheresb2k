@@ -123,6 +123,10 @@ export default function TaskDetailPage({
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
+  const [processorUploadedFiles, setProcessorUploadedFiles] = useState<
+    string[] | null
+  >([]);
+  const [currentStage, setCurrentStage] = useState<string>("");
 
   // Dialog states
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
@@ -144,63 +148,9 @@ export default function TaskDetailPage({
     tags: [],
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Step 1: Fetch files first
-      const { data: fileData, error: fileError } = await supabase.storage
-        .from("task-files")
-        .list(taskId);
-
-      if (fileError) {
-        console.error("Error fetching task files:", fileError);
-        return;
-      }
-
-      // Set attachments after getting files
-      setTask((prev: any) => ({
-        ...prev,
-        attachments: fileData.map((file) => file.name),
-      }));
-
-      // Step 2: Then fetch task data
-      const { data: taskData, error: taskError } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", taskId)
-        .single();
-
-      if (taskError) {
-        console.error("Error fetching task data:", taskError);
-        return;
-      }
-
-      // Merge in the task data without touching attachments
-      setTask((prev: any) => ({
-        ...prev,
-        id: taskData.id,
-        title: taskData.project_name,
-        description: taskData.description,
-        priority: taskData.priority || "low",
-        dueDate: taskData.due_date || "",
-        assignedTo: "",
-        createdBy: "",
-        comments: taskData.comments || [],
-        createdDate: taskData.created_at,
-      }));
-    };
-
-    fetchData();
-  }, [taskId]);
-
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      // const newFiles = Array.from(e.target.files).map((file) => ({
-      //   name: file.name,
-      //   size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      //   type: file.type,
-      // }));
-
       const newFiles = Array.from(e.target.files).map((file) => file);
 
       setUploadedFiles([...uploadedFiles, ...newFiles]);
@@ -413,6 +363,28 @@ export default function TaskDetailPage({
     );
   };
 
+  const handleDownloadOfUploadedFiles = async (fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("processor-files")
+        .download(`${currentStage}_${taskId}/${fileName}`);
+
+      if (error) throw new Error("Download failed: " + error.message);
+      if (!data) throw new Error("No file data found");
+
+      const url = URL.createObjectURL(data); // `data` is a Blob
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || "downloaded_file";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
+  };
+
   const handleDownload = async (fileName: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -433,6 +405,44 @@ export default function TaskDetailPage({
     } catch (error) {
       console.error("Error downloading file:", error);
     }
+  };
+
+  const onAdd = () => {
+    console.log("File added");
+  };
+
+  const fetchProcessorFiles = async () => {
+    const { data: current_stage, error: current_stageError } = await supabase
+      .from("task_iterations")
+      .select("current_stage")
+      .eq("project_id", taskId)
+      .single();
+
+    if (current_stageError) {
+      console.error("Error fetching current stage:", current_stageError);
+      return;
+    }
+
+    setCurrentStage(current_stage.current_stage);
+
+    const { data: processorFiles, error: processorError } =
+      await supabase.storage
+        .from("processor-files")
+        .list(current_stage.current_stage + "_" + taskId);
+
+    if (processorFiles === null) {
+      console.warn("No processor files found for this task.");
+      setProcessorUploadedFiles([]);
+      return;
+    }
+
+    setProcessorUploadedFiles(processorFiles.map((file) => file.name));
+
+    if (processorError) {
+      console.error("Error fetching processor files:", processorError);
+      return;
+    }
+    console.log("Processor Files:", processorFiles);
   };
 
   const handleSubmitFileUpload = async () => {
@@ -481,10 +491,83 @@ export default function TaskDetailPage({
         position: "top-right",
       });
       setUploadedFiles([]);
+      fetchProcessorFiles();
     } catch (error) {
       console.error("Error uploading files:", error);
     }
   };
+
+  const fetchData = async () => {
+    const { data, error } = await supabase
+      .from("task_iterations")
+      .select("sent_by")
+      .eq("project_id", taskId)
+      .single();
+
+    if (error) {
+      console.log("Error while fetching 'sent_by' data");
+    }
+
+    const sent_by = data?.sent_by;
+    let folder_path = "";
+    let storage_name = "";
+    if (sent_by == "Processor") {
+      folder_path = "PM_" + taskId;
+      storage_name = "processor-files";
+    } else if (sent_by == "PM") {
+      folder_path = taskId;
+      storage_name = "task-files";
+    }
+    // console.log(storage_folder);
+    // console.log(data);
+    // Step 1: Fetch files first
+    console.log(sent_by, folder_path);
+    const { data: fileData, error: fileError } = await supabase.storage
+      .from(storage_name)
+      .list(folder_path);
+
+    if (fileError) {
+      console.error("Error fetching task files:", fileError);
+      return;
+    }
+
+    // Set attachments after getting files
+    setTask((prev: any) => ({
+      ...prev,
+      attachments: fileData.map((file) => file.name),
+    }));
+
+    // Step 2: Then fetch task data
+    const { data: taskData, error: taskError } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", taskId)
+      .single();
+
+    if (taskError) {
+      console.error("Error fetching task data:", taskError);
+      return;
+    }
+
+    // Merge in the task data without touching attachments
+    setTask((prev: any) => ({
+      ...prev,
+      id: taskData.id,
+      title: taskData.project_name,
+      description: taskData.description,
+      priority: taskData.priority || "low",
+      dueDate: taskData.due_date || "",
+      assignedTo: "",
+      createdBy: "",
+      comments: taskData.comments || [],
+      createdDate: taskData.created_at,
+    }));
+  };
+
+  useEffect(() => {
+    fetchProcessorFiles();
+    fetchData();
+  }, [taskId]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -746,7 +829,7 @@ export default function TaskDetailPage({
               </p>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex items-center justify-center w-full">
+              <div className="flex-row items-center justify-center w-full">
                 <label
                   htmlFor="dropzone-file"
                   className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
@@ -768,12 +851,42 @@ export default function TaskDetailPage({
                     multiple
                   />
                 </label>
+                <div className="p-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium mb-2">Files Uploaded</h3>
+                    {processorUploadedFiles?.map((item: string) => (
+                      <div
+                        key={item}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Paperclip className="h-4 w-4 text-gray-500" />
+                          <div>
+                            <p className="font-medium">
+                              {item.split("/").pop()}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadOfUploadedFiles(item)}
+                          className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                        >
+                          <DownloadCloud className="h-4 w-4" /> Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Uploaded files list */}
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2 mt-4">
-                  <h3 className="text-sm font-medium mb-2">Uploaded Files</h3>
+                  <h3 className="text-sm font-medium mb-2">
+                    Files to be uploaded
+                  </h3>
+
+                  {/* <p> Harish </p> */}
                   {uploadedFiles.map((file, idx) => (
                     <div
                       key={idx}
