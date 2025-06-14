@@ -116,38 +116,41 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   // Define the order of fields for each form
   const form1Fields = [
-    'serialNumber',
-    'taskId',
-    'clientInstruction',
-    'mailInstruction',
-    'projectName',
-    'numberOfFiles',
-    'numberOfPages',
-    'language',
-    'processType',
-    'deliveryDate',
-    'estimatePOHours'  // This will be the last field for Enter key navigation
+    "serialNumber",
+    "taskId",
+    "clientInstruction",
+    "mailInstruction",
+    "projectName",
+    "numberOfFiles",
+    "numberOfPages",
+    "language",
+    "processType",
+    "deliveryDate",
+    "estimatePOHours", // This will be the last field for Enter key navigation
   ];
 
   const form2Fields = [
-    'fileName',
-    'estimatedHoursOCR',
-    'estimatedHoursQC',
-    'estimatedHoursQA',
+    "fileName",
+    "estimatedHoursOCR",
+    "estimatedHoursQC",
+    "estimatedHoursQA",
   ];
 
-  const handleKeyDown = (e: React.KeyboardEvent, currentField: keyof FormRefs) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    currentField: keyof FormRefs
+  ) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault(); // Prevent form submission
-      
+
       // Don't proceed if we're at estimatePOHours - let user handle file upload manually
-      if (currentField === 'estimatePOHours') {
+      if (currentField === "estimatePOHours") {
         return;
       }
 
       const currentFormFields = currentPage === 1 ? form1Fields : form2Fields;
       const currentIndex = currentFormFields.indexOf(currentField);
-      
+
       // If it's the last field in Form 2, submit the form
       if (currentPage === 2 && currentIndex === currentFormFields.length - 1) {
         handleSubmit(e as any);
@@ -164,34 +167,47 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    console.log('Files selected:', files);
+    console.log("Files selected:", files);
     if (files) {
       // Add new files to existing selection
       const newFiles = Array.from(files);
-      console.log('New files to add:', newFiles.map(f => f.name));
-      setFormData(prevData => {
+      console.log(
+        "New files to add:",
+        newFiles.map((f) => f.name)
+      );
+      setFormData((prevData) => {
         const updatedData = {
           ...prevData,
           selectedFiles: [...prevData.selectedFiles, ...newFiles],
-          numberOfFiles: (prevData.selectedFiles.length + files.length).toString()
+          numberOfFiles: (
+            prevData.selectedFiles.length + files.length
+          ).toString(),
         };
-        console.log('Updated selected files:', updatedData.selectedFiles.map(f => f.name));
+        console.log(
+          "Updated selected files:",
+          updatedData.selectedFiles.map((f) => f.name)
+        );
         return updatedData;
       });
     }
     // Reset the input value so the same file can be selected again
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const removeFile = (indexToRemove: number) => {
-    console.log('Removing file at index:', indexToRemove);
-    setFormData(prevData => {
-      const updatedFiles = prevData.selectedFiles.filter((_, index) => index !== indexToRemove);
-      console.log('Files after removal:', updatedFiles.map(f => f.name));
+    console.log("Removing file at index:", indexToRemove);
+    setFormData((prevData) => {
+      const updatedFiles = prevData.selectedFiles.filter(
+        (_, index) => index !== indexToRemove
+      );
+      console.log(
+        "Files after removal:",
+        updatedFiles.map((f) => f.name)
+      );
       return {
         ...prevData,
         selectedFiles: updatedFiles,
-        numberOfFiles: updatedFiles.length.toString()
+        numberOfFiles: updatedFiles.length.toString(),
       };
     });
   };
@@ -220,10 +236,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         data: { user },
       } = await supabase.auth.getUser();
       currentUserId = user?.id || null;
-      if (
-        !currentUserId &&
-        formData.selectedFiles.length > 0
-      ) {
+      if (!currentUserId && formData.selectedFiles.length > 0) {
         console.warn(
           "Attempting to upload file without an authenticated user. This might be restricted by RLS."
         );
@@ -259,13 +272,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
         estimated_hours_qc: parseFloat(formData.estimatedHoursQC) || 0,
         estimated_hours_qa: parseFloat(formData.estimatedHoursQA) || 0,
         created_by: currentUserId,
-        created_at: new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
-        updated_at: new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
+        // created_at: new Date().toLocaleString("en-IN", {
+        //   timeZone: "Asia/Kolkata",
+        // }),
+        // updated_at: new Date().toLocaleString("en-IN", {
+        //   timeZone: "Asia/Kolkata",
+        // }),
       };
+
+      console.log("Project core data:", projectCoreData);
 
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
@@ -357,7 +372,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       const taskIterationData = {
         project_id: newProjectId,
         iteration_number: 1,
-        current_stage: "PM",
+        current_stage: "Processor",
         status_flag: "pending_action",
         // current_file_version_id: newFileId,
         assigned_to_processor_user_id: currentUserId,
@@ -514,7 +529,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="serialNumber"
                     value={formData.serialNumber}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'serialNumber')}
+                    onKeyDown={(e) => handleKeyDown(e, "serialNumber")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -529,7 +544,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="taskId"
                     value={formData.taskId}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'taskId')}
+                    onKeyDown={(e) => handleKeyDown(e, "taskId")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -544,7 +559,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="clientInstruction"
                   value={formData.clientInstruction}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'clientInstruction')}
+                  onKeyDown={(e) => handleKeyDown(e, "clientInstruction")}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -559,7 +574,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="mailInstruction"
                   value={formData.mailInstruction}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'mailInstruction')}
+                  onKeyDown={(e) => handleKeyDown(e, "mailInstruction")}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -576,7 +591,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="projectName"
                     value={formData.projectName}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'projectName')}
+                    onKeyDown={(e) => handleKeyDown(e, "projectName")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -592,7 +607,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="numberOfFiles"
                     value={formData.numberOfFiles}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'numberOfFiles')}
+                    onKeyDown={(e) => handleKeyDown(e, "numberOfFiles")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -609,7 +624,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="numberOfPages"
                     value={formData.numberOfPages}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'numberOfPages')}
+                    onKeyDown={(e) => handleKeyDown(e, "numberOfPages")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -624,7 +639,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="language"
                     value={formData.language}
                     onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, 'language')}
+                    onKeyDown={(e) => handleKeyDown(e, "language")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -639,7 +654,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="processType"
                   value={formData.processType}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'processType')}
+                  onKeyDown={(e) => handleKeyDown(e, "processType")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select Process Type</option>
@@ -661,7 +676,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="deliveryDate"
                   value={formData.deliveryDate}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'deliveryDate')}
+                  onKeyDown={(e) => handleKeyDown(e, "deliveryDate")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -676,7 +691,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="estimatePOHours"
                   value={formData.estimatePOHours}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'estimatePOHours')}
+                  onKeyDown={(e) => handleKeyDown(e, "estimatePOHours")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -786,7 +801,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="fileName"
                   value={formData.fileName}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'fileName')}
+                  onKeyDown={(e) => handleKeyDown(e, "fileName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -801,7 +816,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="estimatedHoursOCR"
                   value={formData.estimatedHoursOCR}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursOCR')}
+                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursOCR")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -817,7 +832,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="estimatedHoursQC"
                   value={formData.estimatedHoursQC}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursQC')}
+                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursQC")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />
@@ -833,7 +848,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   name="estimatedHoursQA"
                   value={formData.estimatedHoursQA}
                   onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, 'estimatedHoursQA')}
+                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursQA")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   step="0.5"
                 />

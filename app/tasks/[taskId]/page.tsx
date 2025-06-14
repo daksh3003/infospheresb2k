@@ -81,9 +81,10 @@ export default function TaskDetailPage({
   const [filesToBeUploaded, setfilesToBeUploaded] = useState<File[]>([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
-  const [uploadedFiles, setuploadedFiles] = useState<string[] | null>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<string[] | null>([]);
   const [currentStage, setCurrentStage] = useState<string>("");
   const [sentBy, setSentBy] = useState<string>("");
+  const [completionStatus, setCompletionStatus] = useState<boolean>(false);
 
   // Dialog states
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
@@ -106,6 +107,8 @@ export default function TaskDetailPage({
   });
 
   const [PMFiles, setPMFiles] = useState<string[]>([]);
+  const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
+  const [processorFiles, setProcessorFiles] = useState<string[]>([]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,11 +161,28 @@ export default function TaskDetailPage({
 
   const handleCompleteTask = async () => {
     console.log("Completing task:", taskId);
+    let overall_completion_status = false;
+    console.log("Current Stage:", currentStage);
+    console.log("Sent By:", sentBy);
+    if (
+      (currentStage === "Processor" && sentBy === "QA") ||
+      (currentStage === "QA" && sentBy === "QC") ||
+      (currentStage === "QC" && sentBy === "Processor")
+    ) {
+      overall_completion_status = true;
+    }
+    // console.log("Overall Completion Status:", overall_completion_status);
+    if (overall_completion_status) {
+      setCompletionStatus(true);
+    }
     try {
       // Update the task in Supabase
       const { error } = await supabase
         .from("projects")
-        .update({ completion_status: true })
+        .update({
+          completion_status: true,
+          overall_completion_status: overall_completion_status,
+        })
         .eq("id", taskId);
 
       if (error) {
@@ -194,32 +214,43 @@ export default function TaskDetailPage({
         setSubmitTo("Send to QC");
         setShowSubmitToButton(true);
       } else if (
-        data.sent_by === "Processor" &&
-        currentStage === "PM" &&
-        uploadedFiles?.length === 0
+        (data.sent_by === "Processor" &&
+          currentStage === "QC" &&
+          uploadedFiles?.length === 0) ||
+        (data.sent_by === "QC" && currentStage === "Processor")
       ) {
         setSubmitTo("Send to QA");
         setShowSubmitToButton(true);
       } else if (
         data.sent_by === "Processor" &&
-        currentStage === "PM" &&
+        currentStage === "QC" &&
         uploadedFiles &&
         uploadedFiles.length > 0
       ) {
         setSubmitTo("Send to Processor Team");
+        // console.log("hello");
         setShowSubmitToButton(true);
       } else if (
-        data.sent_by === "QC" &&
-        currentStage === "QA" &&
-        uploadedFiles?.length === 0
+        (data.sent_by === "QC" &&
+          currentStage === "QA" &&
+          uploadedFiles?.length === 0) ||
+        (currentStage === "Processor" && data.sent_by === "QA") ||
+        (data.sent_by === "Processor" &&
+          currentStage === "QA" &&
+          uploadedFiles &&
+          uploadedFiles.length === 0)
       ) {
         setSubmitTo("Send to Delivery");
         setShowSubmitToButton(true);
       } else if (
-        data.sent_by === "QC" &&
-        currentStage === "QA" &&
-        uploadedFiles &&
-        uploadedFiles.length > 0
+        (data.sent_by === "QC" &&
+          currentStage === "QA" &&
+          uploadedFiles &&
+          uploadedFiles.length > 0) ||
+        (data.sent_by === "Processor" &&
+          currentStage === "QA" &&
+          uploadedFiles &&
+          uploadedFiles.length > 0)
       ) {
         setSubmitTo("Send to Processor Team");
         setShowSubmitToButton(true);
@@ -227,7 +258,8 @@ export default function TaskDetailPage({
         setShowSubmitToButton(false);
       }
 
-      setSentBy(data.sent_by);
+      // setSentBy(data.sent_by);
+      // console.log(SubmitTo);
       // console.log(data.sent_by);
 
       // Update local state
@@ -274,7 +306,12 @@ export default function TaskDetailPage({
     } else if (SubmitTo === "Send to Delivery" && currentStage === "QC") {
       next_current_stage = "Delivery";
       next_sent_by = "QC";
+    } else if (SubmitTo === "Send to Delivery" && currentStage === "QA") {
+      next_current_stage = "Delivery";
+      next_sent_by = "QA";
     }
+
+    console.log(next_current_stage, next_sent_by);
 
     const { data, error } = await supabase
       .from("task_iterations")
@@ -296,7 +333,7 @@ export default function TaskDetailPage({
         position: "top-right",
       });
     } else {
-      toast("Task sent to QC", {
+      toast("Task sent to " + next_current_stage, {
         type: "success",
         position: "top-right",
       });
@@ -440,7 +477,7 @@ export default function TaskDetailPage({
   const fetchProcessorFiles = async () => {
     const { data: current_stage, error: current_stageError } = await supabase
       .from("task_iterations")
-      .select("current_stage")
+      .select("current_stage, sent_by")
       .eq("project_id", taskId)
       .single();
 
@@ -454,35 +491,112 @@ export default function TaskDetailPage({
     let storage_name = "";
     let folder_path = "";
 
-    console.log(current_stage.current_stage, sentBy);
+    // console.log(current_stage.current_stage, current_stage.sent_by);
 
-    if (current_stage.current_stage === "PM") {
-      folder_path = `${current_stage.current_stage}_${taskId}`;
+    let isQcInLoop = true;
+
+    const { data: qcData, error: qcError } = await supabase.storage
+      .from("qc-files")
+      .list(taskId);
+
+    if (qcData && qcData.length === 0) {
+      console.log("Error fetching QC data:", qcError);
+      isQcInLoop = false;
+    }
+
+    // console.log("qcData : ", qcData);
+
+    // console.log("isQcInLoop : ", isQcInLoop);
+
+    if (
+      (current_stage.sent_by === "Processor" &&
+        current_stage.current_stage === "QC") ||
+      (current_stage.sent_by === "QC" &&
+        current_stage.current_stage === "QA") ||
+      (current_stage.sent_by === "QA" &&
+        current_stage.current_stage === "Processor" &&
+        !isQcInLoop) ||
+      (current_stage.sent_by === "QC" &&
+        current_stage.current_stage === "Processor") ||
+      (current_stage.current_stage === "Delivery" &&
+        current_stage.sent_by === "QA" &&
+        !isQcInLoop)
+    ) {
+      folder_path = `PM_${taskId}`;
       storage_name = "processor-files";
-    } else if (sentBy === "Processor" || current_stage.current_stage === "QC") {
-      folder_path = `${taskId}`;
-      storage_name = "qc-files";
-    } else if (current_stage.current_stage === "QA") {
-      folder_path = `${taskId}`;
-      storage_name = "qa-files";
+    } else if (
+      (current_stage.sent_by === "Processor" &&
+        current_stage.current_stage === "QA") ||
+      (current_stage.sent_by === "QC" &&
+        current_stage.current_stage === "Processor" &&
+        isQcInLoop) ||
+      (current_stage.sent_by === "QA" &&
+        current_stage.current_stage === "Processor") ||
+      (current_stage.current_stage === "Delivery" &&
+        current_stage.sent_by === "QA" &&
+        isQcInLoop)
+    ) {
+      folder_path = `QC_${taskId}`;
+      storage_name = "processor-files";
+    }
+    // console.log(current_stage.current_stage, current_stage.sent_by);
+    else if (
+      current_stage.current_stage === "Delivery" &&
+      current_stage.sent_by === "Processor"
+    ) {
+      folder_path = `QA_${taskId}`;
+      storage_name = "processor-files";
+    } else if (
+      current_stage.current_stage === "Delivery" &&
+      current_stage.sent_by === "QA"
+    ) {
+      folder_path = `PM_${taskId}`;
+      storage_name = "processor-files";
     }
 
-    const { data: processorFiles, error: processorError } =
-      await supabase.storage.from(storage_name).list(folder_path);
+    // if (
+    //   (current_stage.sent_by === "PM" &&
+    //     current_stage.current_stage === "Processor") ||
+    //   (current_stage.sent_by === "Processor" &&
+    //     current_stage.current_stage === "QC") ||
+    //   (current_stage.sent_by === "QC" &&
+    //     current_stage.current_stage === "Processor") ||
+    //   (current_stage.sent_by === "QC" && current_stage.current_stage === "QA")
+    // ) {
+    //   folder_path = `Processor_${taskId}`;
+    //   storage_name = "processor-files";
+    // } else if (
+    //   (current_stage.sent_by === "Processor" &&
+    //     current_stage.current_stage === "QA") ||
+    //   (current_stage.sent_by === "QA" &&
+    //     current_stage.current_stage === "Processor")
+    // ) {
+    //   folder_path = `QC_${taskId}`;
+    //   storage_name = "processor-files";
+    // }
 
-    if (processorFiles === null) {
-      console.warn("No processor files found for this task.");
-      setfilesToBeUploaded([]);
-      return;
+    console.log(folder_path, storage_name);
+
+    if (current_stage.sent_by !== "PM") {
+      const { data: processorFiles, error: processorError } =
+        await supabase.storage.from(storage_name).list(folder_path);
+
+      if (processorError) {
+        console.error("Error fetching processor files:", processorError);
+        return;
+      }
+      if (processorFiles === null) {
+        console.warn("No processor files found for this task.");
+        setfilesToBeUploaded([]);
+        return;
+      }
+
+      console.log("processorFiles : ", processorFiles);
+
+      setProcessorFiles(processorFiles.map((file) => file.name));
+
+      console.log("Processor Files:", processorFiles);
     }
-
-    setuploadedFiles(processorFiles.map((file) => file.name));
-
-    if (processorError) {
-      console.error("Error fetching processor files:", processorError);
-      return;
-    }
-    console.log("Processor Files:", processorFiles);
   };
 
   const handleSubmitFileUpload = async () => {
@@ -493,7 +607,7 @@ export default function TaskDetailPage({
 
     const { data, error } = await supabase
       .from("task_iterations")
-      .select("current_stage")
+      .select("current_stage, sent_by")
       .eq("project_id", taskId)
       .single();
     console.log("Task Iteration Data:", data);
@@ -513,13 +627,13 @@ export default function TaskDetailPage({
         });
         date = date.replaceAll("/", "-");
 
-        let file_path = `${data.current_stage}_${taskId}/${date}_${file.name}`;
-        let storage_name = "processor-files";
+        let file_path = "";
+        let storage_name = "";
 
-        if (currentStage === "PM") {
-          file_path = `${data.current_stage}_${taskId}/${date}_${file.name}`;
+        if (currentStage === "Processor") {
+          file_path = `${data.sent_by}_${taskId}/${date}_${file.name}`;
           storage_name = "processor-files";
-        } else if (sentBy === "Processor" || currentStage === "QC") {
+        } else if (currentStage === "QC") {
           file_path = `${taskId}/${date}_${file.name}`;
           storage_name = "qc-files";
         } else if (currentStage === "QA") {
@@ -540,7 +654,9 @@ export default function TaskDetailPage({
           return;
         }
       });
-      fetchProcessorFiles();
+
+      // fetchUploadedFiles();
+      fetchData();
       toast("Selected files uploaded successfully!", {
         type: "success",
         position: "top-right",
@@ -551,21 +667,32 @@ export default function TaskDetailPage({
     }
   };
 
+  // const fetchUploadedFiles = async () => {};
+
   const fetchData = async () => {
+    // console.log("Fetching data");
     const { data, error } = await supabase
       .from("task_iterations")
-      .select("sent_by")
+      .select("sent_by, current_stage")
       .eq("project_id", taskId)
       .single();
 
     if (error) {
       console.log("Error while fetching 'sent_by' data");
+      return;
     }
+
+    console.log(data);
+
+    setSentBy(data?.sent_by);
+    setCurrentStage(data?.current_stage);
 
     // console.log(storage_folder);
     // console.log(data);
     // Step 1: Fetch files first
     // console.log(sent_by, folder_path);
+    const sent_by = data?.sent_by;
+    const current_stage = data?.current_stage;
 
     const { data: PMFiles, error: PMError } = await supabase.storage
       .from("task-files")
@@ -579,33 +706,41 @@ export default function TaskDetailPage({
 
     setPMFiles(PMFiles.map((file) => file.name));
 
-    const sent_by = data?.sent_by;
+    // console.log("Current Stage:", current_stage, "Sent By:", sent_by);
+
+    // if (sent_by !== "PM") {
+    var folder_path_correction = "";
+    var storage_name_correction = "";
+
+    if (current_stage === "Processor") {
+      if (sent_by === "QC") {
+        folder_path_correction = taskId;
+        storage_name_correction = "qc-files";
+      } else if (sent_by === "QA") {
+        folder_path_correction = taskId;
+        storage_name_correction = "qa-files";
+      }
+    } else if (current_stage === "QA" && sent_by === "Processor") {
+      folder_path_correction = taskId;
+      storage_name_correction = "qc-files";
+    }
+
+    const { data: correctionFiles, error: correctionError } =
+      await supabase.storage
+        .from(storage_name_correction)
+        .list(folder_path_correction);
+
+    if (correctionError) {
+      console.log("Error fetching correction files:", correctionError);
+      // return;
+    }
+    setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
+    // }
+
+    // console.log("hello");
+
     let folder_path = "";
     let storage_name = "";
-
-    if (sent_by == "Processor" || sent_by == "QC") {
-      folder_path = "PM_" + taskId;
-      storage_name = "processor-files";
-    } else if (sent_by == "PM") {
-      folder_path = taskId;
-      storage_name = "task-files";
-    }
-    // console.log(PMFiles);
-
-    const { data: fileData, error: fileError } = await supabase.storage
-      .from(storage_name)
-      .list(folder_path);
-
-    if (fileError) {
-      console.error("Error fetching task files:", fileError);
-      return;
-    }
-
-    // Set attachments after getting files
-    setTask((prev: any) => ({
-      ...prev,
-      attachments: fileData.map((file) => file.name),
-    }));
 
     // Step 2: Then fetch task data
     const { data: taskData, error: taskError } = await supabase
@@ -616,8 +751,11 @@ export default function TaskDetailPage({
 
     if (taskError) {
       console.error("Error fetching task data:", taskError);
-      return;
+      // console.log("Task Error:", taskError);
+      // return;
     }
+
+    // console.log("Task Data:", taskData);
 
     // Merge in the task data without touching attachments
     setTask((prev: any) => ({
@@ -631,12 +769,40 @@ export default function TaskDetailPage({
       createdBy: "",
       comments: taskData.comments || [],
       createdDate: taskData.created_at,
+      overall_completion_status: taskData.overall_completion_status,
     }));
+
+    // console.log("Current Stage:", data?.current_stage);
+    // let folder_path = "";
+    // let storage_name = "";
+    // console.log("Current Stage:", current_stage, "Sent By:", sent_by);
+    if (current_stage === "Processor") {
+      folder_path = `${sent_by}_${taskId}`;
+      storage_name = "processor-files";
+    } else if (current_stage === "QC") {
+      folder_path = taskId;
+      storage_name = "qc-files";
+    } else if (current_stage === "QA") {
+      folder_path = taskId;
+      storage_name = "qa-files";
+    }
+    console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
+
+    const { data: uploadedFiles, error: uploadedError } = await supabase.storage
+      .from(storage_name)
+      .list(folder_path);
+    if (uploadedError) {
+      console.log("Error fetching uploaded files:", uploadedError);
+      return;
+    }
+    console.log(uploadedFiles);
+    setUploadedFiles(uploadedFiles.map((file) => file.name));
   };
 
   useEffect(() => {
     fetchProcessorFiles();
     fetchData();
+    // fetchUploadedFiles();
   }, [taskId]);
 
   return (
@@ -651,6 +817,15 @@ export default function TaskDetailPage({
         </button> */}
         <TaskDetailBackButton />
         <div className="text-sm text-gray-500">Task ID: {task.id}</div>
+        {task.overall_completion_status ? (
+          <h3 className="text-sm font-medium text-green-500 mb-1">
+            Overall Task Status: Completed
+          </h3>
+        ) : (
+          <h3 className="text-sm font-medium text-red-500 mb-1">
+            Overall Task Status: Pending
+          </h3>
+        )}
       </div>
 
       {/* Main task card */}
@@ -896,30 +1071,70 @@ export default function TaskDetailPage({
 
               {/* Processor Files */}
               <div>
-                <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                  Processor Files
-                </h3>
-                <div className="space-y-2">
-                  {task.attachments.map((item: string) => (
-                    <div
-                      key={item}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{item.split("/").pop()}</p>
+                {processorFiles && processorFiles.length > 0 ? (
+                  <>
+                    <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
+                      Processor Files
+                    </h3>
+                    <div className="space-y-2">
+                      {processorFiles.map((item: string) => (
+                        <div
+                          key={item}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Paperclip className="h-4 w-4 text-gray-500" />
+                            <div>
+                              <p className="font-medium">
+                                {item.split("/").pop()}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDownload(item)}
+                            className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                          >
+                            <DownloadCloud className="h-4 w-4" /> Download
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(item)}
-                        className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        <DownloadCloud className="h-4 w-4" /> Download
-                      </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Correction Files */}
+              <div>
+                {correctionFiles && correctionFiles.length > 0 ? (
+                  <>
+                    <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
+                      Correction Files
+                    </h3>
+                    <div className="space-y-2">
+                      {correctionFiles.map((item: string) => (
+                        <div
+                          key={item}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Paperclip className="h-4 w-4 text-gray-500" />
+                            <div>
+                              <p className="font-medium">
+                                {item.split("/").pop()}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDownload(item)}
+                            className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                          >
+                            <DownloadCloud className="h-4 w-4" /> Download
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

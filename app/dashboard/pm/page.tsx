@@ -100,7 +100,7 @@ export default function PMDashboard() {
         projects ( project_name, id ) // Minimal join
       `
         )
-        .eq("current_stage", "PM");
+        .in("current_stage", ["Processor", "PM"]);
 
       console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data);
       if (error && Object.keys(error).length > 0) {
