@@ -167,7 +167,8 @@ export default function TaskDetailPage({
     if (
       (currentStage === "Processor" && sentBy === "QA") ||
       (currentStage === "QA" && sentBy === "QC") ||
-      (currentStage === "QC" && sentBy === "Processor")
+      (currentStage === "QC" && sentBy === "Processor") ||
+      (currentStage === "QA" && sentBy === "Processor")
     ) {
       overall_completion_status = true;
     }
