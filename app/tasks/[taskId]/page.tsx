@@ -345,7 +345,7 @@ export default function TaskDetailPage({
       next_sent_by = "QA";
     }
 
-    console.log(next_current_stage, next_sent_by);
+    // console.log(next_current_stage, next_sent_by);
 
     const { data: stages, error: stagesError } = await supabase
       .from("task_iterations")
@@ -358,12 +358,19 @@ export default function TaskDetailPage({
       return;
     }
 
+    let updatedStages = [...stages.stages];
+    if (next_current_stage === "Delivery") {
+      updatedStages = [...updatedStages, currentStage, next_current_stage];
+    } else {
+      updatedStages.push(currentStage);
+    }
+
     const { data, error } = await supabase
       .from("task_iterations")
       .update({
         current_stage: next_current_stage,
         sent_by: next_sent_by,
-        stages: [...stages.stages, currentStage],
+        stages: updatedStages,
       })
       .eq("project_id", taskId);
 
@@ -547,11 +554,11 @@ export default function TaskDetailPage({
 
       if (storage_name === "processor-files") {
         if (folder_path.includes("PM_")) {
-          new_file_name = "processor_file_v0_" + index;
-        } else if (folder_path.includes("QC_")) {
           new_file_name = "processor_file_v1_" + index;
-        } else if (folder_path.includes("QA_")) {
+        } else if (folder_path.includes("QC_")) {
           new_file_name = "processor_file_v2_" + index;
+        } else if (folder_path.includes("QA_")) {
+          new_file_name = "processor_file_v3_" + index;
         }
       } else if (storage_name === "qc-files") {
         new_file_name = "qc_file_" + index;
@@ -846,20 +853,90 @@ export default function TaskDetailPage({
     let folder_path = "";
     let storage_name = "";
 
-    // Step 2: Then fetch task data
+    // Step 2: Then fetch task data with creator information
     const { data: taskData, error: taskError } = await supabase
       .from("projects")
-      .select("*")
+      .select(
+        `
+        *,
+        creator:profiles!inner (
+          user_id,
+          name,
+          email,
+          role
+        )
+      `
+      )
       .eq("id", taskId)
       .single();
 
     if (taskError) {
       console.error("Error fetching task data:", taskError);
-      // console.log("Task Error:", taskError);
-      // return;
+      // Try alternative approach if the join fails
+      const { data: simpleTaskData, error: simpleError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", taskId)
+        .single();
+
+      if (simpleError) {
+        console.error("Error fetching simple task data:", simpleError);
+        return;
+      }
+
+      // Fetch creator info separately
+      const { data: creatorData, error: creatorError } = await supabase
+        .from("profiles")
+        .select("user_id, name, email, role")
+        .eq("user_id", simpleTaskData.created_by)
+        .single();
+
+      if (creatorError) {
+        console.error("Error fetching creator data:", creatorError);
+        setTask((prev: any) => ({
+          ...prev,
+          id: simpleTaskData.id,
+          title: simpleTaskData.project_name,
+          description: simpleTaskData.description,
+          priority: simpleTaskData.priority || "low",
+          dueDate: simpleTaskData.delivery_date || "",
+          assignedTo: "",
+          createdBy: {
+            id: simpleTaskData.created_by,
+            name: "Unknown",
+            email: "",
+            role: "",
+          },
+          comments: simpleTaskData.comments || [],
+          createdDate: simpleTaskData.created_at,
+          overall_completion_status: simpleTaskData.overall_completion_status,
+        }));
+        return;
+      }
+
+      // Set task with creator info
+      setTask((prev: any) => ({
+        ...prev,
+        id: simpleTaskData.id,
+        title: simpleTaskData.project_name,
+        description: simpleTaskData.description,
+        priority: simpleTaskData.priority || "low",
+        dueDate: simpleTaskData.delivery_date || "",
+        assignedTo: "",
+        createdBy: {
+          id: creatorData.user_id,
+          name: creatorData.name,
+          email: creatorData.email,
+          role: creatorData.role,
+        },
+        comments: simpleTaskData.comments || [],
+        createdDate: simpleTaskData.created_at,
+        overall_completion_status: simpleTaskData.overall_completion_status,
+      }));
+      return;
     }
 
-    // console.log("Task Data:", taskData);
+    console.log("Task Data with creator:", taskData);
 
     // Merge in the task data without touching attachments
     setTask((prev: any) => ({
@@ -868,9 +945,14 @@ export default function TaskDetailPage({
       title: taskData.project_name,
       description: taskData.description,
       priority: taskData.priority || "low",
-      dueDate: taskData.due_date || "",
+      dueDate: taskData.delivery_date || "",
       assignedTo: "",
-      createdBy: "",
+      createdBy: {
+        id: taskData.creator?.user_id || "",
+        name: taskData.creator?.name || "Unknown",
+        email: taskData.creator?.email || "",
+        role: taskData.creator?.role || "",
+      },
       comments: taskData.comments || [],
       createdDate: taskData.created_at,
       overall_completion_status: taskData.overall_completion_status,
@@ -920,7 +1002,10 @@ export default function TaskDetailPage({
 
     let timelineItems: any[] = [];
 
+    let cnt_of_processor = 1;
+
     for (let i = 0; i < len; i++) {
+      console.log("i : ", i);
       let folder_path = "";
       let storage_name = "";
       let current_stage = "";
@@ -933,16 +1018,17 @@ export default function TaskDetailPage({
         if (stagesArray[i - 1] === "PM") {
           folder_path = `PM_${taskId}`;
           storage_name = "processor-files";
-          current_stage = "Processor (1)";
+          current_stage = "Processor (" + cnt_of_processor + ")";
         } else if (stagesArray[i - 1] === "QC") {
           folder_path = `QC_${taskId}`;
           storage_name = "processor-files";
-          current_stage = "Processor (2)";
+          current_stage = "Processor (" + cnt_of_processor + ")";
         } else if (stagesArray[i - 1] === "QA") {
           folder_path = `QA_${taskId}`;
           storage_name = "processor-files";
-          current_stage = "Processor (3)";
+          current_stage = "Processor (" + cnt_of_processor + ")";
         }
+        cnt_of_processor++;
       } else if (stagesArray[i] === "QC") {
         folder_path = taskId;
         storage_name = "qc-files";
@@ -951,12 +1037,23 @@ export default function TaskDetailPage({
         folder_path = taskId;
         storage_name = "qa-files";
         current_stage = "QA";
+      } else if (stagesArray[i] === "Delivery") {
+        // console.log("cnt_of_processor : ", cnt_of_processor);
+        if (cnt_of_processor == 2) {
+          folder_path = `PM_${taskId}`;
+        } else if (cnt_of_processor == 3) {
+          folder_path = `QC_${taskId}`;
+        } else if (cnt_of_processor == 4) {
+          folder_path = `QA_${taskId}`;
+        }
+        storage_name = "processor-files";
+        current_stage = "Delivery";
       }
 
       const { data: uploadedFiles, error: uploadedFilesError } =
         await supabase.storage.from(storage_name).list(folder_path);
       if (uploadedFilesError) {
-        console.log("Error fetching uploaded files:", uploadedFilesError);
+        console.log("Error fetching uploaded files:" + i, uploadedFilesError);
         return;
       }
       // console.log("uploadedFiles : ", uploadedFiles);
@@ -977,6 +1074,7 @@ export default function TaskDetailPage({
 
       timelineItems.push(timelineItem);
     }
+    console.log("timelineItems : ", timelineItems);
     setTimelineItems(timelineItems);
   };
 
@@ -1110,14 +1208,19 @@ export default function TaskDetailPage({
                     Created By
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200">
-                      <img
-                        src={task.createdBy.avatar}
-                        alt={task.createdBy.name}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                      <span className="text-xs text-gray-600">
+                        {task.createdBy?.name?.charAt(0) || "?"}
+                      </span>
                     </div>
-                    <span className="text-gray-900">{task.createdBy.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">
+                        {task.createdBy?.name || "Unknown"}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {task.createdBy?.email || ""}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,13 +1,15 @@
+"use client";
+
 import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Modal from "@mui/material/Modal";
-import { Clock, DownloadCloud, Paperclip } from "react-feather";
+import { Clock, DownloadCloud, Paperclip, CheckCircle } from "react-feather";
 import { ChevronDown, ChevronUp } from "react-feather";
 import "./Timeline.css";
 
 const style = {
-  position: "absolute",
+  position: "absolute" as const,
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
@@ -103,7 +105,7 @@ export default function TimelineModal({
         onClick={handleOpen}
         variant="contained"
         color="primary"
-        startIcon={<Clock size={18} />}
+        startIcon={<Clock className="h-4 w-4" />}
         sx={{
           textTransform: "none",
           borderRadius: "8px",
@@ -176,6 +178,17 @@ export default function TimelineModal({
                     >
                       <div className="timeline-card-title">
                         <h3>{item.title}</h3>
+                        {item.title === "Delivery" ? (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-green-600"></p>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Final Approved Files
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500"></p>
+                        )}
                         {item.date && (
                           <span className="timeline-date">{item.date}</span>
                         )}
@@ -183,7 +196,7 @@ export default function TimelineModal({
                       {expandedCards[index] ? (
                         <ChevronUp size={16} />
                       ) : (
-                        <ChevronDown size={16} />
+                        <ChevronDown className="h-4 w-4" />
                       )}
                     </div>
 
