@@ -16,14 +16,27 @@ export function TaskDetailBackButton() {
       return;
     }
 
-    // Easier redirect to the respective dashboard based on the source.
+    // Handle the global dashboard case
+    if (source === "global") {
+      router.push("/dashboard");
+      return;
+    }
+
+    // Handle specific dashboard cases (pm, qc, qa)
     if (source) {
       router.push(`/dashboard/${source}`);
       return;
     }
 
-    //Case of the source not being specified
+    // Default case - go to main dashboard
     router.push("/dashboard");
+  };
+
+  const getBackText = () => {
+    if (source === "global") {
+      return "Back to Global Dashboard";
+    }
+    return source ? `Back to ${source.toUpperCase()} Dashboard` : "Back to Dashboard";
   };
 
   return (
@@ -33,7 +46,7 @@ export function TaskDetailBackButton() {
       onClick={handleBackClick}
     >
       <ChevronLeft className="mr-1 h-4 w-4" />
-      Back to {source ? `${source.toUpperCase()} Dashboard` : "Dashboard"}
+      {getBackText()}
     </Button>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Ensure this is your UI library's Button
+import { Button } from "@/components/ui/button"; 
 import { 
   Card, 
   CardContent, 
@@ -83,12 +83,17 @@ export function TaskCard({
     if (onClick) {
       onClick();
     } else {
-      // Get the current path to determine which dashboard we're in
+      // To get the current path of the Dashboard.
       const currentPath = window.location.pathname;
-      const dashboardType = currentPath.split('/')[2]; // This will be 'pm', 'qc', or 'qa'
+      const pathParts = currentPath.split('/');
       
-      // Add the source dashboard as a query parameter
-      router.push(`/tasks/${id}?source=${dashboardType}`);
+      // If we're in a specific dashboard (pm, qc, qa)
+      if (pathParts[2]) {
+        router.push(`/tasks/${id}?source=${pathParts[2]}`);
+      } else {
+        // If we're in the main dashboard , hardcode the source to global.
+        router.push(`/tasks/${id}?source=global`);
+      }
     }
   };
 

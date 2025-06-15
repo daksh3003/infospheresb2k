@@ -331,10 +331,7 @@ export default function TaskDetailPage({
     } else if (SubmitTo === "Send to Processor Team" && currentStage === "QA") {
       next_current_stage = "Processor";
       next_sent_by = "QA";
-    } else if (
-      SubmitTo === "Send to Delivery" &&
-      currentStage === "Processor"
-    ) {
+    } else if (SubmitTo === "Send to Delivery" && currentStage === "Processor") {
       next_current_stage = "Delivery";
       next_sent_by = "Processor";
     } else if (SubmitTo === "Send to Delivery" && currentStage === "QC") {
@@ -344,8 +341,6 @@ export default function TaskDetailPage({
       next_current_stage = "Delivery";
       next_sent_by = "QA";
     }
-
-    // console.log(next_current_stage, next_sent_by);
 
     const { data: stages, error: stagesError } = await supabase
       .from("task_iterations")
@@ -389,12 +384,25 @@ export default function TaskDetailPage({
         position: "top-right",
       });
     } else {
+      // Get the source from URL parameters
+      const searchParams = new URLSearchParams(window.location.search);
+      const source = searchParams.get("source");
+
       toast("Task sent to " + next_current_stage, {
         type: "success",
         position: "top-right",
       });
+      
       setTimeout(() => {
-        router.push(`/dashboard/pm`);
+        // Redirect based on source
+        if (source === "global") {
+          router.push("/dashboard");
+        } else if (source) {
+          router.push(`/dashboard/${source}`);
+        } else {
+          // Default fallback to PM dashboard if no source
+          router.push("/dashboard");
+        }
       }, 4000);
     }
   };
