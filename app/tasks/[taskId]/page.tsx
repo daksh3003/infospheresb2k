@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
-import { TimelineItem } from "@/components/Timeline/Timeline";
 
 // const timelineItems: TimelineItem[] = [
 //   {
@@ -148,6 +147,9 @@ export default function TaskDetailPage({
   const [processorFiles, setProcessorFiles] = useState<string[]>([]);
   const [timelineItems, setTimelineItems] = useState<any[]>([]);
 
+  const [storage_name, setStorageName] = useState<string>("");
+  const [folder_path, setFolderPath] = useState<string>("");
+
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -205,7 +207,6 @@ export default function TaskDetailPage({
     if (
       (currentStage === "Processor" && sentBy === "QA") ||
       (currentStage === "QA" && sentBy === "QC") ||
-      (currentStage === "QC" && sentBy === "Processor") ||
       (currentStage === "QA" && sentBy === "Processor")
     ) {
       overall_completion_status = true;
@@ -363,13 +364,13 @@ export default function TaskDetailPage({
       return;
     }
 
-    console.log("stages : ", stages);
-    let stagesArray: string[] = [];
-    if (stages === null) {
-      stagesArray = [];
-    } else {
-      stagesArray = stages.stages;
-    }
+    // console.log("stages : ", stages);
+    // let stagesArray: string[] = [];
+    // if (stages.stages === null) {
+    //   stagesArray = [];
+    // } else {
+    //   stagesArray = stages.stages;
+    // }
     // if (stagesData === null) {
     //   stagesData = [];
     // }
@@ -379,7 +380,7 @@ export default function TaskDetailPage({
       .update({
         current_stage: next_current_stage,
         sent_by: next_sent_by,
-        stages: [...stagesArray, currentStage],
+        stages: [...stages.stages, currentStage],
       })
       .eq("project_id", taskId);
 
@@ -491,11 +492,36 @@ export default function TaskDetailPage({
     );
   };
 
-  const handleDownloadOffilesToBeUploaded = async (fileName: string) => {
+  const handleDownloadOffilesToBeUploaded = async (
+    fileName: string,
+    index: number
+  ) => {
     try {
+      let storage_name = "";
+      let folder_path = "";
+
+      if (currentStage === "Processor") {
+        if (sentBy === "PM") {
+          storage_name = "task-files";
+          folder_path = taskId;
+        } else if (sentBy === "QC") {
+          storage_name = "qc-files";
+          folder_path = taskId;
+        } else if (sentBy === "QA") {
+          storage_name = "qa-files";
+          folder_path = taskId;
+        }
+      } else if (currentStage === "QC") {
+        storage_name = "qc-files";
+        folder_path = taskId;
+      } else if (currentStage === "QA") {
+        storage_name = "qa-files";
+        folder_path = taskId;
+      }
+
       const { data, error } = await supabase.storage
-        .from("processor-files")
-        .download(`${currentStage}_${taskId}/${fileName}`);
+        .from(storage_name)
+        .download(`${folder_path}/${fileName}`);
 
       if (error) throw new Error("Download failed: " + error.message);
       if (!data) throw new Error("No file data found");
@@ -513,11 +539,19 @@ export default function TaskDetailPage({
     }
   };
 
-  const handleDownload = async (fileName: string) => {
+  const handleDownload = async (
+    fileName: string,
+    storage_name: string,
+    folder_path: string,
+    index: number
+  ) => {
     try {
+      console.log("storage_name : ", storage_name);
+      console.log("folder_path : ", folder_path);
+      console.log("fileName : ", fileName);
       const { data, error } = await supabase.storage
-        .from("task-files")
-        .download(`${taskId}/${fileName}`);
+        .from(storage_name)
+        .download(`${folder_path}/${fileName}`);
 
       if (error) throw new Error("Download failed: " + error.message);
       if (!data) throw new Error("No file data found");
@@ -525,7 +559,27 @@ export default function TaskDetailPage({
       const url = URL.createObjectURL(data); // `data` is a Blob
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName || "downloaded_file";
+
+      let new_file_name = "";
+
+      if (storage_name === "processor-files") {
+        if (folder_path.includes("PM_")) {
+          new_file_name = "processor_file_v0_" + index;
+        } else if (folder_path.includes("QC_")) {
+          new_file_name = "processor_file_v1_" + index;
+        } else if (folder_path.includes("QA_")) {
+          new_file_name = "processor_file_v2_" + index;
+        }
+      } else if (storage_name === "qc-files") {
+        new_file_name = "qc_file_" + index;
+      } else if (storage_name === "qa-files") {
+        new_file_name = "qa_file_" + index;
+      } else if (storage_name === "task-files") {
+        console.log("index : ", index);
+        new_file_name = "client_file_" + index;
+      }
+
+      a.download = new_file_name || "downloaded_file";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -619,26 +673,8 @@ export default function TaskDetailPage({
       storage_name = "processor-files";
     }
 
-    // if (
-    //   (current_stage.sent_by === "PM" &&
-    //     current_stage.current_stage === "Processor") ||
-    //   (current_stage.sent_by === "Processor" &&
-    //     current_stage.current_stage === "QC") ||
-    //   (current_stage.sent_by === "QC" &&
-    //     current_stage.current_stage === "Processor") ||
-    //   (current_stage.sent_by === "QC" && current_stage.current_stage === "QA")
-    // ) {
-    //   folder_path = `Processor_${taskId}`;
-    //   storage_name = "processor-files";
-    // } else if (
-    //   (current_stage.sent_by === "Processor" &&
-    //     current_stage.current_stage === "QA") ||
-    //   (current_stage.sent_by === "QA" &&
-    //     current_stage.current_stage === "Processor")
-    // ) {
-    //   folder_path = `QC_${taskId}`;
-    //   storage_name = "processor-files";
-    // }
+    setStorageName(storage_name);
+    setFolderPath(folder_path);
 
     console.log(folder_path, storage_name);
 
@@ -866,48 +902,79 @@ export default function TaskDetailPage({
   };
 
   const fetchTimelineItems = async () => {
-    // const { data: timelineItemsData, error: timelineError } = await supabase
-    //   .from("task_iterations")
-    //   .select("*")
-    //   .eq("project_id", taskId)
-    //   .single();
-    // if (timelineError) {
-    //   console.log("Error fetching timeline items:", timelineError);
-    //   return;
-    // }
-    // console.log("timelineItemsData : ", timelineItemsData);
-    // let folder_path = "";
-    // let storage_name = "";
-    // if (timelineItemsData.sent_by === "PM") {
-    //   folder_path = taskId;
-    //   storage_name = "task-files";
-    // } else if (timelineItemsData.sent_by === "Processor") {
-    //   folder_path = `PM_${taskId}`;
-    //   storage_name = "processor-files";
-    // } else if (timelineItemsData.sent_by === "QC") {
-    //   folder_path = taskId;
-    //   storage_name = "qc-files";
-    // } else if (timelineItemsData.sent_by === "QA") {
-    //   folder_path = taskId;
-    //   storage_name = "qa-files";
-    // }
-    // const { data: uploadedFiles, error: uploadedFilesError } =
-    //   await supabase.storage.from(storage_name).list(folder_path);
-    // if (uploadedFilesError) {
-    //   console.log("Error fetching uploaded files:", uploadedFilesError);
-    //   return;
-    // }
-    // console.log("uploadedFiles : ", uploadedFiles);
-    // const timelineItem = {
-    //   id: timelineItemsData.sent_by,
-    //   title: timelineItemsData.sent_by,
-    //   content: uploadedFiles.map((file) => file.name),
-    //   completed: true,
-    //   date: new Date().toLocaleString("en-IN", {
-    //     timeZone: "Asia/Kolkata",
-    //   }),
-    // };
-    // setTimelineItems([...timelineItems, timelineItem]);
+    const { data: stages, error: timelineError } = await supabase
+      .from("task_iterations")
+      .select("stages")
+      .eq("project_id", taskId)
+      .single();
+    if (timelineError) {
+      console.log("Error fetching timeline items:", timelineError);
+      return;
+    }
+    console.log("stages : ", stages);
+    const stagesArray = stages.stages;
+    const len = stagesArray.length;
+
+    let timelineItems: any[] = [];
+
+    for (let i = 0; i < len; i++) {
+      let folder_path = "";
+      let storage_name = "";
+      let current_stage = "";
+
+      if (stagesArray[i] === "PM") {
+        folder_path = taskId;
+        storage_name = "task-files";
+        current_stage = "PM";
+      } else if (stagesArray[i] === "Processor") {
+        if (stagesArray[i - 1] === "PM") {
+          folder_path = `PM_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (1)";
+        } else if (stagesArray[i - 1] === "QC") {
+          folder_path = `QC_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (2)";
+        } else if (stagesArray[i - 1] === "QA") {
+          folder_path = `QA_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (3)";
+        }
+      } else if (stagesArray[i] === "QC") {
+        folder_path = taskId;
+        storage_name = "qc-files";
+        current_stage = "QC";
+      } else if (stagesArray[i] === "QA") {
+        folder_path = taskId;
+        storage_name = "qa-files";
+        current_stage = "QA";
+      }
+
+      const { data: uploadedFiles, error: uploadedFilesError } =
+        await supabase.storage.from(storage_name).list(folder_path);
+      if (uploadedFilesError) {
+        console.log("Error fetching uploaded files:", uploadedFilesError);
+        return;
+      }
+      // console.log("uploadedFiles : ", uploadedFiles);
+      const timelineItem = {
+        id: taskId,
+        title: current_stage,
+        content: uploadedFiles.map((file, index) => ({
+          name: file.name,
+          onClick: () => {
+            handleDownload(file.name, storage_name, folder_path, index);
+          },
+        })),
+        completed: true,
+        date: new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
+      };
+
+      timelineItems.push(timelineItem);
+    }
+    setTimelineItems(timelineItems);
   };
 
   useEffect(() => {
@@ -944,6 +1011,7 @@ export default function TaskDetailPage({
             items={timelineItems}
             title="Timeline"
             buttonText="View Timeline"
+            handleDownload={handleDownload}
           />
         </div>
       </div>
@@ -1170,7 +1238,7 @@ export default function TaskDetailPage({
                   Client Files
                 </h3>
                 <div className="space-y-2">
-                  {PMFiles.map((item: string) => (
+                  {PMFiles.map((item: string, index: number) => (
                     <div
                       key={item}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
@@ -1182,7 +1250,9 @@ export default function TaskDetailPage({
                         </div>
                       </div>
                       <button
-                        onClick={() => handleDownload(item)}
+                        onClick={() =>
+                          handleDownload(item, "task-files", taskId, index)
+                        }
                         className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                       >
                         <DownloadCloud className="h-4 w-4" /> Download
@@ -1200,7 +1270,7 @@ export default function TaskDetailPage({
                       Processor Files
                     </h3>
                     <div className="space-y-2">
-                      {processorFiles.map((item: string) => (
+                      {processorFiles.map((item: string, index: number) => (
                         <div
                           key={item}
                           className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
@@ -1214,7 +1284,14 @@ export default function TaskDetailPage({
                             </div>
                           </div>
                           <button
-                            onClick={() => handleDownload(item)}
+                            onClick={() =>
+                              handleDownload(
+                                item,
+                                storage_name,
+                                folder_path,
+                                index
+                              )
+                            }
                             className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                           >
                             <DownloadCloud className="h-4 w-4" /> Download
@@ -1234,7 +1311,7 @@ export default function TaskDetailPage({
                       Correction Files
                     </h3>
                     <div className="space-y-2">
-                      {correctionFiles.map((item: string) => (
+                      {correctionFiles.map((item: string, index: number) => (
                         <div
                           key={item}
                           className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
@@ -1248,7 +1325,14 @@ export default function TaskDetailPage({
                             </div>
                           </div>
                           <button
-                            onClick={() => handleDownload(item)}
+                            onClick={() =>
+                              handleDownload(
+                                item,
+                                storage_name,
+                                folder_path,
+                                index
+                              )
+                            }
                             className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                           >
                             <DownloadCloud className="h-4 w-4" /> Download

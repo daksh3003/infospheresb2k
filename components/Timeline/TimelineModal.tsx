@@ -2,7 +2,7 @@ import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Modal from "@mui/material/Modal";
-import { Clock } from "react-feather";
+import { Clock, DownloadCloud, Paperclip } from "react-feather";
 import { ChevronDown, ChevronUp } from "react-feather";
 import "./Timeline.css";
 
@@ -25,7 +25,7 @@ const style = {
 interface TimelineItem {
   id: string;
   title: string;
-  content: string;
+  content: [];
   completed: boolean;
   date?: string;
 }
@@ -34,12 +34,19 @@ interface TimelineModalProps {
   items: TimelineItem[];
   title?: string;
   buttonText?: string;
+  handleDownload: (
+    fileName: string,
+    storage_name: string,
+    folder_path: string,
+    fileIdx: number
+  ) => void;
 }
 
 export default function TimelineModal({
   items,
   title = "Timeline",
   buttonText = "View Timeline",
+  handleDownload,
 }: TimelineModalProps) {
   const [open, setOpen] = React.useState(false);
   const [expandedCards, setExpandedCards] = React.useState<{
@@ -49,11 +56,45 @@ export default function TimelineModal({
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
-  const toggleCard = (id: string) => {
+  const toggleCard = (id: number) => {
     setExpandedCards((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const ProcessForDownload = (
+    itemIdx: any,
+    fileIdx: number,
+    fileName: string
+  ) => {
+    let storage_name = "";
+    let folder_path = "";
+    if (items[itemIdx].title === "PM") {
+      storage_name = "task-files";
+      folder_path = items[itemIdx].id;
+    } else if (
+      items[itemIdx].title === "Processor (1)"
+      // items[itemIdx - 1].title === "PM"
+    ) {
+      storage_name = "processor-files";
+      folder_path = `PM_${items[itemIdx].id}`;
+    } else if (
+      items[itemIdx].title === "Processor (2)"
+      // items[itemIdx - 1].title === "QC"
+    ) {
+      storage_name = "processor-files";
+      folder_path = `QC_${items[itemIdx].id}`;
+    } else if (
+      items[itemIdx].title === "Processor (3)"
+      // items[itemIdx - 1].title === "QA"
+    ) {
+      storage_name = "processor-files";
+      folder_path = `QA_${items[itemIdx].id}`;
+    } else if (items[itemIdx].title === "QA") {
+    }
+
+    handleDownload(fileName, storage_name, folder_path, fileIdx);
   };
 
   return (
@@ -120,7 +161,7 @@ export default function TimelineModal({
           <Box sx={{ padding: "24px" }}>
             <div className="timeline">
               {items.map((item, index) => (
-                <div key={item.id} className="timeline-item">
+                <div key={index} className="timeline-item">
                   <div className="timeline-marker">
                     <div
                       className={`circle ${item.completed ? "completed" : ""}`}
@@ -131,7 +172,7 @@ export default function TimelineModal({
                   <div className="timeline-content">
                     <div
                       className="timeline-card-header"
-                      onClick={() => toggleCard(item.id)}
+                      onClick={() => toggleCard(index)}
                     >
                       <div className="timeline-card-title">
                         <h3>{item.title}</h3>
@@ -139,16 +180,36 @@ export default function TimelineModal({
                           <span className="timeline-date">{item.date}</span>
                         )}
                       </div>
-                      {expandedCards[item.id] ? (
+                      {expandedCards[index] ? (
                         <ChevronUp size={16} />
                       ) : (
                         <ChevronDown size={16} />
                       )}
                     </div>
 
-                    {expandedCards[item.id] && (
+                    {expandedCards[index] && (
                       <div className="timeline-card-content">
-                        {item.content}
+                        {item.content.map((file: any, fileIdx: number) => (
+                          <div
+                            key={fileIdx}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Paperclip className="h-4 w-4 text-gray-500" />
+                              <div>
+                                <p className="font-medium">{file.name}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() =>
+                                ProcessForDownload(index, fileIdx, file.name)
+                              }
+                              className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                            >
+                              <DownloadCloud className="h-4 w-4" /> Download
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
