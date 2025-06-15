@@ -19,6 +19,43 @@ import {
   ArrowBigUpDashIcon,
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
+import TimelineModal from "@/components/Timeline/TimelineModal";
+import { TimelineItem } from "@/components/Timeline/Timeline";
+
+// const timelineItems: TimelineItem[] = [
+//   {
+//     id: "1",
+//     title: "Project Kickoff",
+//     content:
+//       "Initial meeting with stakeholders to define project scope and objectives. Key decisions were made regarding timeline and resource allocation.",
+//     completed: true,
+//     date: "2024-01-15",
+//   },
+//   {
+//     id: "2",
+//     title: "Design Phase",
+//     content:
+//       "Created wireframes and high-fidelity designs. Conducted user research and gathered feedback from the team.",
+//     completed: true,
+//     date: "2024-02-01",
+//   },
+//   {
+//     id: "3",
+//     title: "Development",
+//     content:
+//       "Started implementation of core features. Frontend and backend teams working in parallel to meet deadlines.",
+//     completed: false,
+//     date: "2024-02-15",
+//   },
+//   {
+//     id: "4",
+//     title: "Testing",
+//     content:
+//       "Quality assurance phase including unit testing, integration testing, and user acceptance testing.",
+//     completed: false,
+//     date: "2024-03-01",
+//   },
+// ];
 
 // Simple dialog component
 const Dialog = ({
@@ -109,6 +146,7 @@ export default function TaskDetailPage({
   const [PMFiles, setPMFiles] = useState<string[]>([]);
   const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
   const [processorFiles, setProcessorFiles] = useState<string[]>([]);
+  const [timelineItems, setTimelineItems] = useState<any[]>([]);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,9 +352,35 @@ export default function TaskDetailPage({
 
     console.log(next_current_stage, next_sent_by);
 
+    const { data: stages, error: stagesError } = await supabase
+      .from("task_iterations")
+      .select("stages")
+      .eq("project_id", taskId)
+      .single();
+
+    if (stagesError) {
+      console.error("Error fetching stages:", stagesError);
+      return;
+    }
+
+    console.log("stages : ", stages);
+    let stagesArray: string[] = [];
+    if (stages === null) {
+      stagesArray = [];
+    } else {
+      stagesArray = stages.stages;
+    }
+    // if (stagesData === null) {
+    //   stagesData = [];
+    // }
+
     const { data, error } = await supabase
       .from("task_iterations")
-      .update({ current_stage: next_current_stage, sent_by: next_sent_by })
+      .update({
+        current_stage: next_current_stage,
+        sent_by: next_sent_by,
+        stages: [...stagesArray, currentStage],
+      })
       .eq("project_id", taskId);
 
     if (error) {
@@ -797,12 +861,60 @@ export default function TaskDetailPage({
       return;
     }
     console.log(uploadedFiles);
+
     setUploadedFiles(uploadedFiles.map((file) => file.name));
+  };
+
+  const fetchTimelineItems = async () => {
+    // const { data: timelineItemsData, error: timelineError } = await supabase
+    //   .from("task_iterations")
+    //   .select("*")
+    //   .eq("project_id", taskId)
+    //   .single();
+    // if (timelineError) {
+    //   console.log("Error fetching timeline items:", timelineError);
+    //   return;
+    // }
+    // console.log("timelineItemsData : ", timelineItemsData);
+    // let folder_path = "";
+    // let storage_name = "";
+    // if (timelineItemsData.sent_by === "PM") {
+    //   folder_path = taskId;
+    //   storage_name = "task-files";
+    // } else if (timelineItemsData.sent_by === "Processor") {
+    //   folder_path = `PM_${taskId}`;
+    //   storage_name = "processor-files";
+    // } else if (timelineItemsData.sent_by === "QC") {
+    //   folder_path = taskId;
+    //   storage_name = "qc-files";
+    // } else if (timelineItemsData.sent_by === "QA") {
+    //   folder_path = taskId;
+    //   storage_name = "qa-files";
+    // }
+    // const { data: uploadedFiles, error: uploadedFilesError } =
+    //   await supabase.storage.from(storage_name).list(folder_path);
+    // if (uploadedFilesError) {
+    //   console.log("Error fetching uploaded files:", uploadedFilesError);
+    //   return;
+    // }
+    // console.log("uploadedFiles : ", uploadedFiles);
+    // const timelineItem = {
+    //   id: timelineItemsData.sent_by,
+    //   title: timelineItemsData.sent_by,
+    //   content: uploadedFiles.map((file) => file.name),
+    //   completed: true,
+    //   date: new Date().toLocaleString("en-IN", {
+    //     timeZone: "Asia/Kolkata",
+    //   }),
+    // };
+    // setTimelineItems([...timelineItems, timelineItem]);
   };
 
   useEffect(() => {
     fetchProcessorFiles();
     fetchData();
+    fetchTimelineItems();
+    // console.log("timelineItems : ", timelineItems);
     // fetchUploadedFiles();
   }, [taskId]);
 
@@ -827,7 +939,17 @@ export default function TaskDetailPage({
             Overall Task Status: Pending
           </h3>
         )}
+        <div className="flex justify-end">
+          <TimelineModal
+            items={timelineItems}
+            title="Timeline"
+            buttonText="View Timeline"
+          />
+        </div>
       </div>
+
+      {/* <div style={{ maxWidth: "800px", margin: "40px auto" }}> */}
+      {/* </div> */}
 
       {/* Main task card */}
       <div className="mb-6 border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
