@@ -1,6 +1,8 @@
 // File: components/task-card.tsx
 
-import React, { useState, useRef } from "react";
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
 import {
   X,
   ChevronRight,
@@ -42,6 +44,13 @@ interface FormData {
   estimatedHoursQA: string;
 }
 
+interface UserProfile {
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 type FormRefs = {
   serialNumber: React.RefObject<HTMLInputElement | null>;
   taskId: React.RefObject<HTMLInputElement | null>;
@@ -69,6 +78,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState<FormData>({
     // Form1 Fields
     serialNumber: "",
@@ -224,6 +234,30 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }));
   };
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('user_id, name, email, role')
+            .eq('user_id', user.id)
+            .single();
+            
+          if (error) throw error;
+          setCurrentUser(profile);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchUserProfile();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -232,77 +266,75 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     let currentUserId: string | null = null;
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       currentUserId = user?.id || null;
-      if (!currentUserId && formData.selectedFiles.length > 0) {
-        console.warn(
-          "Attempting to upload file without an authenticated user. This might be restricted by RLS."
-        );
+      if (!currentUserId) {
+        toast.error("You must be logged in to create a task");
+        setIsSubmitting(false);
+        return;
       }
     } catch (authError) {
-      console.warn("Could not get authenticated user:", authError);
+      console.error("Could not get authenticated user:", authError);
+      toast.error("Authentication error occurred");
+      setIsSubmitting(false);
+      return;
     }
 
     try {
       // 1. Insert into 'projects' table
-      const file_names = [];
-      if (formData.selectedFiles.length > 0) {
-        for (let i = 0; i < formData.selectedFiles.length; i++) {
-          file_names.push(formData.selectedFiles[i].name);
-        }
-      }
-
       const projectCoreData = {
         project_name: formData.projectName,
         task_id: formData.taskId,
         po_hours: parseFloat(formData.estimatePOHours) || 0,
         mail_instruction: formData.mailInstruction,
-        file_count: formData.numberOfFiles,
-        page_count: formData.numberOfPages,
+        file_count: parseInt(formData.numberOfFiles) || 0,
+        page_count: parseInt(formData.numberOfPages) || 0,
         language: formData.language,
         process_type: formData.processType,
         delivery_date: formData.deliveryDate || null,
         serial_number: formData.serialNumber,
         client_instruction: formData.clientInstruction,
-        list_of_files: file_names,
+        list_of_files: formData.selectedFiles.map(f => f.name),
         reference_file_name: formData.fileName || null,
         estimated_hours_ocr: parseFloat(formData.estimatedHoursOCR) || 0,
         estimated_hours_qc: parseFloat(formData.estimatedHoursQC) || 0,
         estimated_hours_qa: parseFloat(formData.estimatedHoursQA) || 0,
         created_by: currentUserId,
-        // created_at: new Date().toLocaleString("en-IN", {
-        //   timeZone: "Asia/Kolkata",
-        // }),
-        // updated_at: new Date().toLocaleString("en-IN", {
-        //   timeZone: "Asia/Kolkata",
-        // }),
+        completion_status: false,
+        overall_completion_status: false
       };
 
-      console.log("Project core data:", projectCoreData);
+      console.log("Creating project with data:", projectCoreData);
 
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .insert([projectCoreData])
-        .select()
+        .select(`
+          *,
+          profiles!projects_created_by_fkey (
+            name
+          )
+        `)
         .single();
 
       if (projectError) {
         console.error("Error inserting project:", projectError);
-        alert(`Failed to save project: ${projectError.message}`);
+        toast.error(`Failed to save project: ${projectError.message}`);
         setIsSubmitting(false);
         return;
       }
 
       if (!projectData) {
-        console.error("No project data returned after insert.");
-        alert("Failed to save project: No data returned.");
+        console.error("No project data returned after insert");
+        toast.error("Failed to save project: No data returned");
         setIsSubmitting(false);
         return;
       }
 
       const newProjectId = projectData.id;
+      const creatorName = projectData.profiles?.name || "Unknown";
+      console.log("Task created by:", creatorName);
+
       let newFileId: string | null = null;
       let uploadedFilePath: string | null = null;
       let originalFileName: string | null = null;
@@ -320,17 +352,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
           date = date.replaceAll("/", "-");
           const filePathInStorage = `${newProjectId}/${date}_${originalFileName}`;
 
-          const { data: uploadData, error: uploadError } =
-            await supabase.storage
-              .from("task-files")
-              .upload(filePathInStorage, fileToUpload, {
-                contentType: fileToUpload.type,
-                upsert: true,
-              });
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("task-files")
+            .upload(filePathInStorage, fileToUpload, {
+              contentType: fileToUpload.type,
+              upsert: true,
+            });
 
           if (uploadError) {
             console.error("Error uploading file:", uploadError);
-            alert(`Failed to upload file: ${uploadError.message}`);
+            toast.error(`Failed to upload file: ${uploadError.message}`);
             setIsSubmitting(false);
             return;
           }
@@ -338,46 +369,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
         }
       }
 
-      // 3. Insert into 'file_versions' table (if a file was uploaded)
-      if (uploadedFilePath && originalFileName) {
-        const fileVersionData = {
-          project_id: newProjectId,
-          uploaded_by_user_id: currentUserId,
-          stage_uploaded_at: "PM",
-          file_name: originalFileName,
-          file_path_supabase_storage: uploadedFilePath,
-          page_count: formData.numberOfPages
-            ? parseInt(formData.numberOfPages)
-            : null,
-          file_size_bytes: fileSize,
-          version_notes: "Initial file uploaded during task creation.",
-        };
-
-        const { data: fileVersion, error: fileVersionError } = await supabase
-          .from("file_versions")
-          .insert([fileVersionData])
-          .select("id")
-          .single();
-
-        if (fileVersionError) {
-          console.error("Error inserting file version:", fileVersionError);
-          alert(`Failed to save file version: ${fileVersionError.message}`);
-          setIsSubmitting(false);
-          return;
-        }
-        newFileId = fileVersion.id;
-      }
-
-      // 4. Insert into 'task_iterations' table
+      // 3. Insert into 'task_iterations' table
       const taskIterationData = {
         project_id: newProjectId,
         iteration_number: 1,
         current_stage: "Processor",
         status_flag: "pending_action",
-        // current_file_version_id: newFileId,
         assigned_to_processor_user_id: currentUserId,
         notes: "Task created.",
         sent_by: "PM",
+        stages: [] // Initialize empty stages array
       };
 
       const { data: iteration, error: iterationError } = await supabase
@@ -388,45 +389,23 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
       if (iterationError) {
         console.error("Error inserting task iteration:", iterationError);
-        alert(`Failed to save task iteration: ${iterationError.message}`);
+        toast.error(`Failed to save task iteration: ${iterationError.message}`);
         setIsSubmitting(false);
         return;
       }
-      const newTaskIterationId = iteration.id;
-      if (newFileId && newTaskIterationId) {
-        const { error: updateFileError } = await supabase
-          .from("file_versions")
-          .update({ task_iteration_id: newTaskIterationId })
-          .eq("id", newFileId);
 
-        if (updateFileError) {
-          console.error(
-            "Error updating file version with iteration ID:",
-            updateFileError
-          );
-        }
-      }
-
-      // 5. Insert into 'process_logs' table
+      // 4. Insert into 'process_logs' table
       const processLogData = {
-        task_iteration_id: newTaskIterationId,
+        task_iteration_id: iteration.id,
         user_id: currentUserId,
         stage_acted_upon: "PM",
         action_taken: "created_task",
         log_notes: `Project '${formData.projectName}' created. ${
-          originalFileName
-            ? `Initial file: ${originalFileName}`
-            : "No initial file."
+          originalFileName ? `Initial file: ${originalFileName}` : "No initial file."
         }`,
-        hours_spent_ocr: formData.estimatedHoursOCR
-          ? parseFloat(formData.estimatedHoursOCR)
-          : null,
-        hours_spent_qc: formData.estimatedHoursQC
-          ? parseFloat(formData.estimatedHoursQC)
-          : null,
-        hours_spent_qa: formData.estimatedHoursQA
-          ? parseFloat(formData.estimatedHoursQA)
-          : null,
+        hours_spent_ocr: parseFloat(formData.estimatedHoursOCR) || null,
+        hours_spent_qc: parseFloat(formData.estimatedHoursQC) || null,
+        hours_spent_qa: parseFloat(formData.estimatedHoursQA) || null,
       };
 
       const { error: logError } = await supabase
@@ -437,18 +416,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
         console.warn("Failed to save process log:", logError.message);
       }
 
-      console.log(
-        "Successfully added project and initial iteration. Project ID:",
-        newProjectId,
-        "Iteration ID:",
-        newTaskIterationId
-      );
+      toast.success("Task successfully added");
 
-      toast("Task successfully added ", {
-        type: "success",
-        position: "top-right",
-      });
-
+      // Reset form
       setFormData({
         serialNumber: "",
         taskId: "",
@@ -468,21 +438,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
         estimatedHoursQC: "",
         estimatedHoursQA: "",
       });
+      
       setCurrentPage(1);
       if (onTaskAdded) {
         onTaskAdded();
       }
       onClose();
+
     } catch (error) {
       console.error("Unexpected error during submission:", error);
-      const errorMessage =
-        typeof error === "object" && error !== null && "message" in error
-          ? (error as Error).message
-          : "An unknown error occurred.";
-      alert(
-        `An unexpected error occurred: ${errorMessage}. Check console for details.`
-      );
-    } finally {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(`An unexpected error occurred: ${errorMessage}`);
       setIsSubmitting(false);
     }
   };
@@ -501,9 +467,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
     <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-screen overflow-auto pointer-events-auto">
         <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Loading Engineer Task
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Loading Engineer Task
+            </h2>
+            <p className="text-sm text-gray-500">
+              Created by: {currentUser?.name || "Loading..."}
+            </p>
+          </div>
           <button
             onClick={onClose}
             type="button"

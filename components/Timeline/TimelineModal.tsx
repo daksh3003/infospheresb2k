@@ -1,13 +1,14 @@
+"use client";
+
 import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Modal from "@mui/material/Modal";
-import { Clock } from "react-feather";
-import { ChevronDown, ChevronUp } from "react-feather";
+import { Clock, ChevronDown, ChevronUp } from "lucide-react";
 import "./Timeline.css";
 
 const style = {
-  position: "absolute",
+  position: "absolute" as const,
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
@@ -62,7 +63,7 @@ export default function TimelineModal({
         onClick={handleOpen}
         variant="contained"
         color="primary"
-        startIcon={<Clock size={18} />}
+        startIcon={<Clock className="h-4 w-4" />}
         sx={{
           textTransform: "none",
           borderRadius: "8px",
@@ -140,9 +141,9 @@ export default function TimelineModal({
                         )}
                       </div>
                       {expandedCards[item.id] ? (
-                        <ChevronUp size={16} />
+                        <ChevronUp className="h-4 w-4" />
                       ) : (
-                        <ChevronDown size={16} />
+                        <ChevronDown className="h-4 w-4" />
                       )}
                     </div>
 

@@ -364,15 +364,16 @@ export default function TaskDetailPage({
     }
 
     console.log("stages : ", stages);
-    let stagesArray: string[] = [];
-    if (stages === null) {
-      stagesArray = [];
-    } else {
+    let stagesArray = [];
+    
+    // Handle the stages data properly
+    if (stages && stages.stages) {
+      // If stages.stages exists and is an array, use it
       stagesArray = stages.stages;
+    } else if (stages && !stages.stages) {
+      // If stages exists but stages.stages doesn't, start a new array
+      stagesArray = [];
     }
-    // if (stagesData === null) {
-    //   stagesData = [];
-    // }
 
     const { data, error } = await supabase
       .from("task_iterations")
@@ -807,20 +808,88 @@ export default function TaskDetailPage({
     let folder_path = "";
     let storage_name = "";
 
-    // Step 2: Then fetch task data
+    // Step 2: Then fetch task data with creator information
     const { data: taskData, error: taskError } = await supabase
       .from("projects")
-      .select("*")
+      .select(`
+        *,
+        creator:profiles!inner (
+          user_id,
+          name,
+          email,
+          role
+        )
+      `)
       .eq("id", taskId)
       .single();
 
     if (taskError) {
       console.error("Error fetching task data:", taskError);
-      // console.log("Task Error:", taskError);
-      // return;
+      // Try alternative approach if the join fails
+      const { data: simpleTaskData, error: simpleError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", taskId)
+        .single();
+
+      if (simpleError) {
+        console.error("Error fetching simple task data:", simpleError);
+        return;
+      }
+
+      // Fetch creator info separately
+      const { data: creatorData, error: creatorError } = await supabase
+        .from("profiles")
+        .select("user_id, name, email, role")
+        .eq("user_id", simpleTaskData.created_by)
+        .single();
+
+      if (creatorError) {
+        console.error("Error fetching creator data:", creatorError);
+        setTask((prev: any) => ({
+          ...prev,
+          id: simpleTaskData.id,
+          title: simpleTaskData.project_name,
+          description: simpleTaskData.description,
+          priority: simpleTaskData.priority || "low",
+          dueDate: simpleTaskData.delivery_date || "",
+          assignedTo: "",
+          createdBy: {
+            id: simpleTaskData.created_by,
+            name: "Unknown",
+            email: "",
+            role: ""
+          },
+          comments: simpleTaskData.comments || [],
+          createdDate: simpleTaskData.created_at,
+          overall_completion_status: simpleTaskData.overall_completion_status,
+        }));
+        return;
+      }
+
+      // Set task with creator info
+      setTask((prev: any) => ({
+        ...prev,
+        id: simpleTaskData.id,
+        title: simpleTaskData.project_name,
+        description: simpleTaskData.description,
+        priority: simpleTaskData.priority || "low",
+        dueDate: simpleTaskData.delivery_date || "",
+        assignedTo: "",
+        createdBy: {
+          id: creatorData.user_id,
+          name: creatorData.name,
+          email: creatorData.email,
+          role: creatorData.role
+        },
+        comments: simpleTaskData.comments || [],
+        createdDate: simpleTaskData.created_at,
+        overall_completion_status: simpleTaskData.overall_completion_status,
+      }));
+      return;
     }
 
-    // console.log("Task Data:", taskData);
+    console.log("Task Data with creator:", taskData);
 
     // Merge in the task data without touching attachments
     setTask((prev: any) => ({
@@ -829,9 +898,14 @@ export default function TaskDetailPage({
       title: taskData.project_name,
       description: taskData.description,
       priority: taskData.priority || "low",
-      dueDate: taskData.due_date || "",
+      dueDate: taskData.delivery_date || "",
       assignedTo: "",
-      createdBy: "",
+      createdBy: {
+        id: taskData.creator?.user_id || "",
+        name: taskData.creator?.name || "Unknown",
+        email: taskData.creator?.email || "",
+        role: taskData.creator?.role || ""
+      },
       comments: taskData.comments || [],
       createdDate: taskData.created_at,
       overall_completion_status: taskData.overall_completion_status,
@@ -1039,14 +1113,15 @@ export default function TaskDetailPage({
                     Created By
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200">
-                      <img
-                        src={task.createdBy.avatar}
-                        alt={task.createdBy.name}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                      <span className="text-xs text-gray-600">
+                        {task.createdBy?.name?.charAt(0) || "?"}
+                      </span>
                     </div>
-                    <span className="text-gray-900">{task.createdBy.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-gray-900">{task.createdBy?.name || "Unknown"}</span>
+                      <span className="text-xs text-gray-500">{task.createdBy?.email || ""}</span>
+                    </div>
                   </div>
                 </div>
               </div>
