@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
+import { version } from "os";
 
 // const timelineItems: TimelineItem[] = [
 //   {
@@ -146,9 +147,11 @@ export default function TaskDetailPage({
   const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
   const [processorFiles, setProcessorFiles] = useState<string[]>([]);
   const [timelineItems, setTimelineItems] = useState<any[]>([]);
+  const [isQcinLoop, setIsQcinLoop] = useState<boolean>(true);
 
   const [storage_name, setStorageName] = useState<string>("");
   const [folder_path, setFolderPath] = useState<string>("");
+  const [version, setVersion] = useState<number>(1);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,19 +301,10 @@ export default function TaskDetailPage({
         setShowSubmitToButton(false);
       }
 
-      // setSentBy(data.sent_by);
-      // console.log(SubmitTo);
-      // console.log(data.sent_by);
-
       // Update local state
       setStatus("completed");
       setProgress(100);
       setShowCompleteDialog(false);
-
-      // Navigate back to dashboard after brief delay
-      // setTimeout(() => {
-      //   router.push("/dashboard/pm");
-      // }, 1500);
     } catch (error) {
       console.error("Error completing task:", error);
     }
@@ -363,17 +357,6 @@ export default function TaskDetailPage({
       console.error("Error fetching stages:", stagesError);
       return;
     }
-
-    // console.log("stages : ", stages);
-    // let stagesArray: string[] = [];
-    // if (stages.stages === null) {
-    //   stagesArray = [];
-    // } else {
-    //   stagesArray = stages.stages;
-    // }
-    // if (stagesData === null) {
-    //   stagesData = [];
-    // }
 
     const { data, error } = await supabase
       .from("task_iterations")
@@ -623,6 +606,8 @@ export default function TaskDetailPage({
       isQcInLoop = false;
     }
 
+    setIsQcinLoop(isQcInLoop);
+
     // console.log("qcData : ", qcData);
 
     // console.log("isQcInLoop : ", isQcInLoop);
@@ -675,6 +660,24 @@ export default function TaskDetailPage({
 
     setStorageName(storage_name);
     setFolderPath(folder_path);
+
+    if (storage_name === "processor-files") {
+      if (
+        folder_path.includes("PM_") &&
+        folder_path.includes("QC_") &&
+        folder_path.includes("QA_")
+      ) {
+        setVersion(3);
+      } else if (
+        folder_path.includes("PM_") &&
+        !folder_path.includes("QC_") &&
+        !folder_path.includes("QA_")
+      ) {
+        setVersion(1);
+      } else {
+        setVersion(2);
+      }
+    }
 
     console.log(folder_path, storage_name);
 
@@ -1267,7 +1270,7 @@ export default function TaskDetailPage({
                 {processorFiles && processorFiles.length > 0 ? (
                   <>
                     <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                      Processor Files
+                      Processor Files {"v" + version}
                     </h3>
                     <div className="space-y-2">
                       {processorFiles.map((item: string, index: number) => (
@@ -1384,7 +1387,7 @@ export default function TaskDetailPage({
                         Files Uploaded
                       </h3>
                     )}
-                    {uploadedFiles?.map((item: string) => (
+                    {uploadedFiles?.map((item: string, index: number) => (
                       <div
                         key={item}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
@@ -1399,7 +1402,7 @@ export default function TaskDetailPage({
                         </div>
                         <button
                           onClick={() =>
-                            handleDownloadOffilesToBeUploaded(item)
+                            handleDownloadOffilesToBeUploaded(item, index)
                           }
                           className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                         >

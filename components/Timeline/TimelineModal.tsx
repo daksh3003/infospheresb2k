@@ -189,27 +189,40 @@ export default function TimelineModal({
 
                     {expandedCards[index] && (
                       <div className="timeline-card-content">
-                        {item.content.map((file: any, fileIdx: number) => (
-                          <div
-                            key={fileIdx}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Paperclip className="h-4 w-4 text-gray-500" />
-                              <div>
-                                <p className="font-medium">{file.name}</p>
+                        {item.content.length === 0 ? (
+                          <h3 className="text-md font-medium mb-2 text-center">
+                            {" "}
+                            No files uploaded
+                          </h3>
+                        ) : (
+                          <>
+                            {item.content.map((file: any, fileIdx: number) => (
+                              <div
+                                key={fileIdx}
+                                className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Paperclip className="h-4 w-4 text-gray-500" />
+                                  <div>
+                                    <p className="font-medium">{file.name}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    ProcessForDownload(
+                                      index,
+                                      fileIdx,
+                                      file.name
+                                    )
+                                  }
+                                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                                >
+                                  <DownloadCloud className="h-4 w-4" /> Download
+                                </button>
                               </div>
-                            </div>
-                            <button
-                              onClick={() =>
-                                ProcessForDownload(index, fileIdx, file.name)
-                              }
-                              className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                            >
-                              <DownloadCloud className="h-4 w-4" /> Download
-                            </button>
-                          </div>
-                        ))}
+                            ))}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
