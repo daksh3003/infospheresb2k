@@ -7,15 +7,23 @@ import { useRouter, useSearchParams } from "next/navigation";
 export function TaskDetailBackButton() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const from = searchParams.get("from");
+  const source = searchParams.get("source");
 
   const handleBackClick = () => {
     if (from) {
       router.push(from);
-    } else {
-      router.push("/dashboard");
+      return;
     }
+
+    // Easier redirect to the respective dashboard based on the source.
+    if (source) {
+      router.push(`/dashboard/${source}`);
+      return;
+    }
+
+    //Case of the source not being specified
+    router.push("/dashboard");
   };
 
   return (
@@ -25,7 +33,7 @@ export function TaskDetailBackButton() {
       onClick={handleBackClick}
     >
       <ChevronLeft className="mr-1 h-4 w-4" />
-      Back to {from ? formatSourceName(from) : "Dashboard"}
+      Back to {source ? `${source.toUpperCase()} Dashboard` : "Dashboard"}
     </Button>
   );
 }
