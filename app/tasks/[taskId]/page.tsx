@@ -120,6 +120,12 @@ export default function TaskDetailPage({
   const [folder_path, setFolderPath] = useState<string>("");
   const [version, setVersion] = useState<number>(1);
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
+
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -532,11 +538,11 @@ export default function TaskDetailPage({
 
       if (storage_name === "processor-files") {
         if (folder_path.includes("PM_")) {
-          new_file_name = "processor_file_v1_" + index;
+          new_file_name = "processor_file_v1_" + fileName;
         } else if (folder_path.includes("QC_")) {
-          new_file_name = "processor_file_v2_" + index;
+          new_file_name = "processor_file_v2_" + fileName;
         } else if (folder_path.includes("QA_")) {
-          new_file_name = "processor_file_v3_" + index;
+          new_file_name = "processor_file_v3_" + fileName;
         }
       }
 
@@ -585,10 +591,6 @@ export default function TaskDetailPage({
     }
 
     setIsQcinLoop(isQcInLoop);
-
-    // console.log("qcData : ", qcData);
-
-    // console.log("isQcInLoop : ", isQcInLoop);
 
     if (
       (current_stage.sent_by === "Processor" &&
@@ -755,7 +757,7 @@ export default function TaskDetailPage({
     // console.log("Fetching data");
     const { data, error } = await supabase
       .from("task_iterations")
-      .select("sent_by, current_stage")
+      .select("sent_by, current_stage, assigned_to_processor_user_id")
       .eq("project_id", taskId)
       .single();
 
@@ -768,11 +770,8 @@ export default function TaskDetailPage({
 
     setSentBy(data?.sent_by);
     setCurrentStage(data?.current_stage);
+    setIsTaskPickedUp(!!data?.assigned_to_processor_user_id);
 
-    // console.log(storage_folder);
-    // console.log(data);
-    // Step 1: Fetch files first
-    // console.log(sent_by, folder_path);
     const sent_by = data?.sent_by;
     const current_stage = data?.current_stage;
 
@@ -943,17 +942,13 @@ export default function TaskDetailPage({
       overall_completion_status: taskData.overall_completion_status,
     }));
 
-    // console.log("Current Stage:", data?.current_stage);
-    // let folder_path = "";
-    // let storage_name = "";
-    // console.log("Current Stage:", current_stage, "Sent By:", sent_by);
-    if (current_stage === "Processor") {
+    if (currentStage === "Processor") {
       folder_path = `${sent_by}_${taskId}`;
       storage_name = "processor-files";
-    } else if (current_stage === "QC") {
+    } else if (currentStage === "QC") {
       folder_path = taskId;
       storage_name = "qc-files";
-    } else if (current_stage === "QA") {
+    } else if (currentStage === "QA") {
       folder_path = taskId;
       storage_name = "qa-files";
     }
@@ -1063,24 +1058,170 @@ export default function TaskDetailPage({
     setTimelineItems(timelineItems);
   };
 
+  const fetchAvailableUsers = async () => {
+    let roleToFetch = "";
+    if (currentStage === "Processor") {
+      roleToFetch = "processor";
+    } else if (currentStage === "QC") {
+      roleToFetch = "qcTeam";
+    } else if (currentStage === "QA") {
+      roleToFetch = "qaTeam";
+    }
+
+    console.log("roleToFetch : ", roleToFetch);
+
+    // if (!roleToFetch) return;
+
+    try {
+      const { data: users, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", roleToFetch);
+
+      if (error) {
+        console.log("error : ", error);
+        console.error("Error fetching users:", error);
+        return;
+      }
+
+      console.log("users : ", users);
+
+      setAvailableUsers(users || []);
+    } catch (error) {
+      console.error("Error in fetchAvailableUsers:", error);
+    }
+  };
+
+  const handleAssignTask = async () => {
+    if (!selectedUserId) {
+      toast.error("Please select a user to assign the task");
+      return;
+    }
+
+    setIsAssigning(true);
+    try {
+      // First, check if there's an existing record
+      const { data: existingLog, error: fetchError } = await supabase
+        .from("process_logs_test")
+        .select("*")
+        .eq("project_id", taskId)
+        .eq("current_stage", currentStage)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        // PGRST116 is "not found" error
+        console.error("Error checking existing log:", fetchError);
+        throw fetchError;
+      }
+
+      const now = new Date().toISOString();
+
+      // Create new assignment entry
+      const newAssignment = {
+        user_id: selectedUserId,
+        assigned_at: now,
+      };
+
+      // Handle existing or new assignedTo array
+      let assignedToArray = [];
+      if (existingLog?.assigned_to) {
+        // Check if user is already assigned
+        const isAlreadyAssigned = existingLog.assigned_to.some(
+          (assignment: any) => assignment.user_id === selectedUserId
+        );
+
+        if (isAlreadyAssigned) {
+          toast.error("This user is already assigned to this task");
+          setIsAssigning(false);
+          return;
+        }
+
+        // Add new assignment to existing array
+        assignedToArray = [...existingLog.assigned_to, newAssignment];
+      } else {
+        // Create new array with first assignment
+        assignedToArray = [newAssignment];
+      }
+
+      const logData = {
+        project_id: taskId,
+        current_stage: currentStage,
+        sent_by: sentBy,
+        assigned_to: assignedToArray,
+        created_at: existingLog?.created_at || now,
+      };
+
+      // Upsert the record
+      const { error: upsertError } = await supabase
+        .from("process_logs_test")
+        .update(logData)
+        .eq("project_id", taskId)
+        .eq("current_stage", currentStage);
+
+      if (upsertError) {
+        throw upsertError;
+      }
+
+      // // Update task_iterations table
+      // const { error: updateError } = await supabase
+      //   .from("task_iterations")
+      //   .update({
+      //     [`assigned_to_${currentStage.toLowerCase()}_user_id`]:
+      //       assignedToArray.map((a) => a.user_id),
+      //   })
+      //   .eq("project_id", taskId);
+
+      // if (updateError) {
+      //   throw updateError;
+      // }
+
+      toast.success("Task assigned successfully!");
+      await fetchData(); // Refresh the data
+    } catch (error) {
+      console.error("Error assigning task:", error);
+      toast.error("Failed to assign task. Please try again.");
+    } finally {
+      setIsAssigning(false);
+      setSelectedUserId(""); // Reset selection
+    }
+  };
+
   useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          return;
+        }
+        setCurrentUser(profile);
+      }
+    };
+
+    fetchCurrentUser();
     fetchProcessorFiles();
     fetchData();
     fetchTimelineItems();
-    // console.log("timelineItems : ", timelineItems);
-    // fetchUploadedFiles();
   }, [taskId]);
+
+  useEffect(() => {
+    if (currentStage) {
+      fetchAvailableUsers();
+    }
+  }, [currentStage]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Back button and task ID */}
       <div className="flex items-center justify-between mb-6">
-        {/* <button 
-          className="flex items-center gap-2 px-3 py-1 text-gray-600 hover:text-gray-900"
-          onClick={() => router.push('/dashboard')}
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-        </button> */}
         <TaskDetailBackButton />
         <div className="text-sm text-gray-500">Task ID: {task.id}</div>
         {task.overall_completion_status ? (
@@ -1272,6 +1413,29 @@ export default function TaskDetailPage({
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
           {/* Action buttons */}
           <div className="flex flex-wrap gap-3">
+            {currentUser?.role === "projectManager" && (
+              <div className="flex items-center gap-2">
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                >
+                  <option value="">Select user to assign</option>
+                  {availableUsers.map((user) => (
+                    <option key={user.user_id} value={user.user_id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  onClick={handleAssignTask}
+                  disabled={isAssigning || !selectedUserId}
+                >
+                  {isAssigning ? "Assigning..." : "Assign Task"}
+                </button>
+              </div>
+            )}
             {status === "pending" && (
               <button
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -1306,12 +1470,7 @@ export default function TaskDetailPage({
                 <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
               </button>
             )}
-            {/* <button
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              onClick={handleSendToQC}
-            >
-              <ArrowBigUpDashIcon className="h-4 w-4" /> Send To QC
-            </button> */}
+            
           </div>
         </div>
       </div>
