@@ -514,9 +514,9 @@ export default function TaskDetailPage({
     index: number
   ) => {
     try {
-      console.log("storage_name : ", storage_name);
-      console.log("folder_path : ", folder_path);
-      console.log("fileName : ", fileName);
+      // console.log("storage_name : ", storage_name);
+      // console.log("folder_path : ", folder_path);
+      // console.log("fileName : ", fileName);
       const { data, error } = await supabase.storage
         .from(storage_name)
         .download(`${folder_path}/${fileName}`);
@@ -538,16 +538,9 @@ export default function TaskDetailPage({
         } else if (folder_path.includes("QA_")) {
           new_file_name = "processor_file_v3_" + index;
         }
-      } else if (storage_name === "qc-files") {
-        new_file_name = "qc_file_" + index;
-      } else if (storage_name === "qa-files") {
-        new_file_name = "qa_file_" + index;
-      } else if (storage_name === "task-files") {
-        console.log("index : ", index);
-        new_file_name = "client_file_" + index;
       }
 
-      a.download = new_file_name || "downloaded_file";
+      a.download = new_file_name || fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
