@@ -257,7 +257,7 @@ export default function PMDashboard() {
       {}
       <div className="flex items-center justify-between w-full mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Project Manager Dashboard</h1>
+          <h1 className="text-2xl font-bold">Processor Dashboard</h1>
           <p className="text-gray-500">
             Manage projects, teams, and tasks efficiently
           </p>

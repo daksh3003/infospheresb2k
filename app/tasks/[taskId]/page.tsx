@@ -20,42 +20,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
-import { version } from "os";
-
-// const timelineItems: TimelineItem[] = [
-//   {
-//     id: "1",
-//     title: "Project Kickoff",
-//     content:
-//       "Initial meeting with stakeholders to define project scope and objectives. Key decisions were made regarding timeline and resource allocation.",
-//     completed: true,
-//     date: "2024-01-15",
-//   },
-//   {
-//     id: "2",
-//     title: "Design Phase",
-//     content:
-//       "Created wireframes and high-fidelity designs. Conducted user research and gathered feedback from the team.",
-//     completed: true,
-//     date: "2024-02-01",
-//   },
-//   {
-//     id: "3",
-//     title: "Development",
-//     content:
-//       "Started implementation of core features. Frontend and backend teams working in parallel to meet deadlines.",
-//     completed: false,
-//     date: "2024-02-15",
-//   },
-//   {
-//     id: "4",
-//     title: "Testing",
-//     content:
-//       "Quality assurance phase including unit testing, integration testing, and user acceptance testing.",
-//     completed: false,
-//     date: "2024-03-01",
-//   },
-// ];
 
 // Simple dialog component
 const Dialog = ({
@@ -131,7 +95,11 @@ export default function TaskDetailPage({
   const [task, setTask] = useState<any>({
     id: taskId,
     title: "",
-    description: "",
+    client_instruction: "",
+    mail_instruction: "",
+    estimated_hours_qc: 0,
+    estimated_hours_qa: 0,
+    estimated_hours_ocr: 0,
     priority: "low",
     dueDate: "",
     assignedTo: "",
@@ -140,7 +108,6 @@ export default function TaskDetailPage({
     comments: [],
     createdDate: "",
     estimatedHours: 0,
-    tags: [],
   });
 
   const [PMFiles, setPMFiles] = useState<string[]>([]);
@@ -331,7 +298,10 @@ export default function TaskDetailPage({
     } else if (SubmitTo === "Send to Processor Team" && currentStage === "QA") {
       next_current_stage = "Processor";
       next_sent_by = "QA";
-    } else if (SubmitTo === "Send to Delivery" && currentStage === "Processor") {
+    } else if (
+      SubmitTo === "Send to Delivery" &&
+      currentStage === "Processor"
+    ) {
       next_current_stage = "Delivery";
       next_sent_by = "Processor";
     } else if (SubmitTo === "Send to Delivery" && currentStage === "QC") {
@@ -392,7 +362,7 @@ export default function TaskDetailPage({
         type: "success",
         position: "top-right",
       });
-      
+
       setTimeout(() => {
         // Redirect based on source
         if (source === "global") {
@@ -887,6 +857,8 @@ export default function TaskDetailPage({
         .eq("id", taskId)
         .single();
 
+      console.log("simpleTaskData : ", simpleTaskData);
+
       if (simpleError) {
         console.error("Error fetching simple task data:", simpleError);
         return;
@@ -895,7 +867,7 @@ export default function TaskDetailPage({
       // Fetch creator info separately
       const { data: creatorData, error: creatorError } = await supabase
         .from("profiles")
-        .select("user_id, name, email, role")
+        .select("user_id,  emaname,il, role")
         .eq("user_id", simpleTaskData.created_by)
         .single();
 
@@ -905,7 +877,11 @@ export default function TaskDetailPage({
           ...prev,
           id: simpleTaskData.id,
           title: simpleTaskData.project_name,
-          description: simpleTaskData.description,
+          client_instruction: simpleTaskData.client_instruction || "",
+          mail_instruction: simpleTaskData.mail_instruction || "",
+          estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
+          estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
+          estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
           priority: simpleTaskData.priority || "low",
           dueDate: simpleTaskData.delivery_date || "",
           assignedTo: "",
@@ -927,7 +903,11 @@ export default function TaskDetailPage({
         ...prev,
         id: simpleTaskData.id,
         title: simpleTaskData.project_name,
-        description: simpleTaskData.description,
+        client_instruction: simpleTaskData.client_instruction || "",
+        mail_instruction: simpleTaskData.mail_instruction || "",
+        estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
+        estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
+        estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
         priority: simpleTaskData.priority || "low",
         dueDate: simpleTaskData.delivery_date || "",
         assignedTo: "",
@@ -951,7 +931,11 @@ export default function TaskDetailPage({
       ...prev,
       id: taskData.id,
       title: taskData.project_name,
-      description: taskData.description,
+      client_instruction: taskData.client_instruction || "",
+      mail_instruction: taskData.mail_instruction || "",
+      estimated_hours_qc: taskData.estimated_hours_qc || 0,
+      estimated_hours_qa: taskData.estimated_hours_qa || 0,
+      estimated_hours_ocr: taskData.estimated_hours_ocr || 0,
       priority: taskData.priority || "low",
       dueDate: taskData.delivery_date || "",
       assignedTo: "",
@@ -1171,23 +1155,16 @@ export default function TaskDetailPage({
             <div className="flex flex-col gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
-                  Description
+                  Client Instructions
                 </h3>
-                <p className="text-gray-900">{task.description}</p>
+                <p className="text-gray-900">{task.client_instruction}</p>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Tags</h3>
-                <div className="flex flex-wrap gap-2">
-                  {/* {task.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 text-xs bg-gray-100 rounded-full"
-                    >
-                      {tag}
-                    </span>
-                  ))} */}
-                </div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">
+                  Mail Instructions
+                </h3>
+                <p className="text-gray-900">{task.mail_instruction}</p>
               </div>
             </div>
 
@@ -1233,6 +1210,44 @@ export default function TaskDetailPage({
                 </div>
               </div>
 
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">
+                    Est. Hours (QC)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-900">
+                      {task.estimated_hours_qc} hours
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">
+                    Est. Hours (QA)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-900">
+                      {task.estimated_hours_qa} hours
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">
+                    Est. Hours (OCR)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-900">
+                      {task.estimated_hours_ocr} hours
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">
@@ -1246,7 +1261,7 @@ export default function TaskDetailPage({
 
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Estimated Hours
+                    Total Est. Hours
                   </h3>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-gray-500" />
