@@ -180,6 +180,7 @@ export default function Signup() {
                       <option value="projectManager">Project Manager</option>
                       <option value="qcTeam">QC Team</option>
                       <option value="qaTeam">QA Team</option>
+                      <option value = "processor">Processing Team</option>
                     </select>
                   </div>
 

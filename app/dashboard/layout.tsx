@@ -251,6 +251,7 @@ import {
   Menu,
   X,
   Bell,
+  Cpu,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -314,6 +315,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "Project Manager", href: "/dashboard/pm", icon: Users },
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
+    { name: "Processing Team", href: "/dashboard/processor", icon: Cpu },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
