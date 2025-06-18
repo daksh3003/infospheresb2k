@@ -1,8 +1,8 @@
-// app/tasks/[taskId]/page.tsx
 "use client";
+
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, Fragment, use, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import {
   Calendar,
@@ -20,61 +20,20 @@ import {
 } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
+import Dialog from "@/components/Dialog";
+import { getStatusBadge } from "@/components/task/status";
+import { getPriorityBadge } from "@/components/task/priority";
+import { getPauseResumeButton } from "@/components/task/taskAction";
+import { MainTaskCard } from "@/components/MainTaskCard";
+import { TaskAttachments } from "@/components/TaskAttachments";
+import { FileUpload } from "@/components/FileUpload";
 
-// Simple dialog component
-const Dialog = ({
-  isOpen,
-  onClose,
-  title,
-  description,
-  confirmText = "Confirm",
-  onConfirm,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  description: string;
-  confirmText?: string;
-  onConfirm: () => void;
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-        <h3 className="text-lg font-medium mb-2">{title}</h3>
-        <p className="text-gray-500 mb-6">{description}</p>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            {confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default function TaskDetailPage({
-  params,
-}: {
-  params: Promise<{ taskId: string }>;
-}) {
-  const { taskId } = use(params);
-
+export default function TaskDetailPage() {
+  const params = useParams();
+  const taskId = params.taskId as string;
   const router = useRouter();
 
+  // state hooks  :
   const [status, setStatus] = useState<
     "pending" | "in-progress" | "paused" | "completed"
   >("pending");
@@ -87,11 +46,13 @@ export default function TaskDetailPage({
   const [sentBy, setSentBy] = useState<string>("");
   const [completionStatus, setCompletionStatus] = useState<boolean>(false);
 
-  // Dialog states
+  // Dialog states :
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showSubmitToButton, setShowSubmitToButton] = useState(false);
   const [SubmitTo, setSubmitTo] = useState("QC");
+
+  // task states :
   const [task, setTask] = useState<any>({
     id: taskId,
     title: "",
@@ -110,56 +71,24 @@ export default function TaskDetailPage({
     estimatedHours: 0,
   });
 
+  // file states :
   const [PMFiles, setPMFiles] = useState<string[]>([]);
   const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
   const [processorFiles, setProcessorFiles] = useState<string[]>([]);
   const [timelineItems, setTimelineItems] = useState<any[]>([]);
   const [isQcinLoop, setIsQcinLoop] = useState<boolean>(true);
 
+  // file states :
   const [storage_name, setStorageName] = useState<string>("");
   const [folder_path, setFolderPath] = useState<string>("");
   const [version, setVersion] = useState<number>(1);
 
+  // user states :
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
   const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
-
-  // Handle file upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).map((file) => file);
-
-      setfilesToBeUploaded([...filesToBeUploaded, ...newFiles]);
-
-      // Reset file input
-      e.target.value = "";
-    }
-  };
-
-  //handling the remove file case.
-  const handleRemoveFile = (index: number) => {
-    const newFiles = [...filesToBeUploaded];
-    newFiles.splice(index, 1);
-    setfilesToBeUploaded(newFiles);
-  };
-
-  const handleSubmitComment = () => {
-    if (newComment.trim() === "") return;
-
-    const now = new Date();
-    const formattedTime = now.toLocaleString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-    setNewComment("");
-  };
 
   // Handle task actions
   const handleStartTask = () => {
@@ -187,7 +116,7 @@ export default function TaskDetailPage({
     ) {
       overall_completion_status = true;
     }
-    // console.log("Overall Completion Status:", overall_completion_status);
+
     if (overall_completion_status) {
       setCompletionStatus(true);
     }
@@ -383,87 +312,39 @@ export default function TaskDetailPage({
     }
   };
 
-  // Status UI helpers
-  const getStatusBadge = () => {
-    switch (status) {
-      case "in-progress":
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-            In Progress
-          </span>
-        );
-      case "paused":
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
-            Paused
-          </span>
-        );
-      case "completed":
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-            Completed
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-            Pending
-          </span>
-        );
+  // Handle file upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files).map((file) => file);
+
+      setfilesToBeUploaded([...filesToBeUploaded, ...newFiles]);
+
+      // Reset file input
+      e.target.value = "";
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full border border-red-200 text-red-700">
-            High Priority
-          </span>
-        );
-      case "medium":
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full border border-amber-200 text-amber-700">
-            Medium Priority
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 text-xs font-medium rounded-full border border-green-200 text-green-700">
-            Low Priority
-          </span>
-        );
-    }
+  //handling the remove file case.
+  const handleRemoveFile = (index: number) => {
+    const newFiles = [...filesToBeUploaded];
+    newFiles.splice(index, 1);
+    setfilesToBeUploaded(newFiles);
   };
 
-  const getPauseResumeButton = () => {
-    if (status === "in-progress") {
-      return (
-        <button
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-          onClick={handlePauseResumeTask}
-        >
-          <Pause className="h-4 w-4" /> Pause
-        </button>
-      );
-    } else if (status === "paused") {
-      return (
-        <button
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-          onClick={handlePauseResumeTask}
-        >
-          <Play className="h-4 w-4" /> Resume
-        </button>
-      );
-    }
-    return (
-      <button
-        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md opacity-50 cursor-not-allowed"
-        disabled
-      >
-        <Pause className="h-4 w-4" /> Pause
-      </button>
-    );
+  const handleSubmitComment = () => {
+    if (newComment.trim() === "") return;
+
+    const now = new Date();
+    const formattedTime = now.toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    setNewComment("");
   };
 
   const handleDownloadOffilesToBeUploaded = async (
@@ -520,9 +401,6 @@ export default function TaskDetailPage({
     index: number
   ) => {
     try {
-      // console.log("storage_name : ", storage_name);
-      // console.log("folder_path : ", folder_path);
-      // console.log("fileName : ", fileName);
       const { data, error } = await supabase.storage
         .from(storage_name)
         .download(`${folder_path}/${fileName}`);
@@ -554,10 +432,6 @@ export default function TaskDetailPage({
     } catch (error) {
       console.error("Error downloading file:", error);
     }
-  };
-
-  const onAdd = () => {
-    console.log("File added");
   };
 
   const fetchProcessorFiles = async () => {
@@ -622,9 +496,7 @@ export default function TaskDetailPage({
     ) {
       folder_path = `QC_${taskId}`;
       storage_name = "processor-files";
-    }
-    // console.log(current_stage.current_stage, current_stage.sent_by);
-    else if (
+    } else if (
       current_stage.current_stage === "Delivery" &&
       current_stage.sent_by === "Processor"
     ) {
@@ -658,8 +530,6 @@ export default function TaskDetailPage({
         setVersion(2);
       }
     }
-
-    console.log(folder_path, storage_name);
 
     if (current_stage.sent_by !== "PM") {
       const { data: processorFiles, error: processorError } =
@@ -725,8 +595,6 @@ export default function TaskDetailPage({
           storage_name = "qa-files";
         }
 
-        // const filePath = `${data.current_stage}_${taskId}/${date}_${file.name}`;
-
         const { data: StoreFiles, error } = await supabase.storage
           .from(storage_name)
           .upload(file_path, file, {
@@ -739,7 +607,6 @@ export default function TaskDetailPage({
         }
       });
 
-      // fetchUploadedFiles();
       fetchData();
       toast("Selected files uploaded successfully!", {
         type: "success",
@@ -751,10 +618,7 @@ export default function TaskDetailPage({
     }
   };
 
-  // const fetchUploadedFiles = async () => {};
-
   const fetchData = async () => {
-    // console.log("Fetching data");
     const { data, error } = await supabase
       .from("task_iterations")
       .select("sent_by, current_stage, assigned_to_processor_user_id")
@@ -818,8 +682,6 @@ export default function TaskDetailPage({
     setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
     // }
 
-    // console.log("hello");
-
     let folder_path = "";
     let storage_name = "";
 
@@ -830,7 +692,7 @@ export default function TaskDetailPage({
         `
         *,
         creator:profiles!inner (
-          user_id,
+          id,
           name,
           email,
           role
@@ -859,7 +721,7 @@ export default function TaskDetailPage({
       // Fetch creator info separately
       const { data: creatorData, error: creatorError } = await supabase
         .from("profiles")
-        .select("user_id,  emaname,il, role")
+        .select("id,  name, email, role")
         .eq("user_id", simpleTaskData.created_by)
         .single();
 
@@ -904,7 +766,7 @@ export default function TaskDetailPage({
         dueDate: simpleTaskData.delivery_date || "",
         assignedTo: "",
         createdBy: {
-          id: creatorData.user_id,
+          id: creatorData.id,
           name: creatorData.name,
           email: creatorData.email,
           role: creatorData.role,
@@ -1070,8 +932,6 @@ export default function TaskDetailPage({
 
     console.log("roleToFetch : ", roleToFetch);
 
-    // if (!roleToFetch) return;
-
     try {
       const { data: users, error } = await supabase
         .from("profiles")
@@ -1162,19 +1022,6 @@ export default function TaskDetailPage({
         throw upsertError;
       }
 
-      // // Update task_iterations table
-      // const { error: updateError } = await supabase
-      //   .from("task_iterations")
-      //   .update({
-      //     [`assigned_to_${currentStage.toLowerCase()}_user_id`]:
-      //       assignedToArray.map((a) => a.user_id),
-      //   })
-      //   .eq("project_id", taskId);
-
-      // if (updateError) {
-      //   throw updateError;
-      // }
-
       toast.success("Task assigned successfully!");
       await fetchData(); // Refresh the data
     } catch (error) {
@@ -1186,6 +1033,8 @@ export default function TaskDetailPage({
     }
   };
 
+  // useEffect hooks :
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       const {
@@ -1195,7 +1044,7 @@ export default function TaskDetailPage({
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("id", user.id)
           .single();
 
         if (error) {
@@ -1210,13 +1059,11 @@ export default function TaskDetailPage({
     fetchProcessorFiles();
     fetchData();
     fetchTimelineItems();
-  }, [taskId]);
 
-  useEffect(() => {
     if (currentStage) {
       fetchAvailableUsers();
     }
-  }, [currentStage]);
+  }, [taskId, currentStage]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -1243,171 +1090,9 @@ export default function TaskDetailPage({
         </div>
       </div>
 
-      {/* <div style={{ maxWidth: "800px", margin: "40px auto" }}> */}
-      {/* </div> */}
-
-      {/* Main task card */}
       <div className="mb-6 border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
-        {/* Header */}
-        <div className="p-6 pb-4 border-b border-gray-200">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{task.title}</h1>
-              <p className="mt-1 text-gray-500">
-                Created on {task.createdDate}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {getStatusBadge()}
-              {getPriorityBadge(task.priority)}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 pb-6">
-          {/* Progress bar */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-500">
-                Progress
-              </span>
-              <span className="text-sm font-medium text-gray-900">
-                {progress}%
-              </span>
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-600"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Task metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">
-                  Client Instructions
-                </h3>
-                <p className="text-gray-900">{task.client_instruction}</p>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">
-                  Mail Instructions
-                </h3>
-                <p className="text-gray-900">{task.mail_instruction}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Assigned To
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200">
-                      <img
-                        src={task.assignedTo.avatar}
-                        alt={task.assignedTo.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-gray-900">
-                      {task.assignedTo.name}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Created By
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                      <span className="text-xs text-gray-600">
-                        {task.createdBy?.name?.charAt(0) || "?"}
-                      </span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-gray-900">
-                        {task.createdBy?.name || "Unknown"}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {task.createdBy?.email || ""}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Est. Hours (QC)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-900">
-                      {task.estimated_hours_qc} hours
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Est. Hours (QA)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-900">
-                      {task.estimated_hours_qa} hours
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Est. Hours (OCR)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-900">
-                      {task.estimated_hours_ocr} hours
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Due Date
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-900">{task.dueDate}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    Total Est. Hours
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-900">
-                      {task.estimatedHours} hours
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Main task card */}
+        <MainTaskCard task={task} status={status} progress={progress} />
 
         {/* Footer with buttons */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
@@ -1445,7 +1130,7 @@ export default function TaskDetailPage({
               </button>
             )}
 
-            {getPauseResumeButton()}
+            {getPauseResumeButton(status, handlePauseResumeTask)}
 
             <button
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
@@ -1470,7 +1155,6 @@ export default function TaskDetailPage({
                 <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
               </button>
             )}
-            
           </div>
         </div>
       </div>
@@ -1505,233 +1189,28 @@ export default function TaskDetailPage({
       {activeTab === "files" && (
         <div className="space-y-6">
           {/* Downloadable task files */}
-          <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
-            <div className="p-6 pb-2">
-              <h2 className="text-xl font-medium">Task Attachments</h2>
-              <p className="text-sm text-gray-500">
-                Files attached to this task by the creator
-              </p>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* PM Files */}
-              <div>
-                <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                  Client Files
-                </h3>
-                <div className="space-y-2">
-                  {PMFiles.map((item: string, index: number) => (
-                    <div
-                      key={item}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{item.split("/").pop()}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          handleDownload(item, "task-files", taskId, index)
-                        }
-                        className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        <DownloadCloud className="h-4 w-4" /> Download
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Processor Files */}
-              <div>
-                {processorFiles && processorFiles.length > 0 ? (
-                  <>
-                    <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                      Processor Files {"v" + version}
-                    </h3>
-                    <div className="space-y-2">
-                      {processorFiles.map((item: string, index: number) => (
-                        <div
-                          key={item}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Paperclip className="h-4 w-4 text-gray-500" />
-                            <div>
-                              <p className="font-medium">
-                                {item.split("/").pop()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              handleDownload(
-                                item,
-                                storage_name,
-                                folder_path,
-                                index
-                              )
-                            }
-                            className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                          >
-                            <DownloadCloud className="h-4 w-4" /> Download
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-
-              {/* Correction Files */}
-              <div>
-                {correctionFiles && correctionFiles.length > 0 ? (
-                  <>
-                    <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                      Correction Files
-                    </h3>
-                    <div className="space-y-2">
-                      {correctionFiles.map((item: string, index: number) => (
-                        <div
-                          key={item}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Paperclip className="h-4 w-4 text-gray-500" />
-                            <div>
-                              <p className="font-medium">
-                                {item.split("/").pop()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              handleDownload(
-                                item,
-                                storage_name,
-                                folder_path,
-                                index
-                              )
-                            }
-                            className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                          >
-                            <DownloadCloud className="h-4 w-4" /> Download
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          <TaskAttachments
+            PMFiles={PMFiles}
+            processorFiles={processorFiles}
+            correctionFiles={correctionFiles}
+            version={version}
+            taskId={taskId}
+            handleDownload={handleDownload}
+            storage_name={storage_name}
+            folder_path={folder_path}
+          />
 
           {/* File upload section */}
-          <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
-            <div className="p-6 pb-2">
-              <h2 className="text-lg font-medium">Upload Files</h2>
-              <p className="text-sm text-gray-500">
-                Add your completed work or relevant documents
-              </p>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex-row items-center justify-center w-full">
-                <label
-                  htmlFor="dropzone-file"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                    <p className="mb-1 text-sm text-gray-500">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      PDF, DOCX, XLSX, JPG, PNG (MAX. 10MB)
-                    </p>
-                  </div>
-                  <input
-                    id="dropzone-file"
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    multiple
-                  />
-                </label>
-                <div className="p-6">
-                  <div className="space-y-2">
-                    {uploadedFiles && uploadedFiles.length > 0 && (
-                      <h3 className="text-sm font-medium mb-2">
-                        Files Uploaded
-                      </h3>
-                    )}
-                    {uploadedFiles?.map((item: string, index: number) => (
-                      <div
-                        key={item}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Paperclip className="h-4 w-4 text-gray-500" />
-                          <div>
-                            <p className="font-medium">
-                              {item.split("/").pop()}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() =>
-                            handleDownloadOffilesToBeUploaded(item, index)
-                          }
-                          className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                        >
-                          <DownloadCloud className="h-4 w-4" /> Download
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Uploaded files list */}
-              {filesToBeUploaded.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  <h3 className="text-sm font-medium mb-2">
-                    Files to be uploaded
-                  </h3>
-
-                  {/* <p> Harish </p> */}
-                  {filesToBeUploaded.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{file.name}</p>
-                          <p className="text-xs text-gray-500">{file.size}</p>
-                        </div>
-                      </div>
-                      <button
-                        className="text-red-500 hover:text-red-700 p-1"
-                        onClick={() => handleRemoveFile(idx)}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto"
-                onClick={handleSubmitFileUpload}
-              >
-                Submit Files
-              </button>
-            </div>
-          </div>
+          <FileUpload
+            handleFileUpload={handleFileUpload}
+            uploadedFiles={uploadedFiles}
+            filesToBeUploaded={filesToBeUploaded}
+            handleDownloadOffilesToBeUploaded={
+              handleDownloadOffilesToBeUploaded
+            }
+            handleRemoveFile={handleRemoveFile}
+            handleSubmitFileUpload={handleSubmitFileUpload}
+          />
         </div>
       )}
 
