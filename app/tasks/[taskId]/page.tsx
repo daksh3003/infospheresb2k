@@ -27,6 +27,8 @@ import { getPauseResumeButton } from "@/components/task/taskAction";
 import { MainTaskCard } from "@/components/MainTaskCard";
 import { TaskAttachments } from "@/components/TaskAttachments";
 import { FileUpload } from "@/components/FileUpload";
+import { Comments } from "@/components/Comments";
+import { FooterButtons } from "@/components/FooterButtons";
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -445,13 +447,10 @@ export default function TaskDetailPage() {
       console.error("Error fetching current stage:", current_stageError);
       return;
     }
-    // console.log(current_stage.current_stage);
     setCurrentStage(current_stage.current_stage);
 
     let storage_name = "";
     let folder_path = "";
-
-    // console.log(current_stage.current_stage, current_stage.sent_by);
 
     let isQcInLoop = true;
 
@@ -626,15 +625,13 @@ export default function TaskDetailPage() {
       .single();
 
     if (error) {
-      console.log("Error while fetching 'sent_by' data");
+      console.error("Error fetching 'sent_by' data:", error);
       return;
     }
 
-    console.log(data);
-
     setSentBy(data?.sent_by);
     setCurrentStage(data?.current_stage);
-    setIsTaskPickedUp(!!data?.assigned_to_processor_user_id);
+    setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
 
     const sent_by = data?.sent_by;
     const current_stage = data?.current_stage;
@@ -642,7 +639,6 @@ export default function TaskDetailPage() {
     const { data: PMFiles, error: PMError } = await supabase.storage
       .from("task-files")
       .list(taskId);
-    // console.log(PMFiles);
 
     if (PMError) {
       console.error("Error fetching PM files:", PMError);
@@ -651,9 +647,6 @@ export default function TaskDetailPage() {
 
     setPMFiles(PMFiles.map((file) => file.name));
 
-    // console.log("Current Stage:", current_stage, "Sent By:", sent_by);
-
-    // if (sent_by !== "PM") {
     var folder_path_correction = "";
     var storage_name_correction = "";
 
@@ -685,124 +678,57 @@ export default function TaskDetailPage() {
     let folder_path = "";
     let storage_name = "";
 
-    // Step 2: Then fetch task data with creator information
-    const { data: taskData, error: taskError } = await supabase
+    const { data: simpleTaskData, error: simpleError } = await supabase
       .from("projects")
-      .select(
-        `
-        *,
-        creator:profiles!inner (
-          id,
-          name,
-          email,
-          role
-        )
-      `
-      )
+      .select("*")
       .eq("id", taskId)
       .single();
 
-    if (taskError) {
-      console.error("Error fetching task data:", taskError);
-      // Try alternative approach if the join fails
-      const { data: simpleTaskData, error: simpleError } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", taskId)
-        .single();
+    console.log("simpleTaskData : ", simpleTaskData);
 
-      console.log("simpleTaskData : ", simpleTaskData);
-
-      if (simpleError) {
-        console.error("Error fetching simple task data:", simpleError);
-        return;
-      }
-
-      // Fetch creator info separately
-      const { data: creatorData, error: creatorError } = await supabase
-        .from("profiles")
-        .select("id,  name, email, role")
-        .eq("user_id", simpleTaskData.created_by)
-        .single();
-
-      if (creatorError) {
-        console.error("Error fetching creator data:", creatorError);
-        setTask((prev: any) => ({
-          ...prev,
-          id: simpleTaskData.id,
-          title: simpleTaskData.project_name,
-          client_instruction: simpleTaskData.client_instruction || "",
-          mail_instruction: simpleTaskData.mail_instruction || "",
-          estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
-          estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
-          estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
-          priority: simpleTaskData.priority || "low",
-          dueDate: simpleTaskData.delivery_date || "",
-          assignedTo: "",
-          createdBy: {
-            id: simpleTaskData.created_by,
-            name: "Unknown",
-            email: "",
-            role: "",
-          },
-          comments: simpleTaskData.comments || [],
-          createdDate: simpleTaskData.created_at,
-          overall_completion_status: simpleTaskData.overall_completion_status,
-        }));
-        return;
-      }
-
-      // Set task with creator info
-      setTask((prev: any) => ({
-        ...prev,
-        id: simpleTaskData.id,
-        title: simpleTaskData.project_name,
-        client_instruction: simpleTaskData.client_instruction || "",
-        mail_instruction: simpleTaskData.mail_instruction || "",
-        estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
-        estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
-        estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
-        priority: simpleTaskData.priority || "low",
-        dueDate: simpleTaskData.delivery_date || "",
-        assignedTo: "",
-        createdBy: {
-          id: creatorData.id,
-          name: creatorData.name,
-          email: creatorData.email,
-          role: creatorData.role,
-        },
-        comments: simpleTaskData.comments || [],
-        createdDate: simpleTaskData.created_at,
-        overall_completion_status: simpleTaskData.overall_completion_status,
-      }));
+    if (simpleError) {
+      console.error("Error fetching simple task data:", simpleError);
       return;
     }
 
-    console.log("Task Data with creator:", taskData);
+    // Fetch creator info separately
+    const { data: creatorData, error: creatorError } = await supabase
+      .from("profiles")
+      .select("id,  name, email, role")
+      .eq("id", simpleTaskData.created_by)
+      .single();
 
-    // Merge in the task data without touching attachments
+    if (creatorError) {
+      console.error("Error fetching creator data:", creatorError);
+      return;
+    }
+
+    // Set task with creator info
     setTask((prev: any) => ({
       ...prev,
-      id: taskData.id,
-      title: taskData.project_name,
-      client_instruction: taskData.client_instruction || "",
-      mail_instruction: taskData.mail_instruction || "",
-      estimated_hours_qc: taskData.estimated_hours_qc || 0,
-      estimated_hours_qa: taskData.estimated_hours_qa || 0,
-      estimated_hours_ocr: taskData.estimated_hours_ocr || 0,
-      priority: taskData.priority || "low",
-      dueDate: taskData.delivery_date || "",
+      id: simpleTaskData.id,
+      title: simpleTaskData.project_name,
+      client_instruction: simpleTaskData.client_instruction || "",
+      mail_instruction: simpleTaskData.mail_instruction || "",
+      estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
+      estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
+      estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
+      priority: simpleTaskData.priority || "low",
+      dueDate: simpleTaskData.delivery_date || "",
       assignedTo: "",
       createdBy: {
-        id: taskData.creator?.user_id || "",
-        name: taskData.creator?.name || "Unknown",
-        email: taskData.creator?.email || "",
-        role: taskData.creator?.role || "",
+        id: creatorData.id,
+        name: creatorData.name,
+        email: creatorData.email,
+        role: creatorData.role,
       },
-      comments: taskData.comments || [],
-      createdDate: taskData.created_at,
-      overall_completion_status: taskData.overall_completion_status,
+      comments: simpleTaskData.comments || [],
+      createdDate: simpleTaskData.created_at,
+      overall_completion_status: simpleTaskData.overall_completion_status,
     }));
+  
+
+    
 
     if (currentStage === "Processor") {
       folder_path = `${sent_by}_${taskId}`;
@@ -898,7 +824,7 @@ export default function TaskDetailPage() {
         console.log("Error fetching uploaded files:" + i, uploadedFilesError);
         return;
       }
-      // console.log("uploadedFiles : ", uploadedFiles);
+
       const timelineItem = {
         id: taskId,
         title: current_stage,
@@ -1095,68 +1021,23 @@ export default function TaskDetailPage() {
         <MainTaskCard task={task} status={status} progress={progress} />
 
         {/* Footer with buttons */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3">
-            {currentUser?.role === "projectManager" && (
-              <div className="flex items-center gap-2">
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                >
-                  <option value="">Select user to assign</option>
-                  {availableUsers.map((user) => (
-                    <option key={user.user_id} value={user.user_id}>
-                      {user.name || user.email}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                  onClick={handleAssignTask}
-                  disabled={isAssigning || !selectedUserId}
-                >
-                  {isAssigning ? "Assigning..." : "Assign Task"}
-                </button>
-              </div>
-            )}
-            {status === "pending" && (
-              <button
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                onClick={handleStartTask}
-              >
-                <Play className="h-4 w-4" /> Start Task
-              </button>
-            )}
 
-            {getPauseResumeButton(status, handlePauseResumeTask)}
-
-            <button
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-              onClick={() => setShowHandoverDialog(true)}
-            >
-              <Share2 className="h-4 w-4" /> Handover
-            </button>
-
-            {status !== "completed" && (
-              <button
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                onClick={() => setShowCompleteDialog(true)}
-              >
-                <CheckCircle2 className="h-4 w-4" /> Mark Complete
-              </button>
-            )}
-            {showSubmitToButton && status === "completed" && (
-              <button
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                onClick={() => handleSendTo()}
-              >
-                <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
-              </button>
-            )}
-          </div>
-        </div>
+        <FooterButtons
+          currentUser={currentUser}
+          selectedUserId={selectedUserId}
+          setSelectedUserId={setSelectedUserId}
+          availableUsers={availableUsers}
+          handleAssignTask={handleAssignTask}
+          isAssigning={isAssigning}
+          handleStartTask={handleStartTask}
+          handlePauseResumeTask={handlePauseResumeTask}
+          handleSendTo={handleSendTo}
+          showSubmitToButton={showSubmitToButton}
+          setShowHandoverDialog={setShowHandoverDialog}
+          setShowCompleteDialog={setShowCompleteDialog}
+          status={status}
+          SubmitTo={SubmitTo}
+        />
       </div>
 
       {/* Tabs navigation */}
@@ -1215,60 +1096,12 @@ export default function TaskDetailPage() {
       )}
 
       {activeTab === "comments" && (
-        <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
-          <div className="p-6 pb-2">
-            <h2 className="text-lg font-medium">Discussion</h2>
-            <p className="text-sm text-gray-500">
-              Communicate with team members about this task
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {/* {task.comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="flex gap-3 p-3 rounded-md bg-gray-50"
-                >
-                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
-                    <img
-                      src={comment.avatar}
-                      alt={comment.user}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{comment.user}</span>
-                      <span className="text-xs text-gray-500">
-                        {comment.timestamp}
-                      </span>
-                    </div>
-                    <p className="text-sm mt-1">{comment.text}</p>
-                  </div>
-                </div>
-              ))} */}
-            </div>
-
-            {/* Add comment form */}
-            <div className="mt-6">
-              <textarea
-                className="w-full p-3 border border-gray-200 rounded-md"
-                placeholder="Add a comment..."
-                rows={3}
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-              />
-              <div className="mt-2 flex justify-end">
-                <button
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                  onClick={handleSubmitComment}
-                >
-                  Post Comment
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Comments
+          task={task}
+          newComment={newComment}
+          setNewComment={setNewComment}
+          handleSubmitComment={handleSubmitComment}
+        />
       )}
 
       {/* Handover Dialog */}
