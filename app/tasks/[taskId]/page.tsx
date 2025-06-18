@@ -48,6 +48,7 @@ export default function TaskDetailPage() {
     estimated_hours_ocr: 0,
     priority: "low",
     dueDate: "",
+    deliveryTime: "",
     assignedTo: "",
     createdBy: "",
     attachments: [],
@@ -669,7 +670,9 @@ export default function TaskDetailPage() {
       .eq("id", taskId)
       .single();
 
-    console.log("simpleTaskData : ", simpleTaskData);
+    // //logging issues to be checked.
+    // console.log("simpleTaskData : ", simpleTaskData);
+    // console.log("delivery_time from database:", simpleTaskData.delivery_time);
 
     if (simpleError) {
       console.error("Error fetching simple task data:", simpleError);
@@ -700,6 +703,7 @@ export default function TaskDetailPage() {
       estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
       priority: simpleTaskData.priority || "low",
       dueDate: simpleTaskData.delivery_date || "",
+      deliveryTime: simpleTaskData.delivery_time || "",
       assignedTo: "",
       createdBy: {
         id: creatorData.id,

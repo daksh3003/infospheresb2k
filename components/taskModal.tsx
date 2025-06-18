@@ -33,6 +33,8 @@ interface FormData {
   language: string;
   processType: string;
   deliveryDate: string;
+  deliveryTime: string;
+
   estimatePOHours: string;
   listOfFiles: string;
   selectedFiles: File[];
@@ -62,6 +64,7 @@ type FormRefs = {
   language: React.RefObject<HTMLInputElement | null>;
   processType: React.RefObject<HTMLSelectElement | null>;
   deliveryDate: React.RefObject<HTMLInputElement | null>;
+  deliveryTime: React.RefObject<HTMLInputElement | null>;
   estimatePOHours: React.RefObject<HTMLInputElement | null>;
   selectedFiles: React.RefObject<HTMLInputElement | null>;
   listOfFiles: React.RefObject<HTMLInputElement | null>;
@@ -91,6 +94,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     language: "",
     processType: "",
     deliveryDate: "",
+    deliveryTime: "",
     estimatePOHours: "",
     listOfFiles: "",
     selectedFiles: [],
@@ -114,6 +118,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     language: useRef<HTMLInputElement | null>(null),
     processType: useRef<HTMLSelectElement | null>(null),
     deliveryDate: useRef<HTMLInputElement | null>(null),
+    deliveryTime: useRef<HTMLInputElement | null>(null),
     estimatePOHours: useRef<HTMLInputElement | null>(null),
     selectedFiles: useRef<HTMLInputElement | null>(null),
     listOfFiles: useRef<HTMLInputElement | null>(null),
@@ -136,6 +141,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     "language",
     "processType",
     "deliveryDate",
+    "deliveryTime",
     "estimatePOHours", // This will be the last field for Enter key navigation
   ];
 
@@ -228,6 +234,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
     >
   ) => {
     const { name, value } = e.target;
+    
+    // // Debug logging for delivery time specifically
+    // if (name === 'deliveryTime') {
+    //   console.log("Delivery time changed:", { name, value });
+    // }
+    
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -292,6 +304,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
         language: formData.language,
         process_type: formData.processType,
         delivery_date: formData.deliveryDate || null,
+        delivery_time: formData.deliveryTime && formData.deliveryDate 
+          ? `${formData.deliveryDate}T${formData.deliveryTime}:00Z`
+          : null,
         serial_number: formData.serialNumber,
         client_instruction: formData.clientInstruction,
         list_of_files: formData.selectedFiles.map(f => f.name),
@@ -304,7 +319,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         overall_completion_status: false
       };
 
-      console.log("Creating project with data:", projectCoreData);
+      // // Debug logging
+      // console.log("Form delivery time value:", formData.deliveryTime);
+      // console.log("Project core data delivery_time:", projectCoreData.delivery_time);
+      // console.log("Creating project with data:", projectCoreData);
 
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
@@ -319,6 +337,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
       if (projectError) {
         console.error("Error inserting project:", projectError);
+        console.error("Full error details:", JSON.stringify(projectError, null, 2));
         toast.error(`Failed to save project: ${projectError.message}`);
         setIsSubmitting(false);
         return;
@@ -330,6 +349,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         setIsSubmitting(false);
         return;
       }
+
+      // // Debug: Check if delivery_time was actually saved
+      // console.log("Project data returned from database:", projectData);
+      // console.log("Delivery time in returned data:", projectData.delivery_time);
 
       const newProjectId = projectData.id;
       const creatorName = projectData.profiles?.name || "Unknown";
@@ -430,6 +453,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         language: "",
         processType: "",
         deliveryDate: "",
+        deliveryTime: "",
         estimatePOHours: "",
         listOfFiles: "",
         selectedFiles: [],
@@ -449,6 +473,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       console.error("Unexpected error during submission:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast.error(`An unexpected error occurred: ${errorMessage}`);
+      setIsSubmitting(false);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -651,7 +677,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-
+              <div>
+                <label className = "block text-sm font-medium text-gray-700">
+                  Delivery Time
+                </label>
+                <input
+                  ref={refs.deliveryTime}
+                  type="time"
+                  name="deliveryTime"
+                  value={formData.deliveryTime}
+                  onChange={handleChange}
+                  onKeyDown={(e) => handleKeyDown(e, "deliveryTime")}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Estimate PO Hours

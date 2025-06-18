@@ -138,7 +138,7 @@ export const MainTaskCard = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Due Date
@@ -151,12 +151,35 @@ export const MainTaskCard = ({
 
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
+                  Due Time
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-900">
+                    {task.deliveryTime ? 
+                      (() => {
+                        //custom logic to convert it and display it based on db timestampz.
+                        const timeStr = task.deliveryTime.substring(11, 16);
+                        const [hours, minutes] = timeStr.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                        return `${displayHour}:${minutes} ${ampm}`;
+                      })() : 
+                      'Not set'
+                    }
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Total Est. Hours
                 </h3>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-900">
-                    {task.estimatedHours} hours
+                    {task.estimatedHours || 0} hours
                   </span>
                 </div>
               </div>

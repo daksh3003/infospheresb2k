@@ -24,6 +24,7 @@ interface PMDashboardTask {
   projectTaskId: string | null;
   clientInstruction: string | null;
   deliveryDate: string | null;
+  deliveryTime: string | null;
   processType: string | null;
   poHours: number | null;
   isProjectOverallComplete: boolean;
@@ -126,6 +127,7 @@ export default function PMDashboard() {
           projectTaskId: null,
           clientInstruction: null,
           deliveryDate: null,
+          deliveryTime: null,
           processType: null,
           poHours: null,
           isProjectOverallComplete: false,
