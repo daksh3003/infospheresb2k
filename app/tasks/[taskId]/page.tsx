@@ -4,26 +4,9 @@ import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, Fragment, use, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
-import {
-  Calendar,
-  Clock,
-  DownloadCloud,
-  Paperclip,
-  Pause,
-  Play,
-  ArrowLeft,
-  Share2,
-  Upload,
-  CheckCircle2,
-  X,
-  ArrowBigUpDashIcon,
-} from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
 import Dialog from "@/components/Dialog";
-import { getStatusBadge } from "@/components/task/status";
-import { getPriorityBadge } from "@/components/task/priority";
-import { getPauseResumeButton } from "@/components/task/taskAction";
 import { MainTaskCard } from "@/components/MainTaskCard";
 import { TaskAttachments } from "@/components/TaskAttachments";
 import { FileUpload } from "@/components/FileUpload";
@@ -77,7 +60,9 @@ export default function TaskDetailPage() {
   const [PMFiles, setPMFiles] = useState<string[]>([]);
   const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
   const [processorFiles, setProcessorFiles] = useState<string[]>([]);
-  const [timelineItems, setTimelineItems] = useState<any[]>([]);
+
+  // user states :
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isQcinLoop, setIsQcinLoop] = useState<boolean>(true);
 
   // file states :
@@ -86,7 +71,7 @@ export default function TaskDetailPage() {
   const [version, setVersion] = useState<number>(1);
 
   // user states :
-  const [currentUser, setCurrentUser] = useState<any>(null);
+
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
@@ -726,9 +711,6 @@ export default function TaskDetailPage() {
       createdDate: simpleTaskData.created_at,
       overall_completion_status: simpleTaskData.overall_completion_status,
     }));
-  
-
-    
 
     if (currentStage === "Processor") {
       folder_path = `${sent_by}_${taskId}`;
@@ -752,98 +734,6 @@ export default function TaskDetailPage() {
     console.log(uploadedFiles);
 
     setUploadedFiles(uploadedFiles.map((file) => file.name));
-  };
-
-  const fetchTimelineItems = async () => {
-    const { data: stages, error: timelineError } = await supabase
-      .from("task_iterations")
-      .select("stages")
-      .eq("project_id", taskId)
-      .single();
-    if (timelineError) {
-      console.log("Error fetching timeline items:", timelineError);
-      return;
-    }
-    console.log("stages : ", stages);
-    const stagesArray = stages.stages;
-    const len = stagesArray.length;
-
-    let timelineItems: any[] = [];
-
-    let cnt_of_processor = 1;
-
-    for (let i = 0; i < len; i++) {
-      console.log("i : ", i);
-      let folder_path = "";
-      let storage_name = "";
-      let current_stage = "";
-
-      if (stagesArray[i] === "PM") {
-        folder_path = taskId;
-        storage_name = "task-files";
-        current_stage = "PM";
-      } else if (stagesArray[i] === "Processor") {
-        if (stagesArray[i - 1] === "PM") {
-          folder_path = `PM_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        } else if (stagesArray[i - 1] === "QC") {
-          folder_path = `QC_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        } else if (stagesArray[i - 1] === "QA") {
-          folder_path = `QA_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        }
-        cnt_of_processor++;
-      } else if (stagesArray[i] === "QC") {
-        folder_path = taskId;
-        storage_name = "qc-files";
-        current_stage = "QC";
-      } else if (stagesArray[i] === "QA") {
-        folder_path = taskId;
-        storage_name = "qa-files";
-        current_stage = "QA";
-      } else if (stagesArray[i] === "Delivery") {
-        // console.log("cnt_of_processor : ", cnt_of_processor);
-        if (cnt_of_processor == 2) {
-          folder_path = `PM_${taskId}`;
-        } else if (cnt_of_processor == 3) {
-          folder_path = `QC_${taskId}`;
-        } else if (cnt_of_processor == 4) {
-          folder_path = `QA_${taskId}`;
-        }
-        storage_name = "processor-files";
-        current_stage = "Delivery";
-      }
-
-      const { data: uploadedFiles, error: uploadedFilesError } =
-        await supabase.storage.from(storage_name).list(folder_path);
-      if (uploadedFilesError) {
-        console.log("Error fetching uploaded files:" + i, uploadedFilesError);
-        return;
-      }
-
-      const timelineItem = {
-        id: taskId,
-        title: current_stage,
-        content: uploadedFiles.map((file, index) => ({
-          name: file.name,
-          onClick: () => {
-            handleDownload(file.name, storage_name, folder_path, index);
-          },
-        })),
-        completed: true,
-        date: new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
-      };
-
-      timelineItems.push(timelineItem);
-    }
-    console.log("timelineItems : ", timelineItems);
-    setTimelineItems(timelineItems);
   };
 
   const fetchAvailableUsers = async () => {
@@ -984,7 +874,6 @@ export default function TaskDetailPage() {
     fetchCurrentUser();
     fetchProcessorFiles();
     fetchData();
-    fetchTimelineItems();
 
     if (currentStage) {
       fetchAvailableUsers();
@@ -1008,7 +897,6 @@ export default function TaskDetailPage() {
         )}
         <div className="flex justify-end">
           <TimelineModal
-            items={timelineItems}
             title="Timeline"
             buttonText="View Timeline"
             handleDownload={handleDownload}

@@ -1,12 +1,14 @@
 "use client";
 
-import * as React from "react";
+import React, { useEffect } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Modal from "@mui/material/Modal";
 import { Clock, DownloadCloud, Paperclip, CheckCircle } from "react-feather";
 import { ChevronDown, ChevronUp } from "react-feather";
 import "./Timeline.css";
+import { supabase } from "@/utils/supabase";
+import { useParams } from "next/navigation";
 
 const style = {
   position: "absolute" as const,
@@ -33,7 +35,6 @@ interface TimelineItem {
 }
 
 interface TimelineModalProps {
-  items: TimelineItem[];
   title?: string;
   buttonText?: string;
   handleDownload: (
@@ -45,7 +46,6 @@ interface TimelineModalProps {
 }
 
 export default function TimelineModal({
-  items,
   title = "Timeline",
   buttonText = "View Timeline",
   handleDownload,
@@ -57,6 +57,102 @@ export default function TimelineModal({
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+
+  const { taskId } = useParams() as { taskId: string };
+  const [timelineItems, setTimelineItems] = React.useState<any[]>([]);
+
+  const fetchTimelineItems = async () => {
+    const { data: stages, error: timelineError } = await supabase
+      .from("task_iterations")
+      .select("stages")
+      .eq("project_id", taskId)
+      .single();
+    if (timelineError) {
+      console.log("Error fetching timeline items:", timelineError);
+      return;
+    }
+    console.log("stages : ", stages);
+    const stagesArray = stages.stages;
+    const len = stagesArray.length;
+
+    let timelineItems: any[] = [];
+
+    let cnt_of_processor = 1;
+
+    for (let i = 0; i < len; i++) {
+      console.log("i : ", i);
+
+      let folder_path = "";
+      let storage_name = "";
+      let current_stage = "";
+
+      if (stagesArray[i] === "PM") {
+        folder_path = taskId;
+        storage_name = "task-files";
+        current_stage = "PM";
+      } else if (stagesArray[i] === "Processor") {
+        if (stagesArray[i - 1] === "PM") {
+          folder_path = `PM_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (" + cnt_of_processor + ")";
+        } else if (stagesArray[i - 1] === "QC") {
+          folder_path = `QC_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (" + cnt_of_processor + ")";
+        } else if (stagesArray[i - 1] === "QA") {
+          folder_path = `QA_${taskId}`;
+          storage_name = "processor-files";
+          current_stage = "Processor (" + cnt_of_processor + ")";
+        }
+        cnt_of_processor++;
+      } else if (stagesArray[i] === "QC") {
+        folder_path = taskId;
+        storage_name = "qc-files";
+        current_stage = "QC";
+      } else if (stagesArray[i] === "QA") {
+        folder_path = taskId;
+        storage_name = "qa-files";
+        current_stage = "QA";
+      } else if (stagesArray[i] === "Delivery") {
+        // console.log("cnt_of_processor : ", cnt_of_processor);
+        if (cnt_of_processor == 2) {
+          folder_path = `PM_${taskId}`;
+        } else if (cnt_of_processor == 3) {
+          folder_path = `QC_${taskId}`;
+        } else if (cnt_of_processor == 4) {
+          folder_path = `QA_${taskId}`;
+        }
+        storage_name = "processor-files";
+        current_stage = "Delivery";
+      }
+
+      const { data: uploadedFiles, error: uploadedFilesError } =
+        await supabase.storage.from(storage_name).list(folder_path);
+      if (uploadedFilesError) {
+        console.log("Error fetching uploaded files:" + i, uploadedFilesError);
+        return;
+      }
+
+      const timelineItem = {
+        id: taskId,
+        title: current_stage,
+        content: uploadedFiles.map((file, index) => ({
+          name: file.name,
+          onClick: () => {
+            handleDownload(file.name, storage_name, folder_path, index);
+          },
+        })),
+        completed: true,
+        date: new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
+      };
+
+      timelineItems.push(timelineItem);
+    }
+    console.log("timelineItems : ", timelineItems);
+    setTimelineItems(timelineItems);
+  };
 
   const toggleCard = (id: number) => {
     setExpandedCards((prev) => ({
@@ -72,32 +168,36 @@ export default function TimelineModal({
   ) => {
     let storage_name = "";
     let folder_path = "";
-    if (items[itemIdx].title === "PM") {
+    if (timelineItems[itemIdx].title === "PM") {
       storage_name = "task-files";
-      folder_path = items[itemIdx].id;
+      folder_path = timelineItems[itemIdx].id;
     } else if (
-      items[itemIdx].title === "Processor (1)"
+      timelineItems[itemIdx].title === "Processor (1)"
       // items[itemIdx - 1].title === "PM"
     ) {
       storage_name = "processor-files";
-      folder_path = `PM_${items[itemIdx].id}`;
+      folder_path = `PM_${timelineItems[itemIdx].id}`;
     } else if (
-      items[itemIdx].title === "Processor (2)"
+      timelineItems[itemIdx].title === "Processor (2)"
       // items[itemIdx - 1].title === "QC"
     ) {
       storage_name = "processor-files";
-      folder_path = `QC_${items[itemIdx].id}`;
+      folder_path = `QC_${timelineItems[itemIdx].id}`;
     } else if (
-      items[itemIdx].title === "Processor (3)"
+      timelineItems[itemIdx].title === "Processor (3)"
       // items[itemIdx - 1].title === "QA"
     ) {
       storage_name = "processor-files";
-      folder_path = `QA_${items[itemIdx].id}`;
-    } else if (items[itemIdx].title === "QA") {
+      folder_path = `QA_${timelineItems[itemIdx].id}`;
+    } else if (timelineItems[itemIdx].title === "QA") {
     }
 
     handleDownload(fileName, storage_name, folder_path, fileIdx);
   };
+
+  useEffect(() => {
+    fetchTimelineItems();
+  }, []);
 
   return (
     <div>
@@ -162,13 +262,15 @@ export default function TimelineModal({
 
           <Box sx={{ padding: "24px" }}>
             <div className="timeline">
-              {items.map((item, index) => (
+              {timelineItems.map((item, index) => (
                 <div key={index} className="timeline-item">
                   <div className="timeline-marker">
                     <div
                       className={`circle ${item.completed ? "completed" : ""}`}
                     />
-                    {index < items.length - 1 && <div className="line" />}
+                    {index < timelineItems.length - 1 && (
+                      <div className="line" />
+                    )}
                   </div>
 
                   <div className="timeline-content">
