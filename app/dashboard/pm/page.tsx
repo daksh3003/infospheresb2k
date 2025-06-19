@@ -38,39 +38,58 @@ interface ProjectTask {
   completion_status: boolean;
   status?: "pending" | "in-progress" | "completed" | "overdue";
   priority?: "low" | "medium" | "high" | "critical";
-  //addition of the type to ensure proper bucketing.
+  current_stage?: "Processor" | "QC" | "QA";
   type: "pm" | "qc" | "qa";
 }
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
+    setMounted(true);
     fetchTasks();
   }, []);
 
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // First get all projects
+      const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (projectsError) throw projectsError;
 
-      if (data) {
-        const processedTasks = data.map((task) => {
+      // Then get the current stage for each project
+      const { data: iterationsData, error: iterationsError } = await supabase
+        .from("task_iterations")
+        .select("project_id, current_stage");
+
+      if (iterationsError) throw iterationsError;
+
+      // Create a map of project_id to current_stage
+      const stageMap = iterationsData.reduce((acc: any, curr) => {
+        acc[curr.project_id] = curr.current_stage;
+        return acc;
+      }, {});
+
+      if (projectsData) {
+        const processedTasks = projectsData.map((task) => {
           return {
             ...task,
             status: calculateStatus(task.delivery_date, task.completion_status),
             priority: calculatePriority(task.delivery_date, task.po_hours),
             type: getTaskType(task.process_type),
+            current_stage: stageMap[task.id] || "Processor", // Default to Processor if no stage found
           };
         });
         setTasks(processedTasks);
@@ -82,7 +101,7 @@ export default function DashboardPage() {
     }
   };
 
-  // Helper functions (same as in PM dashboard)
+  // Helper functions (same as before)
   const calculateStatus = (deliveryDate: string, isCompleted: boolean) => {
     if (isCompleted) return "completed";
     if (!deliveryDate) return "pending";
@@ -136,8 +155,17 @@ export default function DashboardPage() {
       statusFilter === "all" || task.status === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || task.priority === priorityFilter;
+    const matchesStage =
+      stageFilter === "all" || task.current_stage === stageFilter;
+    const matchesType = activeTab === "all" || task.type === activeTab;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority &&
+      matchesStage &&
+      matchesType
+    );
   });
 
   const openModal = () => setIsModalOpen(true);
@@ -146,6 +174,14 @@ export default function DashboardPage() {
   const handleTaskAdded = () => {
     fetchTasks();
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -159,7 +195,7 @@ export default function DashboardPage() {
         </div>
         <div>
           <Button
-            variant={"default"}
+            variant="default"
             className="bg-blue-600 hover:bg-blue-700 text-white"
             onClick={openModal}
           >
@@ -192,7 +228,7 @@ export default function DashboardPage() {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
+              <SelectTrigger className="w-full md:w-1/5">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -205,7 +241,7 @@ export default function DashboardPage() {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
+              <SelectTrigger className="w-full md:w-1/5">
                 <SelectValue placeholder="Filter by priority" />
               </SelectTrigger>
               <SelectContent>
@@ -216,11 +252,23 @@ export default function DashboardPage() {
                 <SelectItem value="critical">Critical</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="w-full md:w-1/5">
+                <SelectValue placeholder="Filter by stage" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                <SelectItem value="Processor">Processor</SelectItem>
+                <SelectItem value="QC">QC</SelectItem>
+                <SelectItem value="QA">QA</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="all">
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="all">All Tasks</TabsTrigger>
           <TabsTrigger value="pm">
@@ -237,52 +285,14 @@ export default function DashboardPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* All Tasks Tab */}
-        <TabsContent value="all">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                id={task.id}
-                title={task.project_name || "Untitled Project"}
-                description={
-                  task.client_instruction || "No description available"
-                }
-                dueDate={task.delivery_date}
-                status={task.status || "pending"}
-                priority={task.priority || "medium"}
-                assignedTo={`Task ID: ${task.task_id || "N/A"}`}
-              />
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* PM Tasks Tab */}
-        <TabsContent value="pm">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                id={task.id}
-                title={task.project_name || "Untitled Project"}
-                description={
-                  task.client_instruction || "No description available"
-                }
-                dueDate={task.delivery_date}
-                status={task.status || "pending"}
-                priority={task.priority || "medium"}
-                assignedTo={`Task ID: ${task.task_id || "N/A"}`}
-              />
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* QC Tasks Tab  as of now set to PM , but will be shifted as soon as we include the flow concept.*/}
-        <TabsContent value="qc">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks
-              .filter((task) => task.type === "qc")
-              .map((task) => (
+        <TabsContent value="all" className="mt-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   id={task.id}
@@ -293,33 +303,47 @@ export default function DashboardPage() {
                   dueDate={task.delivery_date}
                   status={task.status || "pending"}
                   priority={task.priority || "medium"}
-                  assignedTo={`Task ID: ${task.task_id || "N/A"}`}
                 />
               ))}
-          </div>
+              {filteredTasks.length === 0 && (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  No tasks found matching your filters
+                </div>
+              )}
+            </div>
+          )}
         </TabsContent>
 
-        {/* QA Tasks Tab */}
-        <TabsContent value="qa">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks
-              .filter((task) => task.type === "qa")
-              .map((task) => (
-                <TaskCard
-                  key={task.id}
-                  id={task.id}
-                  title={task.project_name || "Untitled Project"}
-                  description={
-                    task.client_instruction || "No description available"
-                  }
-                  dueDate={task.delivery_date}
-                  status={task.status || "pending"}
-                  priority={task.priority || "medium"}
-                  assignedTo={`Task ID: ${task.task_id || "N/A"}`}
-                />
-              ))}
-          </div>
-        </TabsContent>
+        {["pm", "qc", "qa"].map((type) => (
+          <TabsContent key={type} value={type} className="mt-6">
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    id={task.id}
+                    title={task.project_name || "Untitled Project"}
+                    description={
+                      task.client_instruction || "No description available"
+                    }
+                    dueDate={task.delivery_date}
+                    status={task.status || "pending"}
+                    priority={task.priority || "medium"}
+                  />
+                ))}
+                {filteredTasks.length === 0 && (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    No tasks found matching your filters
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

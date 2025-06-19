@@ -46,8 +46,8 @@ export const FooterButtons = ({
                 onChange={(e) => setSelectedUserId(e.target.value)}
               >
                 <option value="">Select user to assign</option>
-                {availableUsers.map((user) => (
-                  <option key={user.user_id} value={user.user_id}>
+                {availableUsers.map((user, index) => (
+                  <option key={index} value={user.user_id}>
                     {user.name || user.email}
                   </option>
                 ))}

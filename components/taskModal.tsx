@@ -47,7 +47,7 @@ interface FormData {
 }
 
 interface UserProfile {
-  user_id: string;
+  id: string;
   name: string;
   email: string;
   role: string;
@@ -234,12 +234,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
     >
   ) => {
     const { name, value } = e.target;
-    
+
     // // Debug logging for delivery time specifically
     // if (name === 'deliveryTime') {
     //   console.log("Delivery time changed:", { name, value });
     // }
-    
+
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -249,19 +249,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        console.log(user);
         if (user) {
           const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('user_id, name, email, role')
-            .eq('user_id', user.id)
+            .from("profiles")
+            .select("id, name, email, role")
+            .eq("id", user.id)
             .single();
-            
+
           if (error) throw error;
           setCurrentUser(profile);
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error("Error fetching user profile:", error);
       }
     };
 
@@ -278,7 +281,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     let currentUserId: string | null = null;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       currentUserId = user?.id || null;
       if (!currentUserId) {
         toast.error("You must be logged in to create a task");
@@ -304,19 +309,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
         language: formData.language,
         process_type: formData.processType,
         delivery_date: formData.deliveryDate || null,
-        delivery_time: formData.deliveryTime && formData.deliveryDate 
-          ? `${formData.deliveryDate}T${formData.deliveryTime}:00Z`
-          : null,
+        delivery_time:
+          formData.deliveryTime && formData.deliveryDate
+            ? `${formData.deliveryDate}T${formData.deliveryTime}:00Z`
+            : null,
         serial_number: formData.serialNumber,
         client_instruction: formData.clientInstruction,
-        list_of_files: formData.selectedFiles.map(f => f.name),
+        list_of_files: formData.selectedFiles.map((f) => f.name),
         reference_file_name: formData.fileName || null,
         estimated_hours_ocr: parseFloat(formData.estimatedHoursOCR) || 0,
         estimated_hours_qc: parseFloat(formData.estimatedHoursQC) || 0,
         estimated_hours_qa: parseFloat(formData.estimatedHoursQA) || 0,
         created_by: currentUserId,
         completion_status: false,
-        overall_completion_status: false
+        overall_completion_status: false,
       };
 
       // // Debug logging
@@ -327,17 +333,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .insert([projectCoreData])
-        .select(`
+        .select(
+          `
           *,
           profiles!projects_created_by_fkey (
             name
           )
-        `)
+        `
+        )
         .single();
 
       if (projectError) {
         console.error("Error inserting project:", projectError);
-        console.error("Full error details:", JSON.stringify(projectError, null, 2));
+        console.error(
+          "Full error details:",
+          JSON.stringify(projectError, null, 2)
+        );
         toast.error(`Failed to save project: ${projectError.message}`);
         setIsSubmitting(false);
         return;
@@ -375,12 +386,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
           date = date.replaceAll("/", "-");
           const filePathInStorage = `${newProjectId}/${date}_${originalFileName}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("task-files")
-            .upload(filePathInStorage, fileToUpload, {
-              contentType: fileToUpload.type,
-              upsert: true,
-            });
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("task-files")
+              .upload(filePathInStorage, fileToUpload, {
+                contentType: fileToUpload.type,
+                upsert: true,
+              });
 
           if (uploadError) {
             console.error("Error uploading file:", uploadError);
@@ -424,7 +436,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
         stage_acted_upon: "PM",
         action_taken: "created_task",
         log_notes: `Project '${formData.projectName}' created. ${
-          originalFileName ? `Initial file: ${originalFileName}` : "No initial file."
+          originalFileName
+            ? `Initial file: ${originalFileName}`
+            : "No initial file."
         }`,
         hours_spent_ocr: parseFloat(formData.estimatedHoursOCR) || null,
         hours_spent_qc: parseFloat(formData.estimatedHoursQC) || null,
@@ -462,16 +476,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
         estimatedHoursQC: "",
         estimatedHoursQA: "",
       });
-      
+
       setCurrentPage(1);
       if (onTaskAdded) {
         onTaskAdded();
       }
       onClose();
-
     } catch (error) {
       console.error("Unexpected error during submission:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
       toast.error(`An unexpected error occurred: ${errorMessage}`);
       setIsSubmitting(false);
     } finally {
@@ -678,7 +692,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 />
               </div>
               <div>
-                <label className = "block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700">
                   Delivery Time
                 </label>
                 <input
@@ -689,7 +703,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   onChange={handleChange}
                   onKeyDown={(e) => handleKeyDown(e, "deliveryTime")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
