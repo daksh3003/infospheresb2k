@@ -5,8 +5,8 @@ import { ArrowBigUpDashIcon } from "lucide-react";
 
 export const FooterButtons = ({
   currentUser,
-  selectedUserId,
-  setSelectedUserId,
+  selectedUserData,
+  setSelectedUserData,
   availableUsers,
   handleAssignTask,
   isAssigning,
@@ -20,8 +20,8 @@ export const FooterButtons = ({
   SubmitTo,
 }: {
   currentUser: any;
-  selectedUserId: string;
-  setSelectedUserId: (value: string) => void;
+  selectedUserData: any;
+  setSelectedUserData: (value: any) => void;
   availableUsers: any[];
   handleAssignTask: () => void;
   isAssigning: boolean;
@@ -34,6 +34,7 @@ export const FooterButtons = ({
   status: string;
   SubmitTo: string;
 }) => {
+  
   return (
     <>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
@@ -42,12 +43,23 @@ export const FooterButtons = ({
             <div className="flex items-center gap-2">
               <select
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
+                value={selectedUserData.id}
+                onChange={(e) => {
+                  const selectedUser = availableUsers.find(
+                    (user) => user.id === e.target.value
+                  );
+                  setSelectedUserData({
+                    id: e.target.value,
+                    name: selectedUser?.name,
+                    email: selectedUser?.email,
+                  });
+                  // console.log("Selected user id:", e.target.value);
+                  // console.log("Selected user name:", selectedUser?.name);
+                }}
               >
                 <option value="">Select user to assign</option>
                 {availableUsers.map((user, index) => (
-                  <option key={index} value={user.user_id}>
+                  <option key={index} value={user.id}>
                     {user.name || user.email}
                   </option>
                 ))}
@@ -55,7 +67,7 @@ export const FooterButtons = ({
               <button
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
                 onClick={handleAssignTask}
-                disabled={isAssigning || !selectedUserId}
+                disabled={isAssigning || !selectedUserData.id}
               >
                 {isAssigning ? "Assigning..." : "Assign Task"}
               </button>

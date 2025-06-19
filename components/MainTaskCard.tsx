@@ -2,16 +2,41 @@ import { Calendar, Clock } from "lucide-react";
 import React from "react";
 import { getPriorityBadge } from "./task/priority";
 import { getStatusBadge } from "./task/status";
+import { useState } from "react";
+import { supabase } from "@/utils/supabase";
+import { useEffect } from "react";
 
 export const MainTaskCard = ({
   task,
   status,
   progress,
+  onAssignTask,
 }: {
   task: any;
   status: string;
   progress: number;
+  onAssignTask: () => void;
 }) => {
+  const [assignedTo, setAssignedTo] = useState<any[]>([]);
+
+  const fetchAssignedTo = async () => {
+    const { data, error } = await supabase
+      .from("process_logs_test")
+      .select("assigned_to")
+      .eq("project_id", task.id);
+    if (error) {
+      console.error("Error fetching assigned to:", error);
+      return;
+    }
+    if (data && data.length > 0) {
+      console.log("assigned to: ", data[0].assigned_to);
+      setAssignedTo(data[0].assigned_to);
+    }
+  };
+  useEffect(() => {
+    fetchAssignedTo();
+  }, [onAssignTask]);
+
   return (
     <>
       <div className="p-6 pb-4 border-b border-gray-200">
@@ -66,16 +91,21 @@ export const MainTaskCard = ({
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Assigned To
                 </h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200">
-                    <img
-                      src={task.assignedTo.avatar}
-                      alt={task.assignedTo.name}
-                      className="w-full h-full object-cover"
-                    />
+                {assignedTo.map((user, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 space-y-2"
+                  >
+                    {/* <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200"> */}
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                      <span className="text-xs text-gray-600">
+                        {user.name?.charAt(0) || "?"}
+                      </span>
+                      {/* </div> */}
+                    </div>
+                    <span className="text-gray-900">{user.name}</span>
                   </div>
-                  <span className="text-gray-900">{task.assignedTo.name}</span>
-                </div>
+                ))}
               </div>
 
               <div>
@@ -92,9 +122,9 @@ export const MainTaskCard = ({
                     <span className="text-gray-900">
                       {task.createdBy?.name || "Unknown"}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    {/* <span className="text-xs text-gray-500">
                       {task.createdBy?.email || ""}
-                    </span>
+                    </span> */}
                   </div>
                 </div>
               </div>
@@ -156,18 +186,18 @@ export const MainTaskCard = ({
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-900">
-                    {task.deliveryTime ? 
-                      (() => {
-                        //custom logic to convert it and display it based on db timestampz.
-                        const timeStr = task.deliveryTime.substring(11, 16);
-                        const [hours, minutes] = timeStr.split(':');
-                        const hour = parseInt(hours);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                        return `${displayHour}:${minutes} ${ampm}`;
-                      })() : 
-                      'Not set'
-                    }
+                    {task.deliveryTime
+                      ? (() => {
+                          //custom logic to convert it and display it based on db timestampz.
+                          const timeStr = task.deliveryTime.substring(11, 16);
+                          const [hours, minutes] = timeStr.split(":");
+                          const hour = parseInt(hours);
+                          const ampm = hour >= 12 ? "PM" : "AM";
+                          const displayHour =
+                            hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                          return `${displayHour}:${minutes} ${ampm}`;
+                        })()
+                      : "Not set"}
                   </span>
                 </div>
               </div>

@@ -74,7 +74,8 @@ export default function TaskDetailPage() {
   // user states :
 
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+
+  const [selectedUserData, setSelectedUserData] = useState<any>({});
   const [isAssigning, setIsAssigning] = useState(false);
   const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
 
@@ -773,7 +774,7 @@ export default function TaskDetailPage() {
   };
 
   const handleAssignTask = async () => {
-    if (!selectedUserId) {
+    if (!selectedUserData) {
       toast.error("Please select a user to assign the task");
       return;
     }
@@ -798,7 +799,9 @@ export default function TaskDetailPage() {
 
       // Create new assignment entry
       const newAssignment = {
-        user_id: selectedUserId,
+        name: selectedUserData.name,
+        user_id: selectedUserData.id,
+        email: selectedUserData.email,
         assigned_at: now,
       };
 
@@ -807,7 +810,7 @@ export default function TaskDetailPage() {
       if (existingLog?.assigned_to) {
         // Check if user is already assigned
         const isAlreadyAssigned = existingLog.assigned_to.some(
-          (assignment: any) => assignment.user_id === selectedUserId
+          (assignment: any) => assignment.user_id === selectedUserData.id
         );
 
         if (isAlreadyAssigned) {
@@ -849,7 +852,7 @@ export default function TaskDetailPage() {
       toast.error("Failed to assign task. Please try again.");
     } finally {
       setIsAssigning(false);
-      setSelectedUserId(""); // Reset selection
+      setSelectedUserData({}); // Reset selection
     }
   };
 
@@ -882,7 +885,8 @@ export default function TaskDetailPage() {
     if (currentStage) {
       fetchAvailableUsers();
     }
-  }, [taskId, currentStage]);
+    // console.log("Selected user name : ", selectedUserId);
+  }, [taskId, currentStage, selectedUserData]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -910,14 +914,19 @@ export default function TaskDetailPage() {
 
       <div className="mb-6 border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
         {/* Main task card */}
-        <MainTaskCard task={task} status={status} progress={progress} />
+        <MainTaskCard
+          task={task}
+          status={status}
+          progress={progress}
+          onAssignTask={handleAssignTask}
+        />
 
         {/* Footer with buttons */}
 
         <FooterButtons
           currentUser={currentUser}
-          selectedUserId={selectedUserId}
-          setSelectedUserId={setSelectedUserId}
+          selectedUserData={selectedUserData}
+          setSelectedUserData={setSelectedUserData}
           availableUsers={availableUsers}
           handleAssignTask={handleAssignTask}
           isAssigning={isAssigning}

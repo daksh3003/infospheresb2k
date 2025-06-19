@@ -76,9 +76,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: "Project Manager", href: "/dashboard/pm", icon: Users },
+    { name: "Processing Team", href: "/dashboard/processor", icon: Cpu },
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
-    { name: "Processing Team", href: "/dashboard/processor", icon: Cpu },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 

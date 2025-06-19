@@ -157,7 +157,7 @@ export default function DashboardPage() {
       priorityFilter === "all" || task.priority === priorityFilter;
     const matchesStage =
       stageFilter === "all" || task.current_stage === stageFilter;
-    const matchesType = activeTab === "all" || task.type === activeTab;
+    const matchesType = activeTab === "all" || task.current_stage === activeTab;
 
     return (
       matchesSearch &&
@@ -252,18 +252,6 @@ export default function DashboardPage() {
                 <SelectItem value="critical">Critical</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger className="w-full md:w-1/5">
-                <SelectValue placeholder="Filter by stage" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                <SelectItem value="Processor">Processor</SelectItem>
-                <SelectItem value="QC">QC</SelectItem>
-                <SelectItem value="QA">QA</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -271,15 +259,15 @@ export default function DashboardPage() {
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="all">All Tasks</TabsTrigger>
-          <TabsTrigger value="pm">
+          <TabsTrigger value="Processor">
             <Users className="h-4 w-4 mr-2" />
-            PM Tasks
+            Processor Tasks
           </TabsTrigger>
-          <TabsTrigger value="qc">
+          <TabsTrigger value="QC">
             <ClipboardCheck className="h-4 w-4 mr-2" />
             QC Tasks
           </TabsTrigger>
-          <TabsTrigger value="qa">
+          <TabsTrigger value="QA">
             <ShieldCheck className="h-4 w-4 mr-2" />
             QA Tasks
           </TabsTrigger>
@@ -314,7 +302,7 @@ export default function DashboardPage() {
           )}
         </TabsContent>
 
-        {["pm", "qc", "qa"].map((type) => (
+        {["Processor", "QC", "QA"].map((type) => (
           <TabsContent key={type} value={type} className="mt-6">
             {isLoading ? (
               <div className="flex justify-center py-8">
