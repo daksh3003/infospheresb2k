@@ -773,7 +773,7 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleAssignTask = async () => {
+  const handleAssignTask = async (selectedUserData: any) => {
     if (!selectedUserData) {
       toast.error("Please select a user to assign the task");
       return;
@@ -801,12 +801,23 @@ export default function TaskDetailPage() {
       const newAssignment = {
         name: selectedUserData.name,
         user_id: selectedUserData.id,
-        email: selectedUserData.email,
         assigned_at: now,
       };
 
+      console.log("newAssignment : ", newAssignment);
+      console.log("existingLog : ", existingLog);
+
       // Handle existing or new assignedTo array
-      let assignedToArray = [];
+      let assignedToArray: any[] = [];
+
+      const logData = {
+        project_id: taskId,
+        current_stage: currentStage,
+        sent_by: sentBy,
+        assigned_to: assignedToArray,
+        created_at: existingLog?.created_at || now,
+      };
+
       if (existingLog?.assigned_to) {
         // Check if user is already assigned
         const isAlreadyAssigned = existingLog.assigned_to.some(
@@ -826,24 +837,28 @@ export default function TaskDetailPage() {
         assignedToArray = [newAssignment];
       }
 
-      const logData = {
-        project_id: taskId,
-        current_stage: currentStage,
-        sent_by: sentBy,
-        assigned_to: assignedToArray,
-        created_at: existingLog?.created_at || now,
-      };
+      logData.assigned_to = assignedToArray;
 
-      // Upsert the record
-      const { error: upsertError } = await supabase
-        .from("process_logs_test")
-        .update(logData)
-        .eq("project_id", taskId)
-        .eq("current_stage", currentStage);
+      if (existingLog) {
+        const { error: upsertError } = await supabase
+          .from("process_logs_test")
+          .update(logData)
+          .eq("project_id", taskId)
+          .eq("current_stage", currentStage);
 
-      if (upsertError) {
-        throw upsertError;
+        if (upsertError) {
+          throw upsertError;
+        }
+      } else {
+        const { error: upsertError } = await supabase
+          .from("process_logs_test")
+          .insert(logData);
+
+        if (upsertError) {
+          throw upsertError;
+        }
       }
+      // Upsert the record
 
       toast.success("Task assigned successfully!");
       await fetchData(); // Refresh the data
@@ -881,12 +896,7 @@ export default function TaskDetailPage() {
     fetchCurrentUser();
     fetchProcessorFiles();
     fetchData();
-
-    if (currentStage) {
-      fetchAvailableUsers();
-    }
-    // console.log("Selected user name : ", selectedUserId);
-  }, [taskId, currentStage, selectedUserData]);
+  }, [taskId]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -922,14 +932,11 @@ export default function TaskDetailPage() {
         />
 
         {/* Footer with buttons */}
-
         <FooterButtons
           currentUser={currentUser}
-          selectedUserData={selectedUserData}
-          setSelectedUserData={setSelectedUserData}
-          availableUsers={availableUsers}
-          handleAssignTask={handleAssignTask}
-          isAssigning={isAssigning}
+          currentStage={currentStage}
+          sentBy={sentBy}
+          taskId={taskId}
           handleStartTask={handleStartTask}
           handlePauseResumeTask={handlePauseResumeTask}
           handleSendTo={handleSendTo}
@@ -938,6 +945,7 @@ export default function TaskDetailPage() {
           setShowCompleteDialog={setShowCompleteDialog}
           status={status}
           SubmitTo={SubmitTo}
+          onAssignTask={handleAssignTask}
         />
       </div>
 

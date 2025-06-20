@@ -33,6 +33,7 @@ export const MainTaskCard = ({
       setAssignedTo(data[0].assigned_to);
     }
   };
+
   useEffect(() => {
     fetchAssignedTo();
   }, [onAssignTask]);
@@ -91,21 +92,18 @@ export const MainTaskCard = ({
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Assigned To
                 </h3>
-                {assignedTo.map((user, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 space-y-2"
-                  >
-                    {/* <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200"> */}
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                      <span className="text-xs text-gray-600">
-                        {user.name?.charAt(0) || "?"}
-                      </span>
-                      {/* </div> */}
+                <div className="space-y-2">
+                  {assignedTo.map((user, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-600">
+                          {user.name?.charAt(0) || "?"}
+                        </span>
+                      </div>
+                      <span className="text-gray-900">{user.name}</span>
                     </div>
-                    <span className="text-gray-900">{user.name}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -122,9 +120,6 @@ export const MainTaskCard = ({
                     <span className="text-gray-900">
                       {task.createdBy?.name || "Unknown"}
                     </span>
-                    {/* <span className="text-xs text-gray-500">
-                      {task.createdBy?.email || ""}
-                    </span> */}
                   </div>
                 </div>
               </div>
@@ -188,7 +183,6 @@ export const MainTaskCard = ({
                   <span className="text-gray-900">
                     {task.deliveryTime
                       ? (() => {
-                          //custom logic to convert it and display it based on db timestampz.
                           const timeStr = task.deliveryTime.substring(11, 16);
                           const [hours, minutes] = timeStr.split(":");
                           const hour = parseInt(hours);
