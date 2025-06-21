@@ -138,37 +138,45 @@ export const FooterButtons = ({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="p-5">
                   <ChevronDown className="h-4 w-4" />
-                  Select User to Assign
+                  Select Member to Assign
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56 max-h-[300px] overflow-y-auto">
-                {availableUsers.map((user) => (
-                  <DropdownMenuItem
-                    key={user.id}
-                    onClick={() => onAssignTask(user)}
-                    className="cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                        <span className="text-xs text-gray-600">
-                          {user.name?.charAt(0) || user.email?.charAt(0) || "?"}
-                        </span>
+                {availableUsers && availableUsers.length > 0 ? (
+                  availableUsers.map((user) => (
+                    <DropdownMenuItem
+                      key={user.id}
+                      onClick={() => onAssignTask(user)}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                          <span className="text-xs text-gray-600">
+                            {user.name?.charAt(0) ||
+                              user.email?.charAt(0) ||
+                              "?"}
+                          </span>
+                        </div>
+                        <span>{user.name || user.email}</span>
                       </div>
-                      <span>{user.name || user.email}</span>
-                    </div>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem>
+                    No members available for {currentStage}
                   </DropdownMenuItem>
-                ))}
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            onClick={handleStartTask}
-          >
-            <Play className="h-4 w-4" /> Start Task
-          </button>
-
+          {status === "pending" && (
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={handleStartTask}
+            >
+              <Play className="h-4 w-4" /> Start Task
+            </button>
+          )}
           {getPauseResumeButton(status, handlePauseResumeTask)}
 
           <button

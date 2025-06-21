@@ -80,7 +80,22 @@ export default function TaskDetailPage() {
   const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
 
   // Handle task actions
-  const handleStartTask = () => {
+  const handleStartTask = async () => {
+    const { data: response, error: error } = await supabase
+      .from("process_logs_test")
+      .update({
+        started_at: new Date(),
+      })
+      .eq("project_id", taskId);
+
+    if (error) {
+      toast("Failed to start task", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
     setStatus("in-progress");
     setProgress(5);
   };
@@ -94,6 +109,29 @@ export default function TaskDetailPage() {
   };
 
   const handleCompleteTask = async () => {
+    const { data: response, error: error } = await supabase
+      .from("process_logs_test")
+      .update({
+        ended_at: new Date(),
+      })
+      .eq("project_id", taskId);
+
+    if (error) {
+      toast("Failed to complete task", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    if (response) {
+      toast("Task completed", {
+        type: "success",
+        position: "top-right",
+      });
+    }
+
+    console.log(response);
     console.log("Completing task:", taskId);
     let overall_completion_status = false;
     console.log("Current Stage:", currentStage);

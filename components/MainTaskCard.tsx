@@ -1,10 +1,15 @@
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, ChevronDown } from "lucide-react";
 import React from "react";
 import { getPriorityBadge } from "./task/priority";
 import { getStatusBadge } from "./task/status";
 import { useState } from "react";
 import { supabase } from "@/utils/supabase";
 import { useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 export const MainTaskCard = ({
   task,
@@ -15,7 +20,7 @@ export const MainTaskCard = ({
   task: any;
   status: string;
   progress: number;
-  onAssignTask: () => void;
+  onAssignTask: (user: any) => void;
 }) => {
   const [assignedTo, setAssignedTo] = useState<any[]>([]);
 
@@ -92,18 +97,44 @@ export const MainTaskCard = ({
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Assigned To
                 </h3>
-                <div className="space-y-2">
-                  {assignedTo.map((user, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                        <span className="text-xs text-gray-600">
-                          {user.name?.charAt(0) || "?"}
-                        </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
+                      <div className="flex -space-x-2">
+                        {assignedTo.slice(0, 3).map((user, index) => (
+                          <div
+                            key={index}
+                            className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center ring-2 ring-white"
+                          >
+                            <span className="text-xs text-gray-600">
+                              {user.name?.charAt(0) || "?"}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <span className="text-gray-900">{user.name}</span>
+                      {assignedTo.length > 3 && (
+                        <span className="text-sm text-gray-600">
+                          +{assignedTo.length - 3}
+                        </span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <div className="py-2 px-3 space-y-2">
+                      {assignedTo.map((user, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                            <span className="text-xs text-gray-600">
+                              {user.name?.charAt(0) || "?"}
+                            </span>
+                          </div>
+                          <span className="text-gray-900">{user.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
