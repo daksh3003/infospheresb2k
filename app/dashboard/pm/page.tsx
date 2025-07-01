@@ -72,13 +72,13 @@ export default function DashboardPage() {
       // Then get the current stage for each project
       const { data: iterationsData, error: iterationsError } = await supabase
         .from("task_iterations")
-        .select("project_id, current_stage");
+        .select("task_id, current_stage");
 
       if (iterationsError) throw iterationsError;
 
       // Create a map of project_id to current_stage
       const stageMap = iterationsData.reduce((acc: any, curr) => {
-        acc[curr.project_id] = curr.current_stage;
+        acc[curr.task_id] = curr.current_stage;
         return acc;
       }, {});
 

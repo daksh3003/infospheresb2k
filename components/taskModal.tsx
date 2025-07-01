@@ -1,4 +1,4 @@
-// File: components/task-card.tsx
+// File: components/taskModal.tsx
 
 "use client";
 
@@ -9,7 +9,10 @@ import {
   ChevronLeft,
   Save,
   Upload,
-  Languages,
+  Plus,
+  Minus,
+  FileText,
+  Split,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -21,29 +24,40 @@ interface TaskModalProps {
   onTaskAdded: () => void;
 }
 
-interface FormData {
-  // Form1 Fields
-  serialNumber: string;
-  taskId: string;
-  clientInstruction: string;
-  mailInstruction: string;
-  projectName: string;
-  numberOfFiles: string;
-  numberOfPages: string;
-  language: string;
-  processType: string;
-  deliveryDate: string;
-  deliveryTime: string;
+interface ProjectFormData {
+  project_name: string;
+  po_hours: string;
+  mail_instruction: string;
+  list_of_files: string;
+  reference_file: string;
+  delivery_date: string;
+  delivery_time: string;
+  completion_status: boolean;
+  created_by: string;
+}
 
-  estimatePOHours: string;
-  listOfFiles: string;
-  selectedFiles: File[];
+interface TaskFormData {
+  task_name: string;
+  client_instruction: string;
+  processor_type: string[];
+  estimated_hours_ocr: string;
+  estimated_hours_qc: string;
+  estimated_hours_qa: string;
+  completion_status: boolean;
+  project_id: string;
+}
 
-  // Form2 Fields
-  fileName: string;
-  estimatedHoursOCR: string;
-  estimatedHoursQC: string;
-  estimatedHoursQA: string;
+interface FileFormData {
+  file_name: string;
+  page_count: string;
+  taken_by: string;
+  assigned_to: string;
+}
+
+interface FileGroup {
+  files: File[];
+  taskData: TaskFormData;
+  filesData: FileFormData[];
 }
 
 interface UserProfile {
@@ -53,197 +67,46 @@ interface UserProfile {
   role: string;
 }
 
-type FormRefs = {
-  serialNumber: React.RefObject<HTMLInputElement | null>;
-  taskId: React.RefObject<HTMLInputElement | null>;
-  clientInstruction: React.RefObject<HTMLTextAreaElement | null>;
-  mailInstruction: React.RefObject<HTMLTextAreaElement | null>;
-  projectName: React.RefObject<HTMLInputElement | null>;
-  numberOfFiles: React.RefObject<HTMLInputElement | null>;
-  numberOfPages: React.RefObject<HTMLInputElement | null>;
-  language: React.RefObject<HTMLInputElement | null>;
-  processType: React.RefObject<HTMLSelectElement | null>;
-  deliveryDate: React.RefObject<HTMLInputElement | null>;
-  deliveryTime: React.RefObject<HTMLInputElement | null>;
-  estimatePOHours: React.RefObject<HTMLInputElement | null>;
-  selectedFiles: React.RefObject<HTMLInputElement | null>;
-  listOfFiles: React.RefObject<HTMLInputElement | null>;
-  fileName: React.RefObject<HTMLInputElement | null>;
-  estimatedHoursOCR: React.RefObject<HTMLInputElement | null>;
-  estimatedHoursQC: React.RefObject<HTMLInputElement | null>;
-  estimatedHoursQA: React.RefObject<HTMLInputElement | null>;
-};
-
 const TaskModal: React.FC<TaskModalProps> = ({
   isOpen,
   onClose,
   onTaskAdded,
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState<FormData>({
-    // Form1 Fields
-    serialNumber: "",
-    taskId: "",
-    clientInstruction: "",
-    mailInstruction: "",
-    projectName: "",
-    numberOfFiles: "",
-    numberOfPages: "",
-    language: "",
-    processType: "",
-    deliveryDate: "",
-    deliveryTime: "",
-    estimatePOHours: "",
-    listOfFiles: "",
-    selectedFiles: [],
 
-    // Form2 Fields
-    fileName: "",
-    estimatedHoursOCR: "",
-    estimatedHoursQC: "",
-    estimatedHoursQA: "",
+  // Project form data
+  const [projectData, setProjectData] = useState<ProjectFormData>({
+    project_name: "",
+    po_hours: "",
+    mail_instruction: "",
+    list_of_files: "",
+    reference_file: "",
+    delivery_date: "",
+    delivery_time: "",
+    completion_status: false,
+    created_by: "",
   });
 
-  // Create refs for each input field
-  const refs: FormRefs = {
-    serialNumber: useRef<HTMLInputElement | null>(null),
-    taskId: useRef<HTMLInputElement | null>(null),
-    clientInstruction: useRef<HTMLTextAreaElement | null>(null),
-    mailInstruction: useRef<HTMLTextAreaElement | null>(null),
-    projectName: useRef<HTMLInputElement | null>(null),
-    numberOfFiles: useRef<HTMLInputElement | null>(null),
-    numberOfPages: useRef<HTMLInputElement | null>(null),
-    language: useRef<HTMLInputElement | null>(null),
-    processType: useRef<HTMLSelectElement | null>(null),
-    deliveryDate: useRef<HTMLInputElement | null>(null),
-    deliveryTime: useRef<HTMLInputElement | null>(null),
-    estimatePOHours: useRef<HTMLInputElement | null>(null),
-    selectedFiles: useRef<HTMLInputElement | null>(null),
-    listOfFiles: useRef<HTMLInputElement | null>(null),
-    // Form 2 refs
-    fileName: useRef<HTMLInputElement | null>(null),
-    estimatedHoursOCR: useRef<HTMLInputElement | null>(null),
-    estimatedHoursQC: useRef<HTMLInputElement | null>(null),
-    estimatedHoursQA: useRef<HTMLInputElement | null>(null),
-  };
+  // File upload state
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileGroups, setFileGroups] = useState<FileGroup[]>([]);
 
-  // Define the order of fields for each form
-  const form1Fields = [
-    "serialNumber",
-    "taskId",
-    "clientInstruction",
-    "mailInstruction",
-    "projectName",
-    "numberOfFiles",
-    "numberOfPages",
-    "language",
-    "processType",
-    "deliveryDate",
-    "deliveryTime",
-    "estimatePOHours", // This will be the last field for Enter key navigation
-  ];
-
-  const form2Fields = [
-    "fileName",
-    "estimatedHoursOCR",
-    "estimatedHoursQC",
-    "estimatedHoursQA",
-  ];
-
-  const handleKeyDown = (
-    e: React.KeyboardEvent,
-    currentField: keyof FormRefs
-  ) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault(); // Prevent form submission
-
-      // Don't proceed if we're at estimatePOHours - let user handle file upload manually
-      if (currentField === "estimatePOHours") {
-        return;
-      }
-
-      const currentFormFields = currentPage === 1 ? form1Fields : form2Fields;
-      const currentIndex = currentFormFields.indexOf(currentField);
-
-      // If it's the last field in Form 2, submit the form
-      if (currentPage === 2 && currentIndex === currentFormFields.length - 1) {
-        handleSubmit(e as any);
-        return;
-      }
-
-      // Move to next field
-      const nextField = currentFormFields[currentIndex + 1] as keyof FormRefs;
-      if (nextField && refs[nextField]?.current) {
-        refs[nextField].current?.focus();
-      }
+  // Steps: 1 = Project Form, 2 = File Upload, 3 = File Splitting (if multiple files), 4 = Task Creation
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 1:
+        return "Project Information";
+      case 2:
+        return "File Upload";
+      case 3:
+        return "File Organization";
+      case 4:
+        return "Task & File Details";
+      default:
+        return "Project Creation";
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    console.log("Files selected:", files);
-    if (files) {
-      // Add new files to existing selection
-      const newFiles = Array.from(files);
-      console.log(
-        "New files to add:",
-        newFiles.map((f) => f.name)
-      );
-      setFormData((prevData) => {
-        const updatedData = {
-          ...prevData,
-          selectedFiles: [...prevData.selectedFiles, ...newFiles],
-          numberOfFiles: (
-            prevData.selectedFiles.length + files.length
-          ).toString(),
-        };
-        console.log(
-          "Updated selected files:",
-          updatedData.selectedFiles.map((f) => f.name)
-        );
-        return updatedData;
-      });
-    }
-    // Reset the input value so the same file can be selected again
-    e.target.value = "";
-  };
-
-  const removeFile = (indexToRemove: number) => {
-    console.log("Removing file at index:", indexToRemove);
-    setFormData((prevData) => {
-      const updatedFiles = prevData.selectedFiles.filter(
-        (_, index) => index !== indexToRemove
-      );
-      console.log(
-        "Files after removal:",
-        updatedFiles.map((f) => f.name)
-      );
-      return {
-        ...prevData,
-        selectedFiles: updatedFiles,
-        numberOfFiles: updatedFiles.length.toString(),
-      };
-    });
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-
-    // // Debug logging for delivery time specifically
-    // if (name === 'deliveryTime') {
-    //   console.log("Delivery time changed:", { name, value });
-    // }
-
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
   };
 
   useEffect(() => {
@@ -252,7 +115,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        console.log(user);
+
         if (user) {
           const { data: profile, error } = await supabase
             .from("profiles")
@@ -262,6 +125,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
           if (error) throw error;
           setCurrentUser(profile);
+          setProjectData((prev) => ({ ...prev, created_by: user.id }));
         }
       } catch (error) {
         console.error("Error fetching user profile:", error);
@@ -273,211 +137,337 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const handleProjectChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value } = e.target;
+    setProjectData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setSelectedFiles((prev) => [...prev, ...newFiles]);
+    }
+    e.target.value = "";
+  };
 
-    let currentUserId: string | null = null;
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      currentUserId = user?.id || null;
-      if (!currentUserId) {
-        toast.error("You must be logged in to create a task");
-        setIsSubmitting(false);
+  const removeFile = (indexToRemove: number) => {
+    setSelectedFiles((prev) =>
+      prev.filter((_, index) => index !== indexToRemove)
+    );
+  };
+
+  const handleNextStep = () => {
+    if (currentStep === 1) {
+      // Validate project form
+      if (!projectData.project_name.trim()) {
+        toast.error("Project name is required");
         return;
       }
-    } catch (authError) {
-      console.error("Could not get authenticated user:", authError);
-      toast.error("Authentication error occurred");
-      setIsSubmitting(false);
-      return;
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (selectedFiles.length === 0) {
+        toast.error("Please upload at least one file");
+        return;
+      }
+
+      if (selectedFiles.length === 1) {
+        // Single file - go directly to task creation
+        initializeSingleFileGroup();
+        setCurrentStep(4);
+      } else {
+        // Multiple files - show splitting option
+        initializeFileGroups();
+        setCurrentStep(3);
+      }
+    } else if (currentStep === 3) {
+      if (fileGroups.length === 0) {
+        toast.error("Please organize files into groups");
+        return;
+      }
+      setCurrentStep(4);
     }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const initializeSingleFileGroup = () => {
+    setFileGroups([
+      {
+        files: selectedFiles,
+        taskData: {
+          task_name: "",
+          client_instruction: "",
+          processor_type: [],
+          estimated_hours_ocr: "",
+          estimated_hours_qc: "",
+          estimated_hours_qa: "",
+          completion_status: false,
+          project_id: "",
+        },
+        filesData: selectedFiles.map((file) => ({
+          file_name: file.name,
+          page_count: "",
+          taken_by: "",
+          assigned_to: "",
+        })),
+      },
+    ]);
+  };
+
+  const initializeFileGroups = () => {
+    setFileGroups([
+      {
+        files: [],
+        taskData: {
+          task_name: "",
+          client_instruction: "",
+          processor_type: [],
+          estimated_hours_ocr: "",
+          estimated_hours_qc: "",
+          estimated_hours_qa: "",
+          completion_status: false,
+          project_id: "",
+        },
+        filesData: [],
+      },
+    ]);
+  };
+
+  const addFileGroup = () => {
+    setFileGroups((prev) => [
+      ...prev,
+      {
+        files: [],
+        taskData: {
+          task_name: "",
+          client_instruction: "",
+          processor_type: [],
+          estimated_hours_ocr: "",
+          estimated_hours_qc: "",
+          estimated_hours_qa: "",
+          completion_status: false,
+          project_id: "",
+        },
+        filesData: [],
+      },
+    ]);
+  };
+
+  const removeFileGroup = (groupIndex: number) => {
+    if (fileGroups.length > 1) {
+      setFileGroups((prev) => prev.filter((_, index) => index !== groupIndex));
+    }
+  };
+
+  const assignFileToGroup = (fileIndex: number, groupIndexStr: string) => {
+    const file = selectedFiles[fileIndex];
+
+    // Remove file from all groups first
+    setFileGroups((prev) => {
+      const newGroups = prev.map((group) => ({
+        ...group,
+        files: group.files.filter((f) => f.name !== file.name),
+        filesData: group.filesData.filter((fd) => fd.file_name !== file.name),
+      }));
+
+      // If groupIndexStr is empty, just remove from all groups
+      if (groupIndexStr === "") {
+        return newGroups;
+      }
+
+      const groupIndex = parseInt(groupIndexStr);
+
+      // Add to the specified group
+      if (groupIndex >= 0 && groupIndex < newGroups.length) {
+        newGroups[groupIndex].files.push(file);
+        newGroups[groupIndex].filesData.push({
+          file_name: file.name,
+          page_count: "",
+          taken_by: "",
+          assigned_to: "",
+        });
+      }
+
+      return newGroups;
+    });
+  };
+
+  const removeFileFromGroup = (groupIndex: number, fileIndex: number) => {
+    setFileGroups((prev) => {
+      const newGroups = [...prev];
+      newGroups[groupIndex].files.splice(fileIndex, 1);
+      newGroups[groupIndex].filesData.splice(fileIndex, 1);
+      return newGroups;
+    });
+  };
+
+  const updateTaskData = (
+    groupIndex: number,
+    field: keyof TaskFormData,
+    value: TaskFormData[keyof TaskFormData]
+  ) => {
+    setFileGroups((prev) => {
+      const newGroups = [...prev];
+      newGroups[groupIndex].taskData = {
+        ...newGroups[groupIndex].taskData,
+        [field]: value,
+      };
+      return newGroups;
+    });
+  };
+
+  const updateFileData = (
+    groupIndex: number,
+    fileIndex: number,
+    field: keyof FileFormData,
+    value: string
+  ) => {
+    setFileGroups((prev) => {
+      const newGroups = [...prev];
+      newGroups[groupIndex].filesData[fileIndex] = {
+        ...newGroups[groupIndex].filesData[fileIndex],
+        [field]: value,
+      };
+      return newGroups;
+    });
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    console.log("fileGroups", fileGroups);
+    console.log("projectData", projectData);
+    console.log("selectedFiles", selectedFiles);
 
     try {
-      // 1. Insert into 'projects' table
-      const projectCoreData = {
-        project_name: formData.projectName,
-        task_id: formData.taskId,
-        po_hours: parseFloat(formData.estimatePOHours) || 0,
-        mail_instruction: formData.mailInstruction,
-        file_count: parseInt(formData.numberOfFiles) || 0,
-        page_count: parseInt(formData.numberOfPages) || 0,
-        language: formData.language,
-        process_type: formData.processType,
-        delivery_date: formData.deliveryDate || null,
-        delivery_time:
-          formData.deliveryTime && formData.deliveryDate
-            ? `${formData.deliveryDate}T${formData.deliveryTime}:00Z`
-            : null,
-        serial_number: formData.serialNumber,
-        client_instruction: formData.clientInstruction,
-        list_of_files: formData.selectedFiles.map((f) => f.name),
-        reference_file_name: formData.fileName || null,
-        estimated_hours_ocr: parseFloat(formData.estimatedHoursOCR) || 0,
-        estimated_hours_qc: parseFloat(formData.estimatedHoursQC) || 0,
-        estimated_hours_qa: parseFloat(formData.estimatedHoursQA) || 0,
-        created_by: currentUserId,
-        completion_status: false,
-        overall_completion_status: false,
-      };
+      if (!currentUser) {
+        toast.error("You must be logged in to create a project");
+        return;
+      }
 
-      // // Debug logging
-      // console.log("Form delivery time value:", formData.deliveryTime);
-      // console.log("Project core data delivery_time:", projectCoreData.delivery_time);
-      // console.log("Creating project with data:", projectCoreData);
-
-      const { data: projectData, error: projectError } = await supabase
-        .from("projects")
-        .insert([projectCoreData])
-        .select(
-          `
-          *,
-          profiles!projects_created_by_fkey (
-            name
-          )
-        `
-        )
+      // 1. Create project in projects_test table
+      const { data: projectResult, error: projectError } = await supabase
+        .from("projects_test")
+        .insert([
+          {
+            ...projectData,
+            list_of_files: selectedFiles.map((f) => f.name),
+          },
+        ])
+        .select("project_id")
         .single();
 
       if (projectError) {
-        console.error("Error inserting project:", projectError);
-        console.error(
-          "Full error details:",
-          JSON.stringify(projectError, null, 2)
-        );
-        toast.error(`Failed to save project: ${projectError.message}`);
-        setIsSubmitting(false);
+        console.error("Error creating project:", projectError);
+        toast.error(`Failed to create project: ${projectError.message}`);
         return;
       }
 
-      if (!projectData) {
-        console.error("No project data returned after insert");
-        toast.error("Failed to save project: No data returned");
-        setIsSubmitting(false);
-        return;
-      }
+      const projectId = projectResult.project_id;
 
-      // // Debug: Check if delivery_time was actually saved
-      // console.log("Project data returned from database:", projectData);
-      // console.log("Delivery time in returned data:", projectData.delivery_time);
+      // 2. Create tasks and files for each group
+      for (let groupIndex = 0; groupIndex < fileGroups.length; groupIndex++) {
+        const group = fileGroups[groupIndex];
 
-      const newProjectId = projectData.id;
-      const creatorName = projectData.profiles?.name || "Unknown";
-      console.log("Task created by:", creatorName);
+        // Create task
+        const { data: taskResult, error: taskError } = await supabase
+          .from("tasks_test")
+          .insert([
+            {
+              ...group.taskData,
+              project_id: projectId,
+            },
+          ])
+          .select("task_id")
+          .single();
 
-      let newFileId: string | null = null;
-      let uploadedFilePath: string | null = null;
-      let originalFileName: string | null = null;
-      let fileSize: number | null = null;
+        if (taskError) {
+          console.error("Error creating task:", taskError);
+          toast.error(
+            `Failed to create task ${groupIndex + 1}: ${taskError.message}`
+          );
+          continue;
+        }
 
-      // 2. Handle File Upload
-      if (formData.selectedFiles.length > 0) {
-        for (let i = 0; i < formData.selectedFiles.length; i++) {
-          const fileToUpload = formData.selectedFiles[i];
-          originalFileName = fileToUpload.name;
-          fileSize = fileToUpload.size;
+        const taskId = taskResult.task_id;
+
+        // Upload files and create file records
+        for (let fileIndex = 0; fileIndex < group.files.length; fileIndex++) {
+          const file = group.files[fileIndex];
+          const fileData = group.filesData[fileIndex];
+
+          // Upload file to storage
           let date = new Date().toLocaleString("en-IN", {
             timeZone: "Asia/Kolkata",
           });
           date = date.replaceAll("/", "-");
-          const filePathInStorage = `${newProjectId}/${date}_${originalFileName}`;
+          const filePathInStorage = `${projectId}/${taskId}/${date}_${file.name}`;
 
           const { data: uploadData, error: uploadError } =
             await supabase.storage
               .from("task-files")
-              .upload(filePathInStorage, fileToUpload, {
-                contentType: fileToUpload.type,
+              .upload(filePathInStorage, file, {
+                contentType: file.type,
                 upsert: true,
               });
 
           if (uploadError) {
             console.error("Error uploading file:", uploadError);
-            toast.error(`Failed to upload file: ${uploadError.message}`);
-            setIsSubmitting(false);
-            return;
+            toast.error(
+              `Failed to upload file ${file.name}: ${uploadError.message}`
+            );
+            continue;
           }
-          uploadedFilePath = uploadData.path;
+
+          // Create file record
+          const { error: fileRecordError } = await supabase
+            .from("files_test")
+            .insert([
+              {
+                ...fileData,
+                task_id: taskId,
+                file_name: file.name,
+              },
+            ]);
+
+          if (fileRecordError) {
+            console.error("Error creating file record:", fileRecordError);
+            toast.error(
+              `Failed to create file record for ${file.name}: ${fileRecordError.message}`
+            );
+          }
         }
       }
 
-      // 3. Insert into 'task_iterations' table
-      const taskIterationData = {
-        project_id: newProjectId,
-        iteration_number: 1,
-        current_stage: "Processor",
-        status_flag: "pending_action",
-        assigned_to_processor_user_id: currentUserId,
-        notes: "Task created.",
-        sent_by: "PM",
-        stages: ["PM"],
-      };
-
-      const { data: iteration, error: iterationError } = await supabase
-        .from("task_iterations")
-        .insert([taskIterationData])
-        .select("id")
-        .single();
-
-      if (iterationError) {
-        console.error("Error inserting task iteration:", iterationError);
-        toast.error(`Failed to save task iteration: ${iterationError.message}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // 4. Insert into 'process_logs' table
-      const processLogData = {
-        task_iteration_id: iteration.id,
-        user_id: currentUserId,
-        stage_acted_upon: "PM",
-        action_taken: "created_task",
-        log_notes: `Project '${formData.projectName}' created. ${
-          originalFileName
-            ? `Initial file: ${originalFileName}`
-            : "No initial file."
-        }`,
-        hours_spent_ocr: parseFloat(formData.estimatedHoursOCR) || null,
-        hours_spent_qc: parseFloat(formData.estimatedHoursQC) || null,
-        hours_spent_qa: parseFloat(formData.estimatedHoursQA) || null,
-      };
-
-      const { error: logError } = await supabase
-        .from("process_logs")
-        .insert([processLogData]);
-
-      if (logError) {
-        console.warn("Failed to save process log:", logError.message);
-      }
-
-      toast.success("Task successfully added");
+      toast.success("Project and tasks created successfully!");
 
       // Reset form
-      setFormData({
-        serialNumber: "",
-        taskId: "",
-        clientInstruction: "",
-        mailInstruction: "",
-        projectName: "",
-        numberOfFiles: "",
-        numberOfPages: "",
-        language: "",
-        processType: "",
-        deliveryDate: "",
-        deliveryTime: "",
-        estimatePOHours: "",
-        listOfFiles: "",
-        selectedFiles: [],
-        fileName: "",
-        estimatedHoursOCR: "",
-        estimatedHoursQC: "",
-        estimatedHoursQA: "",
+      setProjectData({
+        project_name: "",
+        po_hours: "",
+        mail_instruction: "",
+        list_of_files: "",
+        reference_file: "",
+        delivery_date: "",
+        delivery_time: "",
+        completion_status: false,
+        created_by: currentUser.id,
       });
+      setSelectedFiles([]);
+      setFileGroups([]);
+      setCurrentStep(1);
 
-      setCurrentPage(1);
       if (onTaskAdded) {
         onTaskAdded();
       }
@@ -487,417 +477,591 @@ const TaskModal: React.FC<TaskModalProps> = ({
       const errorMessage =
         error instanceof Error ? error.message : "An unknown error occurred";
       toast.error(`An unexpected error occurred: ${errorMessage}`);
-      setIsSubmitting(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const nextPage = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setCurrentPage(2);
-  };
-
-  const prevPage = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-  };
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-screen overflow-auto pointer-events-auto">
-        <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-4 border-b">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">
-              Loading Engineer Task
+              {getStepTitle()}
             </h2>
-            <p className="text-sm text-gray-500">
-              Created by: {currentUser?.name || "Loading..."}
-            </p>
+            <p className="text-sm text-gray-500">Step {currentStep} of 4</p>
           </div>
           <button
             onClick={onClose}
-            type="button"
-            className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
-        {currentPage === 1 ? (
-          <div className="p-4">
-            <h3 className="text-lg font-semibold text-blue-600 mb-4">Form 1</h3>
+        {/* Progress Bar */}
+        <div className="px-6 py-2">
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(currentStep / 4) * 100}%` }}
+            ></div>
+          </div>
+        </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Serial Number
-                  </label>
-                  <input
-                    ref={refs.serialNumber}
-                    type="text"
-                    name="serialNumber"
-                    value={formData.serialNumber}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "serialNumber")}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Task ID
-                  </label>
-                  <input
-                    ref={refs.taskId}
-                    type="text"
-                    name="taskId"
-                    value={formData.taskId}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "taskId")}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          {/* Step 1: Project Form */}
+          {currentStep === 1 && (
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Client Instruction
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Project Name *
                 </label>
-                <textarea
-                  ref={refs.clientInstruction}
-                  name="clientInstruction"
-                  value={formData.clientInstruction}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "clientInstruction")}
-                  rows={2}
+                <input
+                  type="text"
+                  name="project_name"
+                  value={projectData.project_name}
+                  onChange={handleProjectChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Mail Instruction
-                </label>
-                <textarea
-                  ref={refs.mailInstruction}
-                  name="mailInstruction"
-                  value={formData.mailInstruction}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "mailInstruction")}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Project Name
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PO Hours
                   </label>
                   <input
-                    ref={refs.projectName}
-                    type="text"
-                    name="projectName"
-                    value={formData.projectName}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "projectName")}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Number of Files (Informational)
-                  </label>
-                  <input
-                    ref={refs.numberOfFiles}
                     type="number"
-                    name="numberOfFiles"
-                    value={formData.numberOfFiles}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "numberOfFiles")}
+                    name="po_hours"
+                    value={projectData.po_hours}
+                    onChange={handleProjectChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Number of Pages
-                  </label>
-                  <input
-                    ref={refs.numberOfPages}
-                    type="number"
-                    name="numberOfPages"
-                    value={formData.numberOfPages}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "numberOfPages")}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    step="0.5"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Language
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reference File
                   </label>
                   <input
-                    ref={refs.language}
                     type="text"
-                    name="language"
-                    value={formData.language}
-                    onChange={handleChange}
-                    onKeyDown={(e) => handleKeyDown(e, "language")}
+                    name="reference_file"
+                    value={projectData.reference_file}
+                    onChange={handleProjectChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Process Type
-                </label>
-                <select
-                  ref={refs.processType}
-                  name="processType"
-                  value={formData.processType}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "processType")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Process Type</option>
-                  <option value="OCR">OCR</option>
-                  <option value="Prep">Prep</option>
-                  <option value="Dtp">DTP</option>
-                  <option value="Source Creation">Source Creation</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Delivery Date
-                </label>
-                <input
-                  ref={refs.deliveryDate}
-                  type="date"
-                  name="deliveryDate"
-                  value={formData.deliveryDate}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "deliveryDate")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Delivery Time
-                </label>
-                <input
-                  ref={refs.deliveryTime}
-                  type="time"
-                  name="deliveryTime"
-                  value={formData.deliveryTime}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "deliveryTime")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Estimate PO Hours
-                </label>
-                <input
-                  ref={refs.estimatePOHours}
-                  type="number"
-                  name="estimatePOHours"
-                  value={formData.estimatePOHours}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "estimatePOHours")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  step="0.5"
-                />
-              </div>
-
-              {/* <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  List of Files (Informational)
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mail Instructions
                 </label>
                 <textarea
-                  name="listOfFiles"
-                  value={formData.listOfFiles}
-                  onChange={handleChange}
-                  rows={2}
+                  name="mail_instruction"
+                  value={projectData.mail_instruction}
+                  onChange={handleProjectChange}
+                  rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter file names separated by commas"
                 />
-              </div> */}
+              </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    name="delivery_date"
+                    value={projectData.delivery_date}
+                    onChange={handleProjectChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Delivery Time
+                  </label>
+                  <input
+                    type="time"
+                    name="delivery_time"
+                    value={projectData.delivery_time}
+                    onChange={handleProjectChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: File Upload */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Upload Input Files
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Files *
                 </label>
                 <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                      <Upload className="w-6 h-6 mb-1 text-gray-500" />
-                      <p className="text-sm text-gray-500">
-                        <span className="font-semibold">Click to upload</span>{" "}
-                        or drag and drop
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                      <p className="mb-1 text-sm text-gray-500">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Multiple files supported
                       </p>
                     </div>
                     <input
                       type="file"
-                      name="selectedFiles"
                       onChange={handleFileChange}
                       className="hidden"
                       multiple
                     />
                   </label>
                 </div>
-                {formData.selectedFiles.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Selected Files ({formData.selectedFiles.length}):
-                    </p>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {formData.selectedFiles.map((file, index) => (
+              </div>
+
+              {selectedFiles.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Selected Files ({selectedFiles.length}):
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">
+                            {file.name}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            ({(file.size / 1024).toFixed(2)} KB)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: File Organization */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Organize Files into Tasks
+                </h3>
+                <button
+                  onClick={addFileGroup}
+                  className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  <Plus size={16} className="mr-1" />
+                  Add Task Group
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-600 mb-4">
+                You have {selectedFiles.length} files to organize into separate
+                tasks. Use the dropdown below to assign files to different task
+                groups.
+              </div>
+
+              {/* Available Files Section */}
+              <div className="border border-gray-200 rounded-lg p-4 mb-4">
+                <h4 className="font-medium text-gray-800 mb-3">
+                  Available Files ({selectedFiles.length})
+                </h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {selectedFiles.map((file, fileIndex) => {
+                    const assignedGroup = fileGroups.findIndex((group) =>
+                      group.files.some((f) => f.name === file.name)
+                    );
+
+                    return (
+                      <div
+                        key={fileIndex}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">
+                            {file.name}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            ({(file.size / 1024).toFixed(2)} KB)
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {assignedGroup >= 0 && (
+                            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                              Task {assignedGroup + 1}
+                            </span>
+                          )}
+                          <select
+                            value={assignedGroup >= 0 ? assignedGroup : ""}
+                            onChange={(e) =>
+                              assignFileToGroup(fileIndex, e.target.value)
+                            }
+                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Unassigned</option>
+                            {fileGroups.map((_, groupIndex) => (
+                              <option key={groupIndex} value={groupIndex}>
+                                Task Group {groupIndex + 1}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Task Groups Section */}
+              {fileGroups.map((group, groupIndex) => (
+                <div
+                  key={groupIndex}
+                  className="border border-gray-200 rounded-lg p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-800">
+                      Task Group {groupIndex + 1} ({group.files.length} files)
+                    </h4>
+                    {fileGroups.length > 1 && (
+                      <button
+                        onClick={() => removeFileGroup(groupIndex)}
+                        className="p-1 text-gray-400 hover:text-red-500"
+                      >
+                        <Minus size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {group.files.length > 0 ? (
+                    <div className="space-y-2">
+                      {group.files.map((file, fileIndex) => (
                         <div
-                          key={index}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                          key={fileIndex}
+                          className="flex items-center justify-between p-2 bg-blue-50 rounded"
                         >
                           <div className="flex items-center space-x-2">
-                            <span className="text-sm text-gray-600">
+                            <FileText className="w-4 h-4 text-blue-500" />
+                            <span className="text-sm text-blue-700">
                               {file.name}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              ({(file.size / 1024).toFixed(2)} KB)
                             </span>
                           </div>
                           <button
-                            type="button"
-                            onClick={() => removeFile(index)}
+                            onClick={() =>
+                              removeFileFromGroup(groupIndex, fileIndex)
+                            }
                             className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200"
                           >
-                            <X size={16} />
+                            <X size={14} />
                           </button>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No files assigned to this group
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Step 4: Task and File Details */}
+          {currentStep === 4 && (
+            <div className="space-y-6">
+              {fileGroups.map((group, groupIndex) => (
+                <div
+                  key={groupIndex}
+                  className="border border-gray-200 rounded-lg p-4"
+                >
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">
+                    Task {groupIndex + 1} Details
+                  </h3>
+
+                  {/* Task Details */}
+                  <div className="mb-6">
+                    <h4 className="font-medium text-gray-700 mb-3">
+                      Task Information
+                    </h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Task Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={group.taskData.task_name}
+                          onChange={(e) =>
+                            updateTaskData(
+                              groupIndex,
+                              "task_name",
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Client Instructions
+                        </label>
+                        <textarea
+                          value={group.taskData.client_instruction}
+                          onChange={(e) =>
+                            updateTaskData(
+                              groupIndex,
+                              "client_instruction",
+                              e.target.value
+                            )
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Processor Type
+                          </label>
+                          <select
+                            value={group.taskData.processor_type[0] || ""}
+                            onChange={(e) =>
+                              updateTaskData(groupIndex, "processor_type", [
+                                e.target.value,
+                              ])
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Select Type</option>
+                            <option value="OCR">OCR</option>
+                            <option value="Prep">Prep</option>
+                            <option value="DTP">DTP</option>
+                            <option value="Source Creation">
+                              Source Creation
+                            </option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Est. Hours OCR
+                          </label>
+                          <input
+                            type="number"
+                            value={group.taskData.estimated_hours_ocr}
+                            onChange={(e) =>
+                              updateTaskData(
+                                groupIndex,
+                                "estimated_hours_ocr",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            step="0.5"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Est. Hours QC
+                          </label>
+                          <input
+                            type="number"
+                            value={group.taskData.estimated_hours_qc}
+                            onChange={(e) =>
+                              updateTaskData(
+                                groupIndex,
+                                "estimated_hours_qc",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            step="0.5"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Est. Hours QA
+                          </label>
+                          <input
+                            type="number"
+                            value={group.taskData.estimated_hours_qa}
+                            onChange={(e) =>
+                              updateTaskData(
+                                groupIndex,
+                                "estimated_hours_qa",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            step="0.5"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            <div className="mt-6 flex justify-between sticky bottom-0 bg-white pt-3 pb-3 border-t">
+                  {/* File Details */}
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-3">
+                      File Details ({group.files.length} files)
+                    </h4>
+                    <div className="space-y-3">
+                      {group.files.map((file, fileIndex) => (
+                        <div
+                          key={fileIndex}
+                          className="border border-gray-100 rounded p-3 bg-gray-50"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">
+                              {file.name}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Page Count
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  group.filesData[fileIndex]?.page_count || ""
+                                }
+                                onChange={(e) =>
+                                  updateFileData(
+                                    groupIndex,
+                                    fileIndex,
+                                    "page_count",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Taken By
+                              </label>
+                              <input
+                                type="text"
+                                value={
+                                  group.filesData[fileIndex]?.taken_by || ""
+                                }
+                                onChange={(e) =>
+                                  updateFileData(
+                                    groupIndex,
+                                    fileIndex,
+                                    "taken_by",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Assigned To
+                              </label>
+                              <input
+                                type="text"
+                                value={
+                                  group.filesData[fileIndex]?.assigned_to || ""
+                                }
+                                onChange={(e) =>
+                                  updateFileData(
+                                    groupIndex,
+                                    fileIndex,
+                                    "assigned_to",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-between items-center p-6 border-t border-gray-200">
+          <div className="flex space-x-2">
+            {currentStep > 1 && (
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={nextPage}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-              >
-                Next <ChevronRight size={16} className="ml-2" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-4">
-            <h3 className="text-lg font-semibold text-blue-600 mb-4">
-              Form 2 - Estimated Hours
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Reference File Name (Optional)
-                </label>
-                <input
-                  ref={refs.fileName}
-                  type="text"
-                  name="fileName"
-                  value={formData.fileName}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "fileName")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Estimated Working Hours for OCR
-                </label>
-                <input
-                  ref={refs.estimatedHoursOCR}
-                  type="number"
-                  name="estimatedHoursOCR"
-                  value={formData.estimatedHoursOCR}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursOCR")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  step="0.5"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Estimated Working Hours for QC
-                </label>
-                <input
-                  ref={refs.estimatedHoursQC}
-                  type="number"
-                  name="estimatedHoursQC"
-                  value={formData.estimatedHoursQC}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursQC")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  step="0.5"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Estimated Working Hours for QA
-                </label>
-                <input
-                  ref={refs.estimatedHoursQA}
-                  type="number"
-                  name="estimatedHoursQA"
-                  value={formData.estimatedHoursQA}
-                  onChange={handleChange}
-                  onKeyDown={(e) => handleKeyDown(e, "estimatedHoursQA")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  step="0.5"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-between sticky bottom-0 bg-white pt-3 pb-3 border-t">
-              <button
-                type="button"
-                onClick={prevPage}
+                onClick={handlePrevStep}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
               >
                 <ChevronLeft size={16} className="mr-2" /> Back
               </button>
+            )}
+          </div>
+
+          <div className="flex space-x-2">
+            {currentStep < 4 ? (
               <button
-                type="submit"
+                type="button"
+                onClick={handleNextStep}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+              >
+                Next <ChevronRight size={16} className="ml-2" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none"
                 disabled={isSubmitting}
               >
-                <Save size={16} className="mr-2" />{" "}
-                {isSubmitting ? "Submitting..." : "Submit"}
+                <Save size={16} className="mr-2" />
+                {isSubmitting ? "Creating..." : "Create Project"}
               </button>
-            </div>
-          </form>
-        )}
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

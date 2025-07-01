@@ -65,7 +65,7 @@ export default function TimelineModal({
     const { data: stages, error: timelineError } = await supabase
       .from("task_iterations")
       .select("stages")
-      .eq("project_id", taskId)
+      .eq("task_id", taskId)
       .single();
     if (timelineError) {
       console.log("Error fetching timeline items:", timelineError);
