@@ -14,13 +14,7 @@ export default function Login() {
     email: "",
     password: "",
   });
-  // const [mounted, setMounted] = useState(false);
-
-  // useEffect(() => {
-  //   setMounted(true);
-  // }, []);
-
-  // if (!mounted) return null;
+  const [mounted, setMounted] = useState(false);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,7 +92,7 @@ export default function Login() {
 
         // Update user metadata with the role for faster access next time
         await supabase.auth.updateUser({
-          data: { role: userRole }
+          data: { role: userRole },
         });
       }
 
@@ -127,6 +121,12 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center">

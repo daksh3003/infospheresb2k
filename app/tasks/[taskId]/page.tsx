@@ -39,7 +39,7 @@ export default function TaskDetailPage() {
 
   // task states :
   const [task, setTask] = useState<any>({
-    id: taskId,
+    task_id: taskId,
     title: "",
     client_instruction: "",
     mail_instruction: "",
@@ -55,6 +55,7 @@ export default function TaskDetailPage() {
     comments: [],
     createdDate: "",
     estimatedHours: 0,
+    project_id: "",
   });
 
   // file states :
@@ -86,7 +87,7 @@ export default function TaskDetailPage() {
       .update({
         started_at: new Date(),
       })
-      .eq("project_id", taskId);
+      .eq("task_id", taskId);
 
     if (error) {
       toast("Failed to start task", {
@@ -114,7 +115,7 @@ export default function TaskDetailPage() {
       .update({
         ended_at: new Date(),
       })
-      .eq("project_id", taskId);
+      .eq("task_id", taskId);
 
     if (error) {
       toast("Failed to complete task", {
@@ -148,24 +149,56 @@ export default function TaskDetailPage() {
       setCompletionStatus(true);
     }
     try {
-      // Update the task in Supabase
-      const { error } = await supabase
-        .from("projects")
-        .update({
-          completion_status: true,
-          overall_completion_status: overall_completion_status,
-        })
-        .eq("id", taskId);
+      // // Update the task in Supabase
+      if (overall_completion_status) {
+        const { error } = await supabase
+          .from("tasks_test")
+          .update({
+            completion_status: true,
+          })
+          .eq("task_id", taskId);
 
-      if (error) {
-        console.error("Error updating task:", error);
-        return;
+        if (error) {
+          console.error("Error updating task:", error);
+          return;
+        }
+
+        // check all the tasks mapped to the same project are completed or not
+        const { data: projectTasks, error: projectTasksError } = await supabase
+          .from("tasks_test")
+          .select("completion_status")
+          .eq("project_id", task.project_id);
+
+        console.log("projectTasks", projectTasks);
+
+        if (projectTasksError) {
+          console.error("Error fetching project tasks:", projectTasksError);
+          return;
+        }
+
+        const isAllTasksCompleted = projectTasks.every(
+          (task) => task.completion_status
+        );
+
+        console.log("isAllTasksCompleted", isAllTasksCompleted);
+
+        if (isAllTasksCompleted) {
+          const { error: projectError } = await supabase
+            .from("projects_test")
+            .update({ completion_status: true })
+            .eq("project_id", task.project_id);
+
+          if (projectError) {
+            console.error("Error updating project:", projectError);
+            return;
+          }
+        }
       }
 
       const { data, error: iterationError } = await supabase
         .from("task_iterations")
         .select("sent_by")
-        .eq("project_id", taskId)
+        .eq("task_id", taskId)
         .single();
 
       if (iterationError) {
@@ -277,7 +310,7 @@ export default function TaskDetailPage() {
     const { data: stages, error: stagesError } = await supabase
       .from("task_iterations")
       .select("stages")
-      .eq("project_id", taskId)
+      .eq("task_id", taskId)
       .single();
 
     if (stagesError) {
@@ -299,7 +332,7 @@ export default function TaskDetailPage() {
         sent_by: next_sent_by,
         stages: updatedStages,
       })
-      .eq("project_id", taskId);
+      .eq("task_id", taskId);
 
     if (error) {
       console.error("Error updating task iteration:", error);
@@ -465,7 +498,7 @@ export default function TaskDetailPage() {
     const { data: current_stage, error: current_stageError } = await supabase
       .from("task_iterations")
       .select("current_stage, sent_by")
-      .eq("project_id", taskId)
+      .eq("task_id", taskId)
       .single();
 
     if (current_stageError) {
@@ -586,7 +619,7 @@ export default function TaskDetailPage() {
     const { data, error } = await supabase
       .from("task_iterations")
       .select("current_stage, sent_by")
-      .eq("project_id", taskId)
+      .eq("task_id", taskId)
       .single();
     console.log("Task Iteration Data:", data);
     if (error) {
@@ -646,7 +679,7 @@ export default function TaskDetailPage() {
     const { data, error } = await supabase
       .from("task_iterations")
       .select("sent_by, current_stage, assigned_to_processor_user_id")
-      .eq("project_id", taskId)
+      .eq("task_id", taskId)
       .single();
 
     if (error) {
@@ -675,43 +708,41 @@ export default function TaskDetailPage() {
     var folder_path_correction = "";
     var storage_name_correction = "";
 
-    if (current_stage === "Processor") {
-      if (sent_by === "QC") {
+    if (sent_by !== "PM") {
+      if (current_stage === "Processor") {
+        if (sent_by === "QC") {
+          folder_path_correction = taskId;
+          storage_name_correction = "qc-files";
+        } else if (sent_by === "QA") {
+          folder_path_correction = taskId;
+          storage_name_correction = "qa-files";
+        }
+      } else if (current_stage === "QA" && sent_by === "Processor") {
         folder_path_correction = taskId;
         storage_name_correction = "qc-files";
-      } else if (sent_by === "QA") {
-        folder_path_correction = taskId;
-        storage_name_correction = "qa-files";
       }
-    } else if (current_stage === "QA" && sent_by === "Processor") {
-      folder_path_correction = taskId;
-      storage_name_correction = "qc-files";
-    }
 
-    const { data: correctionFiles, error: correctionError } =
-      await supabase.storage
-        .from(storage_name_correction)
-        .list(folder_path_correction);
+      const { data: correctionFiles, error: correctionError } =
+        await supabase.storage
+          .from(storage_name_correction)
+          .list(folder_path_correction);
 
-    if (correctionError) {
-      console.log("Error fetching correction files:", correctionError);
-      // return;
+      if (correctionError) {
+        console.log("Error fetching correction files:", correctionError);
+        // return;
+      }
+      setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
+      // }
     }
-    setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
-    // }
 
     let folder_path = "";
     let storage_name = "";
 
     const { data: simpleTaskData, error: simpleError } = await supabase
-      .from("projects")
+      .from("tasks_test")
       .select("*")
-      .eq("id", taskId)
+      .eq("task_id", taskId)
       .single();
-
-    // //logging issues to be checked.
-    // console.log("simpleTaskData : ", simpleTaskData);
-    // console.log("delivery_time from database:", simpleTaskData.delivery_time);
 
     if (simpleError) {
       console.error("Error fetching simple task data:", simpleError);
@@ -733,8 +764,9 @@ export default function TaskDetailPage() {
     // Set task with creator info
     setTask((prev: any) => ({
       ...prev,
-      id: simpleTaskData.id,
-      title: simpleTaskData.project_name,
+      task_id: simpleTaskData.task_id,
+      project_id: simpleTaskData.project_id,
+      title: simpleTaskData.task_name,
       client_instruction: simpleTaskData.client_instruction || "",
       mail_instruction: simpleTaskData.mail_instruction || "",
       estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
@@ -755,17 +787,18 @@ export default function TaskDetailPage() {
       overall_completion_status: simpleTaskData.overall_completion_status,
     }));
 
-    if (currentStage === "Processor") {
+    if (current_stage === "Processor") {
       folder_path = `${sent_by}_${taskId}`;
       storage_name = "processor-files";
-    } else if (currentStage === "QC") {
+    } else if (current_stage === "QC") {
       folder_path = taskId;
       storage_name = "qc-files";
-    } else if (currentStage === "QA") {
+    } else if (current_stage === "QA") {
       folder_path = taskId;
       storage_name = "qa-files";
     }
     console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
+    console.log("current_stage : ", current_stage);
 
     const { data: uploadedFiles, error: uploadedError } = await supabase.storage
       .from(storage_name)
@@ -823,7 +856,7 @@ export default function TaskDetailPage() {
       const { data: existingLog, error: fetchError } = await supabase
         .from("process_logs_test")
         .select("*")
-        .eq("project_id", taskId)
+        .eq("task_id", taskId)
         .eq("current_stage", currentStage)
         .single();
 
@@ -849,7 +882,7 @@ export default function TaskDetailPage() {
       let assignedToArray: any[] = [];
 
       const logData = {
-        project_id: taskId,
+        task_id: taskId,
         current_stage: currentStage,
         sent_by: sentBy,
         assigned_to: assignedToArray,
@@ -881,7 +914,7 @@ export default function TaskDetailPage() {
         const { error: upsertError } = await supabase
           .from("process_logs_test")
           .update(logData)
-          .eq("project_id", taskId)
+          .eq("task_id", taskId)
           .eq("current_stage", currentStage);
 
         if (upsertError) {
@@ -941,7 +974,7 @@ export default function TaskDetailPage() {
       {/* Back button and task ID */}
       <div className="flex items-center justify-between mb-6">
         <TaskDetailBackButton />
-        <div className="text-sm text-gray-500">Task ID: {task.id}</div>
+        <div className="text-sm text-gray-500">Task ID: {task.task_id}</div>
         {task.overall_completion_status ? (
           <h3 className="text-sm font-medium text-green-500 mb-1">
             Overall Task Status: Completed

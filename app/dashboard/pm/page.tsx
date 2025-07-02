@@ -19,15 +19,22 @@ import {
   ClipboardCheck,
   ShieldCheck,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
 import { supabase } from "@/utils/supabase";
+import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { Progress } from "@/components/ui/progress";
 
 interface ProjectTask {
   id: string;
-  project_name: string;
+  task_name: string;
   task_id: string;
+  project_id: string;
   client_instruction: string;
   delivery_date: string;
   process_type: string;
@@ -42,6 +49,15 @@ interface ProjectTask {
   type: "pm" | "qc" | "qa";
 }
 
+interface ProjectGroup {
+  projectId: string;
+  projectName: string;
+  tasks: ProjectTask[];
+  completedCount: number;
+  totalCount: number;
+  completionPercentage: number;
+}
+
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,18 +68,49 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    new Set()
+  );
+  const [projectNames, setProjectNames] = useState<{ [key: string]: string }>(
+    {}
+  );
+
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
     fetchTasks();
   }, []);
 
+  const fetchProjectNames = async (projectIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from("projects_test")
+        .select("project_id, project_name")
+        .in("project_id", projectIds);
+
+      if (error) throw error;
+
+      const projectNameMap = data.reduce(
+        (acc: { [key: string]: string }, project) => {
+          acc[project.project_id] = project.project_name;
+          return acc;
+        },
+        {}
+      );
+
+      setProjectNames(projectNameMap);
+    } catch (error) {
+      console.error("Error fetching project names:", error);
+    }
+  };
+
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
       // First get all projects
       const { data: projectsData, error: projectsError } = await supabase
-        .from("projects")
+        .from("tasks_test")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -82,6 +129,8 @@ export default function DashboardPage() {
         return acc;
       }, {});
 
+      console.log("stageMap", stageMap);
+
       if (projectsData) {
         const processedTasks = projectsData.map((task) => {
           return {
@@ -89,10 +138,17 @@ export default function DashboardPage() {
             status: calculateStatus(task.delivery_date, task.completion_status),
             priority: calculatePriority(task.delivery_date, task.po_hours),
             type: getTaskType(task.process_type),
-            current_stage: stageMap[task.id] || "Processor", // Default to Processor if no stage found
+            current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
           };
         });
+        console.log("processedTasks", processedTasks);
         setTasks(processedTasks);
+
+        // Get unique project IDs and fetch their names
+        const uniqueProjectIds = [
+          ...new Set(processedTasks.map((task) => task.project_id)),
+        ];
+        await fetchProjectNames(uniqueProjectIds);
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -145,7 +201,7 @@ export default function DashboardPage() {
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
-      task.project_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.task_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.task_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.client_instruction
         ?.toLowerCase()
@@ -168,12 +224,54 @@ export default function DashboardPage() {
     );
   });
 
+  // console.log("filteredTasks", filteredTasks);
+
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
   const handleTaskAdded = () => {
     fetchTasks();
   };
+
+  const toggleProjectExpansion = (projectId: string) => {
+    setExpandedProjects((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
+  };
+
+  // Group tasks by project and calculate completion metrics
+  const projectGroups = filteredTasks.reduce(
+    (groups: { [key: string]: ProjectGroup }, task) => {
+      const projectId = task.project_id;
+
+      if (!groups[projectId]) {
+        groups[projectId] = {
+          projectId,
+          projectName: projectNames[projectId] || "Unnamed Project",
+          tasks: [],
+          completedCount: 0,
+          totalCount: 0,
+          completionPercentage: 0,
+        };
+      }
+      groups[projectId].tasks.push(task);
+      groups[projectId].totalCount++;
+      if (task.completion_status) {
+        groups[projectId].completedCount++;
+      }
+      groups[projectId].completionPercentage = Math.round(
+        (groups[projectId].completedCount / groups[projectId].totalCount) * 100
+      );
+      return groups;
+    },
+    {}
+  );
 
   if (!mounted) {
     return (
@@ -193,11 +291,10 @@ export default function DashboardPage() {
             Manage projects, teams, and tasks efficiently
           </p>
         </div>
-        <div>
+        <div className="flex gap-4">
           <Button
-            variant="default"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
             onClick={openModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             Add Task
           </Button>
@@ -279,42 +376,94 @@ export default function DashboardPage() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  id={task.id}
-                  title={task.project_name || "Untitled Project"}
-                  description={
-                    task.client_instruction || "No description available"
-                  }
-                  dueDate={task.delivery_date}
-                  status={task.status || "pending"}
-                  priority={task.priority || "medium"}
-                />
+            <div className="space-y-4">
+              {Object.values(projectGroups).map((group, index) => (
+                <Card key={index} className="overflow-hidden">
+                  <CardHeader
+                    className="cursor-pointer bg-gray-50 dark:bg-gray-800"
+                    onClick={() => toggleProjectExpansion(group.projectId)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {expandedProjects.has(group.projectId) ? (
+                          <ChevronUp className="h-5 w-5 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-500" />
+                        )}
+                        <div>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            {group.projectName}
+                            <span className="text-sm text-gray-500">
+                              {/* ({group.projectId}) */}
+                            </span>
+                          </CardTitle>
+                          <p className="text-sm text-gray-500">
+                            {group.completedCount} of {group.totalCount} tasks
+                            completed
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="w-48">
+                          <Progress
+                            value={group.completionPercentage}
+                            className="h-2"
+                          />
+                        </div>
+                        <Badge
+                          className={
+                            group.completionPercentage === 100
+                              ? "bg-green-500 text-white"
+                              : "bg-blue-500 text-white"
+                          }
+                        >
+                          {group.completionPercentage}%
+                          {group.completionPercentage === 100 && (
+                            <CheckCircle2 className="h-4 w-4 ml-1" />
+                          )}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {expandedProjects.has(group.projectId) && (
+                    <CardContent className="pt-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        {group.tasks.map((task, index) => (
+                          <TaskCard
+                            key={index}
+                            id={task.task_id}
+                            title={task.task_name || "Untitled Task"}
+                            description={
+                              task.client_instruction ||
+                              "No description available"
+                            }
+                            dueDate={task.delivery_date}
+                            status={task.status || "pending"}
+                            priority={task.priority || "medium"}
+                          />
+                        ))}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
               ))}
-              {filteredTasks.length === 0 && (
-                <div className="col-span-full text-center py-8 text-gray-500">
-                  No tasks found matching your filters
-                </div>
-              )}
             </div>
           )}
         </TabsContent>
 
-        {["Processor", "QC", "QA"].map((type) => (
-          <TabsContent key={type} value={type} className="mt-6">
+        {["Processor", "QC", "QA"].map((type, index) => (
+          <TabsContent key={index} value={type} className="mt-6">
             {isLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredTasks.map((task) => (
+                {filteredTasks.map((task, index) => (
                   <TaskCard
-                    key={task.id}
-                    id={task.id}
-                    title={task.project_name || "Untitled Project"}
+                    key={index}
+                    id={task.task_id}
+                    title={task.task_name || "Untitled Project"}
                     description={
                       task.client_instruction || "No description available"
                     }
@@ -333,6 +482,18 @@ export default function DashboardPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {isLoading && (
+        <div className="flex items-center justify-center min-h-[200px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      )}
+
+      {!isLoading && filteredTasks.length === 0 && (
+        <div className="text-center py-10">
+          <p className="text-gray-500">No tasks found</p>
+        </div>
+      )}
     </div>
   );
 }

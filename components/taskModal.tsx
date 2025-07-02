@@ -45,6 +45,7 @@ interface TaskFormData {
   estimated_hours_qa: string;
   completion_status: boolean;
   project_id: string;
+  created_by: string;
 }
 
 interface FileFormData {
@@ -58,6 +59,18 @@ interface FileGroup {
   files: File[];
   taskData: TaskFormData;
   filesData: FileFormData[];
+}
+
+interface TaskIteration {
+  task_id: string;
+  iteration_number: number;
+  current_stage: string;
+  sent_by: string;
+  assigned_to_processor_user_id: string;
+  assigned_to_qc_user_id: string;
+  assigned_to_qa_user_id: string;
+  notes: string;
+  stages: string[];
 }
 
 interface UserProfile {
@@ -215,6 +228,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           estimated_hours_qa: "",
           completion_status: false,
           project_id: "",
+          created_by: currentUser?.id || "",
         },
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
@@ -239,6 +253,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           estimated_hours_qa: "",
           completion_status: false,
           project_id: "",
+          created_by: currentUser?.id || "",
         },
         filesData: [],
       },
@@ -259,6 +274,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           estimated_hours_qa: "",
           completion_status: false,
           project_id: "",
+          created_by: currentUser?.id || "",
         },
         filesData: [],
       },
@@ -402,6 +418,45 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
         const taskId = taskResult.task_id;
 
+        const { data: taskIterationResult, error: taskIterationError } =
+          await supabase.from("task_iterations").insert([
+            {
+              task_id: taskId,
+              iteration_number: 1,
+              current_stage: "Processor",
+              sent_by: "PM",
+              stages: ["PM"],
+              notes: "",
+            },
+          ]);
+
+        if (taskIterationError) {
+          console.error("Error creating task iteration:", taskIterationError);
+          toast.error(
+            `Failed to create task iteration: ${taskIterationError.message}`
+          );
+          continue;
+        }
+
+        const { data: process_logs, error: process_logsError } = await supabase
+          .from("process_logs_test")
+          .insert([
+            {
+              task_id: taskId,
+              current_stage: "Processor",
+              sent_by: "PM",
+              assigned_to: [],
+            },
+          ]);
+
+        if (process_logsError) {
+          console.error("Error creating process logs:", process_logsError);
+          toast.error(
+            `Failed to create process logs: ${process_logsError.message}`
+          );
+          continue;
+        }
+
         // Upload files and create file records
         for (let fileIndex = 0; fileIndex < group.files.length; fileIndex++) {
           const file = group.files[fileIndex];
@@ -412,7 +467,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
             timeZone: "Asia/Kolkata",
           });
           date = date.replaceAll("/", "-");
-          const filePathInStorage = `${projectId}/${taskId}/${date}_${file.name}`;
+          const filePathInStorage = `${taskId}/${date}_${file.name}`;
 
           const { data: uploadData, error: uploadError } =
             await supabase.storage

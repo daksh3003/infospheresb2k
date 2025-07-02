@@ -84,9 +84,9 @@ export default function QCDashboard() {
           id, 
           current_stage, 
           status_flag, 
-          project_id, 
+          task_id, 
           iteration_number, 
-          projects ( project_name, id ) // Minimal join
+          tasks_test ( task_name, task_id ) // Minimal join
         `
         )
         .eq("current_stage", "QC");
@@ -112,13 +112,14 @@ export default function QCDashboard() {
           title: "No Project Name",
           taskIterationId: item.id,
           projectName:
-            item.projects?.project_name ||
-            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            item.tasks_test?.task_name ||
+            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
             "No Project Name",
           currentStage: item.current_stage,
           calculatedStatus: "pending",
-          projectId: item.projects?.id || item.project_id || "dummy_project_id",
-          projectTaskId: null,
+          projectId:
+            item.tasks_test?.task_id || item.task_id || "dummy_project_id",
+          projectTaskId: item.tasks_test?.task_id || null,
           clientInstruction: null,
           deliveryDate: null,
           processType: null,
@@ -132,8 +133,8 @@ export default function QCDashboard() {
           calculatedPriority: "medium",
           displayId: item.id,
           displayTitle:
-            item.projects?.project_name ||
-            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
+            item.tasks_test?.task_name ||
+            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
             "No Project Name",
           displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
           displayDueDate: null,

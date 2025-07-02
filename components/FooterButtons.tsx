@@ -78,7 +78,7 @@ export const FooterButtons = ({
     const { data, error } = await supabase
       .from("process_logs_test")
       .select("assigned_to")
-      .eq("project_id", taskId);
+      .eq("task_id", taskId);
     if (error) {
       console.error("Error fetching assigned to:", error);
       return;

@@ -28,7 +28,7 @@ export const MainTaskCard = ({
     const { data, error } = await supabase
       .from("process_logs_test")
       .select("assigned_to")
-      .eq("project_id", task.id);
+      .eq("task_id", task.task_id);
     if (error) {
       console.error("Error fetching assigned to:", error);
       return;
