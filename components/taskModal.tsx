@@ -13,8 +13,12 @@ import {
   Minus,
   FileText,
   Split,
+  Info,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { Progress } from "./ui/progress";
+import { Tooltip } from "./ui/tooltip";
+import { cn } from "@/lib/utils";
 
 import { supabase } from "../utils/supabase";
 
@@ -51,8 +55,12 @@ interface TaskFormData {
 interface FileFormData {
   file_name: string;
   page_count: string;
-  taken_by: string;
-  assigned_to: string;
+  assigned_to: {
+    user_id: string;
+    name: string;
+    email: string;
+    role: string;
+  }[];
 }
 
 interface FileGroup {
@@ -80,6 +88,10 @@ interface UserProfile {
   role: string;
 }
 
+interface Processor extends UserProfile {
+  role: "processor";
+}
+
 const TaskModal: React.FC<TaskModalProps> = ({
   isOpen,
   onClose,
@@ -88,6 +100,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [processors, setProcessors] = useState<Processor[]>([]);
 
   // Project form data
   const [projectData, setProjectData] = useState<ProjectFormData>({
@@ -106,20 +119,37 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileGroups, setFileGroups] = useState<FileGroup[]>([]);
 
-  // Steps: 1 = Project Form, 2 = File Upload, 3 = File Splitting (if multiple files), 4 = Task Creation
+  const steps = [
+    {
+      number: 1,
+      title: "Project Information",
+      description: "Enter basic project details",
+      icon: FileText,
+    },
+    {
+      number: 2,
+      title: "File Upload",
+      description: "Upload your project files",
+      icon: Upload,
+    },
+    {
+      number: 3,
+      title: "File Organization",
+      description: "Organize files into tasks",
+      icon: Split,
+    },
+    {
+      number: 4,
+      title: "Task & File Details",
+      description: "Configure task settings",
+      icon: Save,
+    },
+  ];
+
+  const progressPercentage = (currentStep / steps.length) * 100;
+
   const getStepTitle = () => {
-    switch (currentStep) {
-      case 1:
-        return "Project Information";
-      case 2:
-        return "File Upload";
-      case 3:
-        return "File Organization";
-      case 4:
-        return "Task & File Details";
-      default:
-        return "Project Creation";
-    }
+    return steps[currentStep - 1].title;
   };
 
   useEffect(() => {
@@ -145,8 +175,24 @@ const TaskModal: React.FC<TaskModalProps> = ({
       }
     };
 
+    const fetchProcessors = async () => {
+      try {
+        const { data: processorData, error } = await supabase
+          .from("profiles")
+          .select("id, name, email, role")
+          .eq("role", "processor");
+
+        if (error) throw error;
+        setProcessors(processorData);
+      } catch (error) {
+        console.error("Error fetching processors:", error);
+        toast.error("Failed to load processors");
+      }
+    };
+
     if (isOpen) {
       fetchUserProfile();
+      fetchProcessors();
     }
   }, [isOpen]);
 
@@ -233,8 +279,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
           page_count: "",
-          taken_by: "",
-          assigned_to: "",
+          assigned_to: [],
         })),
       },
     ]);
@@ -311,8 +356,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         newGroups[groupIndex].filesData.push({
           file_name: file.name,
           page_count: "",
-          taken_by: "",
-          assigned_to: "",
+          assigned_to: [],
         });
       }
 
@@ -348,16 +392,56 @@ const TaskModal: React.FC<TaskModalProps> = ({
     groupIndex: number,
     fileIndex: number,
     field: keyof FileFormData,
-    value: string
+    value: string | string[]
   ) => {
-    setFileGroups((prev) => {
-      const newGroups = [...prev];
-      newGroups[groupIndex].filesData[fileIndex] = {
-        ...newGroups[groupIndex].filesData[fileIndex],
-        [field]: value,
-      };
-      return newGroups;
-    });
+    if (field === "assigned_to") {
+      const processorId = value as string;
+      setFileGroups((prev) => {
+        const newGroups = [...prev];
+        const currentAssignees =
+          newGroups[groupIndex].filesData[fileIndex].assigned_to;
+
+        // Check if processor is already assigned
+        const isAlreadyAssigned = currentAssignees.some(
+          (assignee) => assignee.user_id === processorId
+        );
+
+        if (isAlreadyAssigned) {
+          // Remove processor if already assigned
+          newGroups[groupIndex].filesData[fileIndex].assigned_to =
+            currentAssignees.filter(
+              (assignee) => assignee.user_id !== processorId
+            );
+        } else {
+          // Add new processor
+          const selectedProcessor = processors.find(
+            (processor) => processor.id === processorId
+          );
+          if (selectedProcessor) {
+            newGroups[groupIndex].filesData[fileIndex].assigned_to = [
+              ...currentAssignees,
+              {
+                user_id: selectedProcessor.id,
+                name: selectedProcessor.name,
+                email: selectedProcessor.email,
+                role: selectedProcessor.role,
+              },
+            ];
+          }
+        }
+        console.log("newGroups", newGroups);
+        return newGroups;
+      });
+    } else {
+      setFileGroups((prev) => {
+        const newGroups = [...prev];
+        newGroups[groupIndex].filesData[fileIndex] = {
+          ...newGroups[groupIndex].filesData[fileIndex],
+          [field]: value,
+        };
+        return newGroups;
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -485,6 +569,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
             continue;
           }
 
+          console.log("fileData", fileData);
+
           // Create file record
           const { error: fileRecordError } = await supabase
             .from("files_test")
@@ -540,70 +626,109 @@ const TaskModal: React.FC<TaskModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div
+      className={`fixed inset-0 flex items-center justify-center z-50 ${
+        isOpen ? "" : "hidden"
+      }`}
+    >
+      <div className="fixed inset-0 bg-black opacity-50"></div>
+      <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative z-10">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+        <div className="border-b p-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">
-              {getStepTitle()}
-            </h2>
-            <p className="text-sm text-gray-500">Step {currentStep} of 4</p>
+            <h2 className="text-xl font-semibold">{getStepTitle()}</h2>
+            <p className="text-sm text-gray-500">
+              {steps[currentStep - 1].description}
+            </p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X size={20} />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Progress Bar */}
-        <div className="px-6 py-2">
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
-            ></div>
+        <div className="px-4 py-2 bg-gray-50">
+          <div className="flex justify-between mb-2">
+            {steps.map((step, index) => {
+              const StepIcon = step.icon;
+              return (
+                <div
+                  key={step.number}
+                  className={cn(
+                    "flex flex-col items-center relative",
+                    currentStep >= step.number
+                      ? "text-blue-600"
+                      : "text-gray-400"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center",
+                      currentStep >= step.number ? "bg-blue-100" : "bg-gray-100"
+                    )}
+                  >
+                    <StepIcon className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs mt-1">{step.title}</span>
+                  {index < steps.length - 1 && (
+                    <div
+                      className={cn(
+                        "absolute top-4 left-full w-[calc(100%-2rem)] h-[2px]",
+                        currentStep > step.number
+                          ? "bg-blue-600"
+                          : "bg-gray-200"
+                      )}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
+          <Progress value={progressPercentage} className="h-1" />
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {/* Step 1: Project Form */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-12rem)]">
           {currentStep === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium mb-1">
                   Project Name *
+                  <Tooltip content="Enter a unique name for your project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
                 </label>
                 <input
                   type="text"
                   name="project_name"
                   value={projectData.project_name}
                   onChange={handleProjectChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  required
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Enter project name"
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1">
                     PO Hours
+                    <Tooltip content="Estimated project hours">
+                      <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                    </Tooltip>
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="po_hours"
                     value={projectData.po_hours}
                     onChange={handleProjectChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    step="0.5"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter PO hours"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1">
                     Reference File
                   </label>
                   <input
@@ -611,27 +736,30 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="reference_file"
                     value={projectData.reference_file}
                     onChange={handleProjectChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter reference file"
                   />
                 </div>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium mb-1">
                   Mail Instructions
+                  <Tooltip content="Special instructions for email communications">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
                 </label>
                 <textarea
                   name="mail_instruction"
                   value={projectData.mail_instruction}
                   onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter mail instructions"
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1">
                     Delivery Date
                   </label>
                   <input
@@ -639,12 +767,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="delivery_date"
                     value={projectData.delivery_date}
                     onChange={handleProjectChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-2 border rounded-md"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1">
                     Delivery Time
                   </label>
                   <input
@@ -652,67 +779,54 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     name="delivery_time"
                     value={projectData.delivery_time}
                     onChange={handleProjectChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-2 border rounded-md"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: File Upload */}
           {currentStep === 2 && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Files *
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <Upload className="w-12 h-12 text-gray-400 mb-2" />
+                  <span className="text-sm font-medium">
+                    Click to upload or drag and drop
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Support for multiple files
+                  </span>
                 </label>
-                <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                      <p className="mb-1 text-sm text-gray-500">
-                        Click to upload or drag and drop
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Multiple files supported
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      multiple
-                    />
-                  </label>
-                </div>
               </div>
-
               {selectedFiles.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">
-                    Selected Files ({selectedFiles.length}):
-                  </p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="mt-4">
+                  <h3 className="font-medium mb-2">Selected Files</h3>
+                  <div className="space-y-2">
                     {selectedFiles.map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
                       >
-                        <div className="flex items-center space-x-2">
-                          <FileText className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">
-                            {file.name}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            ({(file.size / 1024).toFixed(2)} KB)
-                          </span>
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 mr-2 text-gray-400" />
+                          <span className="text-sm">{file.name}</span>
                         </div>
                         <button
-                          type="button"
                           onClick={() => removeFile(index)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200"
+                          className="text-red-500 hover:text-red-700"
                         >
-                          <X size={16} />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -722,288 +836,192 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </div>
           )}
 
-          {/* Step 3: File Organization */}
+          {/* File Organization Step */}
           {currentStep === 3 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Organize Files into Tasks
-                </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="font-medium">File Groups</h3>
                 <button
                   onClick={addFileGroup}
-                  className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="flex items-center text-blue-600 hover:text-blue-700"
                 >
-                  <Plus size={16} className="mr-1" />
-                  Add Task Group
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Group
                 </button>
               </div>
-
-              <div className="text-sm text-gray-600 mb-4">
-                You have {selectedFiles.length} files to organize into separate
-                tasks. Use the dropdown below to assign files to different task
-                groups.
-              </div>
-
-              {/* Available Files Section */}
-              <div className="border border-gray-200 rounded-lg p-4 mb-4">
-                <h4 className="font-medium text-gray-800 mb-3">
-                  Available Files ({selectedFiles.length})
-                </h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {selectedFiles.map((file, fileIndex) => {
-                    const assignedGroup = fileGroups.findIndex((group) =>
-                      group.files.some((f) => f.name === file.name)
-                    );
-
-                    return (
-                      <div
-                        key={fileIndex}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-medium mb-2">Available Files</h4>
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
+                    >
+                      <span className="text-sm">{file.name}</span>
+                      <select
+                        onChange={(e) =>
+                          assignFileToGroup(index, e.target.value)
+                        }
+                        className="text-sm border rounded"
                       >
-                        <div className="flex items-center space-x-2">
-                          <FileText className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">
-                            {file.name}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            ({(file.size / 1024).toFixed(2)} KB)
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {assignedGroup >= 0 && (
-                            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                              Task {assignedGroup + 1}
-                            </span>
-                          )}
-                          <select
-                            value={assignedGroup >= 0 ? assignedGroup : ""}
-                            onChange={(e) =>
-                              assignFileToGroup(fileIndex, e.target.value)
-                            }
-                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            <option value="">Unassigned</option>
-                            {fileGroups.map((_, groupIndex) => (
-                              <option key={groupIndex} value={groupIndex}>
-                                Task Group {groupIndex + 1}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        <option value="">Select Group</option>
+                        {fileGroups.map((_, groupIndex) => (
+                          <option key={groupIndex} value={groupIndex}>
+                            Group {groupIndex + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Task Groups Section */}
-              {fileGroups.map((group, groupIndex) => (
-                <div
-                  key={groupIndex}
-                  className="border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-800">
-                      Task Group {groupIndex + 1} ({group.files.length} files)
-                    </h4>
-                    {fileGroups.length > 1 && (
-                      <button
-                        onClick={() => removeFileGroup(groupIndex)}
-                        className="p-1 text-gray-400 hover:text-red-500"
-                      >
-                        <Minus size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {group.files.length > 0 ? (
-                    <div className="space-y-2">
+                <div className="space-y-4">
+                  {fileGroups.map((group, groupIndex) => (
+                    <div key={groupIndex} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">Group {groupIndex + 1}</h4>
+                        <button
+                          onClick={() => removeFileGroup(groupIndex)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                       {group.files.map((file, fileIndex) => (
                         <div
                           key={fileIndex}
-                          className="flex items-center justify-between p-2 bg-blue-50 rounded"
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
                         >
-                          <div className="flex items-center space-x-2">
-                            <FileText className="w-4 h-4 text-blue-500" />
-                            <span className="text-sm text-blue-700">
-                              {file.name}
-                            </span>
-                          </div>
+                          <span className="text-sm">{file.name}</span>
                           <button
                             onClick={() =>
                               removeFileFromGroup(groupIndex, fileIndex)
                             }
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200"
+                            className="text-red-500 hover:text-red-700"
                           >
-                            <X size={14} />
+                            <Minus className="w-4 h-4" />
                           </button>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 text-sm">
-                      No files assigned to this group
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
 
-          {/* Step 4: Task and File Details */}
+          {/* Task Details Step */}
           {currentStep === 4 && (
             <div className="space-y-6">
               {fileGroups.map((group, groupIndex) => (
                 <div
                   key={groupIndex}
-                  className="border border-gray-200 rounded-lg p-4"
+                  className="border rounded-lg p-4 space-y-4"
                 >
-                  <h3 className="text-lg font-medium text-gray-800 mb-4">
-                    Task {groupIndex + 1} Details
+                  <h3 className="font-medium">
+                    Task Group {groupIndex + 1} Details
                   </h3>
-
-                  {/* Task Details */}
-                  <div className="mb-6">
-                    <h4 className="font-medium text-gray-700 mb-3">
-                      Task Information
-                    </h4>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Task Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={group.taskData.task_name}
-                          onChange={(e) =>
-                            updateTaskData(
-                              groupIndex,
-                              "task_name",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Client Instructions
-                        </label>
-                        <textarea
-                          value={group.taskData.client_instruction}
-                          onChange={(e) =>
-                            updateTaskData(
-                              groupIndex,
-                              "client_instruction",
-                              e.target.value
-                            )
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Processor Type
-                          </label>
-                          <select
-                            value={group.taskData.processor_type[0] || ""}
-                            onChange={(e) =>
-                              updateTaskData(groupIndex, "processor_type", [
-                                e.target.value,
-                              ])
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            <option value="">Select Type</option>
-                            <option value="OCR">OCR</option>
-                            <option value="Prep">Prep</option>
-                            <option value="DTP">DTP</option>
-                            <option value="Source Creation">
-                              Source Creation
-                            </option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Est. Hours OCR
-                          </label>
-                          <input
-                            type="number"
-                            value={group.taskData.estimated_hours_ocr}
-                            onChange={(e) =>
-                              updateTaskData(
-                                groupIndex,
-                                "estimated_hours_ocr",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            step="0.5"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Est. Hours QC
-                          </label>
-                          <input
-                            type="number"
-                            value={group.taskData.estimated_hours_qc}
-                            onChange={(e) =>
-                              updateTaskData(
-                                groupIndex,
-                                "estimated_hours_qc",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            step="0.5"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Est. Hours QA
-                          </label>
-                          <input
-                            type="number"
-                            value={group.taskData.estimated_hours_qa}
-                            onChange={(e) =>
-                              updateTaskData(
-                                groupIndex,
-                                "estimated_hours_qa",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            step="0.5"
-                          />
-                        </div>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Task Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={group.taskData.task_name}
+                      onChange={(e) =>
+                        updateTaskData(groupIndex, "task_name", e.target.value)
+                      }
+                      className="w-full p-2 border rounded-md"
+                      placeholder="Enter task name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Client Instructions
+                    </label>
+                    <textarea
+                      value={group.taskData.client_instruction}
+                      onChange={(e) =>
+                        updateTaskData(
+                          groupIndex,
+                          "client_instruction",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 border rounded-md"
+                      rows={3}
+                      placeholder="Enter client instructions"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Est. Hours (OCR)
+                      </label>
+                      <input
+                        type="number"
+                        value={group.taskData.estimated_hours_ocr}
+                        onChange={(e) =>
+                          updateTaskData(
+                            groupIndex,
+                            "estimated_hours_ocr",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-2 border rounded-md"
+                        placeholder="Hours"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Est. Hours (QC)
+                      </label>
+                      <input
+                        type="number"
+                        value={group.taskData.estimated_hours_qc}
+                        onChange={(e) =>
+                          updateTaskData(
+                            groupIndex,
+                            "estimated_hours_qc",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-2 border rounded-md"
+                        placeholder="Hours"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Est. Hours (QA)
+                      </label>
+                      <input
+                        type="number"
+                        value={group.taskData.estimated_hours_qa}
+                        onChange={(e) =>
+                          updateTaskData(
+                            groupIndex,
+                            "estimated_hours_qa",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-2 border rounded-md"
+                        placeholder="Hours"
+                      />
                     </div>
                   </div>
-
-                  {/* File Details */}
                   <div>
-                    <h4 className="font-medium text-gray-700 mb-3">
-                      File Details ({group.files.length} files)
-                    </h4>
-                    <div className="space-y-3">
-                      {group.files.map((file, fileIndex) => (
+                    <h4 className="text-sm font-medium mb-2">Files</h4>
+                    <div className="space-y-2">
+                      {group.filesData.map((fileData, fileIndex) => (
                         <div
                           key={fileIndex}
-                          className="border border-gray-100 rounded p-3 bg-gray-50"
+                          className="grid grid-cols-2 gap-4 p-2 bg-gray-50 rounded"
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-sm">
-                              {file.name}
+                          <div>
+                            <label className="block text-xs text-gray-500">
+                              File Name
+                            </label>
+                            <span className="text-sm">
+                              {fileData.file_name}
                             </span>
                           </div>
 
@@ -1030,45 +1048,46 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             </div>
 
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Taken By
-                              </label>
-                              <input
-                                type="text"
-                                value={
-                                  group.filesData[fileIndex]?.taken_by || ""
-                                }
-                                onChange={(e) =>
-                                  updateFileData(
-                                    groupIndex,
-                                    fileIndex,
-                                    "taken_by",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-2">
                                 Assigned To
                               </label>
-                              <input
-                                type="text"
-                                value={
-                                  group.filesData[fileIndex]?.assigned_to || ""
-                                }
-                                onChange={(e) =>
-                                  updateFileData(
-                                    groupIndex,
-                                    fileIndex,
-                                    "assigned_to",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                              />
+                              <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
+                                {processors.map((processor) => {
+                                  const isAssigned = group.filesData[
+                                    fileIndex
+                                  ].assigned_to.some(
+                                    (assignee) =>
+                                      assignee.user_id === processor.id
+                                  );
+                                  return (
+                                    <div
+                                      key={processor.id}
+                                      className="flex items-center space-x-2"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        id={`processor-${groupIndex}-${fileIndex}-${processor.id}`}
+                                        checked={isAssigned}
+                                        onChange={() =>
+                                          updateFileData(
+                                            groupIndex,
+                                            fileIndex,
+                                            "assigned_to",
+                                            processor.id
+                                          )
+                                        }
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                      <label
+                                        htmlFor={`processor-${groupIndex}-${fileIndex}-${processor.id}`}
+                                        className="text-sm text-gray-700 cursor-pointer hover:text-gray-900"
+                                      >
+                                        {processor.name}
+                                      </label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1082,40 +1101,37 @@ const TaskModal: React.FC<TaskModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center p-6 border-t border-gray-200">
-          <div className="flex space-x-2">
-            {currentStep > 1 && (
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
-              >
-                <ChevronLeft size={16} className="mr-2" /> Back
-              </button>
-            )}
-          </div>
-
-          <div className="flex space-x-2">
-            {currentStep < 4 ? (
-              <button
-                type="button"
-                onClick={handleNextStep}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-              >
-                Next <ChevronRight size={16} className="ml-2" />
-              </button>
+        <div className="border-t p-4 flex justify-between">
+          <button
+            onClick={handlePrevStep}
+            className={`flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors ${
+              currentStep === 1 ? "invisible" : ""
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Previous
+          </button>
+          <button
+            onClick={currentStep === 4 ? handleSubmit : handleNextStep}
+            disabled={isSubmitting}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md transition-colors"
+          >
+            {currentStep === 4 ? (
+              isSubmitting ? (
+                "Creating..."
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" />
+                  Create Task
+                </>
+              )
             ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none"
-                disabled={isSubmitting}
-              >
-                <Save size={16} className="mr-2" />
-                {isSubmitting ? "Creating..." : "Create Project"}
-              </button>
+              <>
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </>
             )}
-          </div>
+          </button>
         </div>
       </div>
     </div>
