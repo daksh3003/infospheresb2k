@@ -14,11 +14,22 @@ import {
   FileText,
   Split,
   Info,
+  Users,
+  Clock,
+  Hash,
+  User,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Progress } from "./ui/progress";
 import { Tooltip } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Card } from "./ui/card";
+import { Badge } from "./ui/badge";
+
+import type { SelectedItems } from "@heroui/react";
+import { Select, SelectItem, Avatar, Chip } from "@heroui/react";
 
 import { supabase } from "../utils/supabase";
 
@@ -394,54 +405,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
     field: keyof FileFormData,
     value: string | string[]
   ) => {
-    if (field === "assigned_to") {
-      const processorId = value as string;
-      setFileGroups((prev) => {
-        const newGroups = [...prev];
-        const currentAssignees =
-          newGroups[groupIndex].filesData[fileIndex].assigned_to;
+    console.log("📥 updateFileData called with", {
+      groupIndex,
+      fileIndex,
+      field,
+      value,
+    });
 
-        // Check if processor is already assigned
-        const isAlreadyAssigned = currentAssignees.some(
-          (assignee) => assignee.user_id === processorId
-        );
-
-        if (isAlreadyAssigned) {
-          // Remove processor if already assigned
-          newGroups[groupIndex].filesData[fileIndex].assigned_to =
-            currentAssignees.filter(
-              (assignee) => assignee.user_id !== processorId
-            );
-        } else {
-          // Add new processor
-          const selectedProcessor = processors.find(
-            (processor) => processor.id === processorId
-          );
-          if (selectedProcessor) {
-            newGroups[groupIndex].filesData[fileIndex].assigned_to = [
-              ...currentAssignees,
-              {
-                user_id: selectedProcessor.id,
-                name: selectedProcessor.name,
-                email: selectedProcessor.email,
-                role: selectedProcessor.role,
-              },
-            ];
-          }
-        }
-        console.log("newGroups", newGroups);
-        return newGroups;
-      });
-    } else {
-      setFileGroups((prev) => {
-        const newGroups = [...prev];
-        newGroups[groupIndex].filesData[fileIndex] = {
-          ...newGroups[groupIndex].filesData[fileIndex],
-          [field]: value,
-        };
-        return newGroups;
-      });
-    }
+    // Simple update for non-assignment fields (like page_count)
+    setFileGroups((prev) => {
+      const newGroups = [...prev];
+      newGroups[groupIndex].filesData[fileIndex] = {
+        ...newGroups[groupIndex].filesData[fileIndex],
+        [field]: value,
+      };
+      return newGroups;
+    });
   };
 
   const handleSubmit = async () => {
@@ -632,7 +611,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       }`}
     >
       <div className="fixed inset-0 bg-black opacity-50"></div>
-      <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative z-10">
+      <div className="bg-white rounded-lg w-full max-w-4xl max-h-[100vh] overflow-hidden relative z-10">
         {/* Header */}
         <div className="border-b p-4 flex items-center justify-between">
           <div>
@@ -1008,91 +987,274 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       />
                     </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Files</h4>
-                    <div className="space-y-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <h4 className="text-lg font-semibold text-gray-900">
+                          Files Configuration
+                        </h4>
+                        <Badge variant="secondary" className="text-xs">
+                          {group.filesData.length} files
+                        </Badge>
+                      </div>
+                      {group.filesData.length > 0 && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <AlertCircle className="w-4 h-4" />
+                          Configure each file individually
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4">
                       {group.filesData.map((fileData, fileIndex) => (
-                        <div
+                        <Card
                           key={fileIndex}
-                          className="grid grid-cols-2 gap-4 p-2 bg-gray-50 rounded"
+                          className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
                         >
-                          <div>
-                            <label className="block text-xs text-gray-500">
-                              File Name
-                            </label>
-                            <span className="text-sm">
-                              {fileData.file_name}
-                            </span>
+                          {/* File Header */}
+                          <div className="flex items-start justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-50 rounded-lg">
+                                <FileText className="w-5 h-5 text-blue-600" />
+                              </div>
+                              <div>
+                                <h5 className="font-semibold text-gray-900 text-base">
+                                  {fileData.file_name}
+                                </h5>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  File {fileIndex + 1} of{" "}
+                                  {group.filesData.length}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge
+                              variant={
+                                group.filesData[fileIndex].assigned_to.length >
+                                0
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="flex items-center gap-1"
+                            >
+                              <User className="w-3 h-3" />
+                              {
+                                group.filesData[fileIndex].assigned_to.length
+                              }{" "}
+                              assigned
+                            </Badge>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Page Count
-                              </label>
-                              <input
-                                type="number"
-                                value={
-                                  group.filesData[fileIndex]?.page_count || ""
-                                }
-                                onChange={(e) =>
-                                  updateFileData(
-                                    groupIndex,
-                                    fileIndex,
-                                    "page_count",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                              />
+                          {/* File Configuration */}
+                          <div className="grid md:grid-cols-2 gap-6">
+                            {/* Page Count Section */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Hash className="w-4 h-4 text-gray-600" />
+                                <label className="text-sm font-medium text-gray-700">
+                                  Page Count
+                                </label>
+                              </div>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={
+                                    group.filesData[fileIndex]?.page_count || ""
+                                  }
+                                  onChange={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    updateFileData(
+                                      groupIndex,
+                                      fileIndex,
+                                      "page_count",
+                                      e.target.value
+                                    );
+                                  }}
+                                  placeholder="Enter page count"
+                                  className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                />
+                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                  <span className="text-xs text-gray-400">
+                                    pages
+                                  </span>
+                                </div>
+                              </div>
                             </div>
 
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-2">
-                                Assigned To
-                              </label>
-                              <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
-                                {processors.map((processor) => {
-                                  const isAssigned = group.filesData[
-                                    fileIndex
-                                  ].assigned_to.some(
-                                    (assignee) =>
-                                      assignee.user_id === processor.id
-                                  );
-                                  return (
-                                    <div
-                                      key={processor.id}
-                                      className="flex items-center space-x-2"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        id={`processor-${groupIndex}-${fileIndex}-${processor.id}`}
-                                        checked={isAssigned}
-                                        onChange={() =>
-                                          updateFileData(
-                                            groupIndex,
-                                            fileIndex,
-                                            "assigned_to",
-                                            processor.id
-                                          )
-                                        }
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                      />
-                                      <label
-                                        htmlFor={`processor-${groupIndex}-${fileIndex}-${processor.id}`}
-                                        className="text-sm text-gray-700 cursor-pointer hover:text-gray-900"
-                                      >
-                                        {processor.name}
-                                      </label>
+                            {/* Team Assignment Section */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-gray-600" />
+                                <label className="text-sm font-medium text-gray-700">
+                                  Assign Processors
+                                </label>
+                              </div>
+
+                              {/* Selected Processors Display */}
+                              <div className="min-h-[48px] p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                {group.filesData[fileIndex].assigned_to.length >
+                                0 ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {group.filesData[fileIndex].assigned_to.map(
+                                      (assignee, index) => (
+                                        <div
+                                          key={index}
+                                          className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"
+                                        >
+                                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                            <span className="text-xs font-medium text-blue-600">
+                                              {assignee.name?.charAt(0) ||
+                                                assignee.email?.charAt(0) ||
+                                                "?"}
+                                            </span>
+                                          </div>
+                                          <span className="text-sm font-medium text-gray-700">
+                                            {assignee.name || assignee.email}
+                                          </span>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center h-full">
+                                    <span className="text-sm text-gray-400 italic">
+                                      No processors assigned
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Simple Checkbox Selection */}
+                              <div className="space-y-2">
+                                <p className="text-xs text-gray-600 font-medium">
+                                  Select Processors:
+                                </p>
+                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white space-y-2">
+                                  {processors && processors.length > 0 ? (
+                                    processors.map((processor) => {
+                                      const isAssigned = group.filesData[
+                                        fileIndex
+                                      ].assigned_to.some(
+                                        (assignee) =>
+                                          assignee.user_id === processor.id
+                                      );
+
+                                      return (
+                                        <label
+                                          key={processor.id}
+                                          className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isAssigned}
+                                            onChange={(e) => {
+                                              e.stopPropagation();
+                                              const isChecked =
+                                                e.target.checked;
+                                              console.log(
+                                                `${
+                                                  isChecked
+                                                    ? "✅ Assigning"
+                                                    : "❌ Removing"
+                                                } processor:`,
+                                                processor.name
+                                              );
+
+                                              setFileGroups((prev) => {
+                                                const newGroups = [...prev];
+                                                const currentAssignees =
+                                                  newGroups[groupIndex]
+                                                    .filesData[fileIndex]
+                                                    .assigned_to;
+
+                                                if (isChecked) {
+                                                  // Add processor if not already assigned
+                                                  if (
+                                                    !currentAssignees.some(
+                                                      (a) =>
+                                                        a.user_id ===
+                                                        processor.id
+                                                    )
+                                                  ) {
+                                                    newGroups[
+                                                      groupIndex
+                                                    ].filesData[
+                                                      fileIndex
+                                                    ].assigned_to = [
+                                                      ...currentAssignees,
+                                                      {
+                                                        user_id: processor.id,
+                                                        name: processor.name,
+                                                        email: processor.email,
+                                                        role: processor.role,
+                                                      },
+                                                    ];
+                                                  }
+                                                } else {
+                                                  // Remove processor
+                                                  newGroups[
+                                                    groupIndex
+                                                  ].filesData[
+                                                    fileIndex
+                                                  ].assigned_to =
+                                                    currentAssignees.filter(
+                                                      (a) =>
+                                                        a.user_id !==
+                                                        processor.id
+                                                    );
+                                                }
+
+                                                return newGroups;
+                                              });
+                                            }}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                          />
+                                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                            <span className="text-sm font-medium text-gray-600">
+                                              {processor.name?.charAt(0) ||
+                                                processor.email?.charAt(0) ||
+                                                "?"}
+                                            </span>
+                                          </div>
+                                          <div className="flex-1">
+                                            <p className="text-sm font-medium text-gray-900">
+                                              {processor.name}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                              {processor.email}
+                                            </p>
+                                          </div>
+                                        </label>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="text-center py-4 text-gray-400">
+                                      <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                      <p className="text-sm">
+                                        No processors available
+                                      </p>
                                     </div>
-                                  );
-                                })}
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </Card>
                       ))}
                     </div>
+
+                    {group.filesData.length === 0 && (
+                      <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          No files to configure
+                        </h3>
+                        <p className="text-gray-500">
+                          Add files to this task group to configure them.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

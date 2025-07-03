@@ -94,9 +94,9 @@ export default function PMDashboard() {
         id, 
         current_stage, 
         status_flag, 
-        project_id, 
+        task_id, 
         iteration_number, 
-        projects ( project_name, id ) // Minimal join
+        tasks_test ( task_name, task_id ) // Minimal join
       `
         )
         .in("current_stage", ["Processor", "PM"]);
@@ -116,12 +116,12 @@ export default function PMDashboard() {
         const dummyTasks: PMDashboardTask[] = data.map((item: any) => ({
           taskIterationId: item.id,
           projectName:
-            item.projects?.project_name ||
-            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
-            "No Project Name",
+            item.tasks_test?.task_name ||
+            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
+            "No Task Name",
           currentStage: item.current_stage,
           calculatedStatus: "pending",
-          projectId: item.projects?.id || item.project_id || "dummy_project_id",
+          projectId: item.tasks_test?.task_id || "dummy_project_id",
           projectTaskId: null,
           clientInstruction: null,
           deliveryDate: null,
@@ -137,9 +137,9 @@ export default function PMDashboard() {
           calculatedPriority: "medium",
           displayId: item.id,
           displayTitle:
-            item.projects?.project_name ||
-            `Project (ID: ${item.project_id?.substring(0, 8)})` ||
-            "No Project Name",
+            item.tasks_test?.task_name ||
+            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
+            "No Task Name",
           displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
           displayDueDate: null,
           displayAssignedTo: `Iter: ${item.iteration_number || "N/A"}`,
@@ -243,8 +243,6 @@ export default function PMDashboard() {
 
     return matchesSearch && matchesStatus && matchesPriority;
   });
-
-
 
   return (
     <div className="space-y-6 p-6">
