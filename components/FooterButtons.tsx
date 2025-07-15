@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { getPauseResumeButton } from "./task/taskAction";
-import { CheckCircle2, Play, Share2, ChevronDown } from "lucide-react";
+import {
+  CheckCircle2,
+  Play,
+  Share2,
+  ChevronDown,
+  UserPlus,
+} from "lucide-react";
 import { ArrowBigUpDashIcon } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import {
@@ -10,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import Dialog from "./Dialog";
+import { toast } from "react-toastify";
 
 export const FooterButtons = ({
   currentUser,
@@ -42,6 +50,9 @@ export const FooterButtons = ({
 }) => {
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [assignedTo, setAssignedTo] = useState<any[]>([]);
+  const [showPickupDialog, setShowPickupDialog] = useState(false);
+  const [isPickingUp, setIsPickingUp] = useState(false);
+  const [hasAssignedUsers, setHasAssignedUsers] = useState(false);
 
   const fetchAvailableUsers = async () => {
     try {
@@ -58,7 +69,7 @@ export const FooterButtons = ({
       const filteredUsers = users?.filter((user) => {
         switch (currentStage) {
           case "Processor":
-            return user.role === "Processor";
+            return user.role === "processor";
           case "QC":
             return user.role === "qcTeam";
           case "QA":
@@ -76,16 +87,19 @@ export const FooterButtons = ({
 
   const fetchAssignedTo = async () => {
     const { data, error } = await supabase
-      .from("process_logs_test")
+      .from("files_test")
       .select("assigned_to")
-      .eq("task_id", taskId);
-    if (error) {
+      .eq("task_id", taskId)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
       console.error("Error fetching assigned to:", error);
       return;
     }
-    if (data && data.length > 0) {
-      setAssignedTo(data[0].assigned_to || []);
-    }
+
+    const assignedUsers = data?.assigned_to || [];
+    setAssignedTo(assignedUsers);
+    setHasAssignedUsers(assignedUsers.length > 0);
   };
 
   // const handleAssignUser = async (user: any) => {
@@ -124,10 +138,93 @@ export const FooterButtons = ({
   //   }
   // };
 
+  const handlePickupTask = async () => {
+    if (!currentUser) {
+      toast.error("User not found");
+      return;
+    }
+
+    setIsPickingUp(true);
+    try {
+      const now = new Date().toISOString();
+
+      // Create assignment entry in the same format as handleAssignTask
+      const newAssignment = {
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+        user_id: currentUser.id,
+        assigned_at: now,
+      };
+
+      const logData = {
+        task_id: taskId,
+        assigned_to: [newAssignment],
+      };
+
+      // Check if record exists
+      const { data: existingLog, error: fetchError } = await supabase
+        .from("files_test")
+        .select("assigned_to")
+        .eq("task_id", taskId)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        throw fetchError;
+      }
+
+      if (existingLog) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from("files_test")
+          .update({ assigned_to: logData.assigned_to })
+          .eq("task_id", taskId);
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from("files_test")
+          .insert(logData);
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      toast.success("Task picked up successfully!");
+      setShowPickupDialog(false);
+      await fetchAssignedTo(); // Refresh the assigned users
+    } catch (error) {
+      console.error("Error picking up task:", error);
+      toast.error("Failed to pick up task. Please try again.");
+    } finally {
+      setIsPickingUp(false);
+    }
+  };
+
+  const canPickupTask = () => {
+    if (!currentUser) return false;
+
+    // Check if user's role matches the current stage
+    switch (currentStage) {
+      case "Processor":
+        return currentUser.role === "processor";
+      case "QC":
+        return currentUser.role === "qcTeam";
+      case "QA":
+        return currentUser.role === "qaTeam";
+      default:
+        return false;
+    }
+  };
+
   useEffect(() => {
     fetchAvailableUsers();
     fetchAssignedTo();
-  }, [currentStage]);
+  }, [currentStage, taskId]);
 
   return (
     <>
@@ -169,6 +266,19 @@ export const FooterButtons = ({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+
+          {/* Pick up task button - shows when no one is assigned and user can pick up */}
+          {!hasAssignedUsers && canPickupTask() && (
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              onClick={() => setShowPickupDialog(true)}
+              disabled={isPickingUp}
+            >
+              <UserPlus className="h-4 w-4" />
+              {isPickingUp ? "Picking up..." : "Pick up Task"}
+            </button>
+          )}
+
           {status === "pending" && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -204,6 +314,18 @@ export const FooterButtons = ({
           )}
         </div>
       </div>
+
+      {/* Pick up task confirmation dialog */}
+      <Dialog
+        isOpen={showPickupDialog}
+        onClose={() => setShowPickupDialog(false)}
+        title="Pick up this task?"
+        description={`Are you sure you want to pick up this task? This will assign the task to you (${
+          currentUser?.name || currentUser?.email
+        }) and you'll be responsible for completing it.`}
+        confirmText="Pick Up Task"
+        onConfirm={handlePickupTask}
+      />
     </>
   );
 };

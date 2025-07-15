@@ -1,0 +1,21 @@
+{
+    "mcpServers": {
+        "supabase": {
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@supabase/mcp-server-supabase@latest",
+                "--read-only",
+                "--project-ref=sorzczyuzhmuzfhgrnxt"
+            ],
+            "env": {
+                "SUPABASE_ACCESS_TOKEN": "sbp_90a8665d72d9d633a2acc3e3f8cc99d86b7a5902"
+            }
+        },
+        "fi_mcp": {
+            "url": "https://mcp.fi.money:8080/mcp/stream"
+        }
+    }
+}

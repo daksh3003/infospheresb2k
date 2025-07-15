@@ -12,11 +12,15 @@ import { TaskAttachments } from "@/components/TaskAttachments";
 import { FileUpload } from "@/components/FileUpload";
 import { Comments } from "@/components/Comments";
 import { FooterButtons } from "@/components/FooterButtons";
+import LoadingScreen from "@/components/ui/loading-screen";
 
 export default function TaskDetailPage() {
   const params = useParams();
   const taskId = params.taskId as string;
   const router = useRouter();
+
+  // Loading state
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // state hooks  :
   const [status, setStatus] = useState<
@@ -675,141 +679,145 @@ export default function TaskDetailPage() {
     }
   };
 
+  // Modified fetchData to handle loading state
   const fetchData = async () => {
-    const { data, error } = await supabase
-      .from("task_iterations")
-      .select("sent_by, current_stage, assigned_to_processor_user_id")
-      .eq("task_id", taskId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("task_iterations")
+        .select("sent_by, current_stage, assigned_to_processor_user_id")
+        .eq("task_id", taskId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching 'sent_by' data:", error);
-      return;
-    }
+      if (error) {
+        console.error("Error fetching 'sent_by' data:", error);
+        return;
+      }
 
-    setSentBy(data?.sent_by);
-    setCurrentStage(data?.current_stage);
-    setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
+      setSentBy(data?.sent_by);
+      setCurrentStage(data?.current_stage);
+      setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
 
-    const sent_by = data?.sent_by;
-    const current_stage = data?.current_stage;
+      const sent_by = data?.sent_by;
+      const current_stage = data?.current_stage;
 
-    const { data: PMFiles, error: PMError } = await supabase.storage
-      .from("task-files")
-      .list(taskId);
+      const { data: PMFiles, error: PMError } = await supabase.storage
+        .from("task-files")
+        .list(taskId);
 
-    if (PMError) {
-      console.error("Error fetching PM files:", PMError);
-      return;
-    }
+      if (PMError) {
+        console.error("Error fetching PM files:", PMError);
+        return;
+      }
 
-    setPMFiles(PMFiles.map((file) => file.name));
+      setPMFiles(PMFiles.map((file) => file.name));
 
-    var folder_path_correction = "";
-    var storage_name_correction = "";
+      var folder_path_correction = "";
+      var storage_name_correction = "";
 
-    if (sent_by !== "PM") {
-      if (current_stage === "Processor") {
-        if (sent_by === "QC") {
+      if (sent_by !== "PM") {
+        if (current_stage === "Processor") {
+          if (sent_by === "QC") {
+            folder_path_correction = taskId;
+            storage_name_correction = "qc-files";
+          } else if (sent_by === "QA") {
+            folder_path_correction = taskId;
+            storage_name_correction = "qa-files";
+          }
+        } else if (current_stage === "QA" && sent_by === "Processor") {
           folder_path_correction = taskId;
           storage_name_correction = "qc-files";
-        } else if (sent_by === "QA") {
-          folder_path_correction = taskId;
-          storage_name_correction = "qa-files";
         }
-      } else if (current_stage === "QA" && sent_by === "Processor") {
-        folder_path_correction = taskId;
-        storage_name_correction = "qc-files";
+
+        const { data: correctionFiles, error: correctionError } =
+          await supabase.storage
+            .from(storage_name_correction)
+            .list(folder_path_correction);
+
+        if (correctionError) {
+          console.log("Error fetching correction files:", correctionError);
+          // return;
+        }
+        setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
+        // }
       }
 
-      const { data: correctionFiles, error: correctionError } =
-        await supabase.storage
-          .from(storage_name_correction)
-          .list(folder_path_correction);
+      let folder_path = "";
+      let storage_name = "";
 
-      if (correctionError) {
-        console.log("Error fetching correction files:", correctionError);
-        // return;
+      const { data: simpleTaskData, error: simpleError } = await supabase
+        .from("tasks_test")
+        .select("*")
+        .eq("task_id", taskId)
+        .single();
+
+      if (simpleError) {
+        console.error("Error fetching simple task data:", simpleError);
+        return;
       }
-      setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
-      // }
+
+      // Fetch creator info separately
+      const { data: creatorData, error: creatorError } = await supabase
+        .from("profiles")
+        .select("id,  name, email, role")
+        .eq("id", simpleTaskData.created_by)
+        .single();
+
+      if (creatorError) {
+        console.error("Error fetching creator data:", creatorError);
+        return;
+      }
+
+      // Set task with creator info
+      setTask((prev: any) => ({
+        ...prev,
+        task_id: simpleTaskData.task_id,
+        project_id: simpleTaskData.project_id,
+        title: simpleTaskData.task_name,
+        client_instruction: simpleTaskData.client_instruction || "",
+        mail_instruction: simpleTaskData.mail_instruction || "",
+        estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
+        estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
+        estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
+        priority: simpleTaskData.priority || "low",
+        dueDate: simpleTaskData.delivery_date || "",
+        deliveryTime: simpleTaskData.delivery_time || "",
+        assignedTo: "",
+        createdBy: {
+          id: creatorData.id,
+          name: creatorData.name,
+          email: creatorData.email,
+          role: creatorData.role,
+        },
+        comments: simpleTaskData.comments || [],
+        createdDate: simpleTaskData.created_at,
+        overall_completion_status: simpleTaskData.overall_completion_status,
+      }));
+
+      if (current_stage === "Processor") {
+        folder_path = `${sent_by}_${taskId}`;
+        storage_name = "processor-files";
+      } else if (current_stage === "QC") {
+        folder_path = taskId;
+        storage_name = "qc-files";
+      } else if (current_stage === "QA") {
+        folder_path = taskId;
+        storage_name = "qa-files";
+      }
+      console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
+      console.log("current_stage : ", current_stage);
+
+      const { data: uploadedFiles, error: uploadedError } =
+        await supabase.storage.from(storage_name).list(folder_path);
+      if (uploadedError) {
+        console.log("Error fetching uploaded files:", uploadedError);
+        return;
+      }
+      console.log(uploadedFiles);
+
+      setUploadedFiles(uploadedFiles.map((file) => file.name));
+    } catch (error) {
+      console.error("Error in fetchData:", error);
     }
-
-    let folder_path = "";
-    let storage_name = "";
-
-    const { data: simpleTaskData, error: simpleError } = await supabase
-      .from("tasks_test")
-      .select("*")
-      .eq("task_id", taskId)
-      .single();
-
-    if (simpleError) {
-      console.error("Error fetching simple task data:", simpleError);
-      return;
-    }
-
-    // Fetch creator info separately
-    const { data: creatorData, error: creatorError } = await supabase
-      .from("profiles")
-      .select("id,  name, email, role")
-      .eq("id", simpleTaskData.created_by)
-      .single();
-
-    if (creatorError) {
-      console.error("Error fetching creator data:", creatorError);
-      return;
-    }
-
-    // Set task with creator info
-    setTask((prev: any) => ({
-      ...prev,
-      task_id: simpleTaskData.task_id,
-      project_id: simpleTaskData.project_id,
-      title: simpleTaskData.task_name,
-      client_instruction: simpleTaskData.client_instruction || "",
-      mail_instruction: simpleTaskData.mail_instruction || "",
-      estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
-      estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
-      estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
-      priority: simpleTaskData.priority || "low",
-      dueDate: simpleTaskData.delivery_date || "",
-      deliveryTime: simpleTaskData.delivery_time || "",
-      assignedTo: "",
-      createdBy: {
-        id: creatorData.id,
-        name: creatorData.name,
-        email: creatorData.email,
-        role: creatorData.role,
-      },
-      comments: simpleTaskData.comments || [],
-      createdDate: simpleTaskData.created_at,
-      overall_completion_status: simpleTaskData.overall_completion_status,
-    }));
-
-    if (current_stage === "Processor") {
-      folder_path = `${sent_by}_${taskId}`;
-      storage_name = "processor-files";
-    } else if (current_stage === "QC") {
-      folder_path = taskId;
-      storage_name = "qc-files";
-    } else if (current_stage === "QA") {
-      folder_path = taskId;
-      storage_name = "qa-files";
-    }
-    console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
-    console.log("current_stage : ", current_stage);
-
-    const { data: uploadedFiles, error: uploadedError } = await supabase.storage
-      .from(storage_name)
-      .list(folder_path);
-    if (uploadedError) {
-      console.log("Error fetching uploaded files:", uploadedError);
-      return;
-    }
-    console.log(uploadedFiles);
-
-    setUploadedFiles(uploadedFiles.map((file) => file.name));
   };
 
   const fetchAvailableUsers = async () => {
@@ -854,10 +862,9 @@ export default function TaskDetailPage() {
     try {
       // First, check if there's an existing record
       const { data: existingLog, error: fetchError } = await supabase
-        .from("process_logs_test")
-        .select("*")
+        .from("files_test")
+        .select("assigned_to")
         .eq("task_id", taskId)
-        .eq("current_stage", currentStage)
         .single();
 
       if (fetchError && fetchError.code !== "PGRST116") {
@@ -871,6 +878,8 @@ export default function TaskDetailPage() {
       // Create new assignment entry
       const newAssignment = {
         name: selectedUserData.name,
+        email: selectedUserData.email,
+        role: selectedUserData.role,
         user_id: selectedUserData.id,
         assigned_at: now,
       };
@@ -881,13 +890,13 @@ export default function TaskDetailPage() {
       // Handle existing or new assignedTo array
       let assignedToArray: any[] = [];
 
-      const logData = {
-        task_id: taskId,
-        current_stage: currentStage,
-        sent_by: sentBy,
-        assigned_to: assignedToArray,
-        created_at: existingLog?.created_at || now,
-      };
+      // const logData = {
+      //   task_id: taskId,
+      //   current_stage: currentStage,
+      //   sent_by: sentBy,
+      //   assigned_to: assignedToArray,
+      //   created_at: now,
+      // };
 
       if (existingLog?.assigned_to) {
         // Check if user is already assigned
@@ -908,21 +917,23 @@ export default function TaskDetailPage() {
         assignedToArray = [newAssignment];
       }
 
-      logData.assigned_to = assignedToArray;
+      const logData = {
+        task_id: taskId,
+        assigned_to: assignedToArray,
+      };
 
       if (existingLog) {
         const { error: upsertError } = await supabase
-          .from("process_logs_test")
-          .update(logData)
-          .eq("task_id", taskId)
-          .eq("current_stage", currentStage);
+          .from("files_test")
+          .update({ assigned_to: logData.assigned_to })
+          .eq("task_id", taskId);
 
         if (upsertError) {
           throw upsertError;
         }
       } else {
         const { error: upsertError } = await supabase
-          .from("process_logs_test")
+          .from("files_test")
           .insert(logData);
 
         if (upsertError) {
@@ -943,31 +954,48 @@ export default function TaskDetailPage() {
   };
 
   // useEffect hooks :
-
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+    const initializeData = async () => {
+      setIsInitialLoading(true);
+      try {
+        const fetchCurrentUser = async () => {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile, error } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", user.id)
+              .single();
 
-        if (error) {
-          console.error("Error fetching user profile:", error);
-          return;
-        }
-        setCurrentUser(profile);
+            if (error) {
+              console.error("Error fetching user profile:", error);
+              return;
+            }
+            setCurrentUser(profile);
+          }
+        };
+
+        await Promise.all([
+          fetchCurrentUser(),
+          fetchProcessorFiles(),
+          fetchData(),
+        ]);
+      } catch (error) {
+        console.error("Error initializing data:", error);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
 
-    fetchCurrentUser();
-    fetchProcessorFiles();
-    fetchData();
+    initializeData();
   }, [taskId]);
+
+  // Show loading screen while initial data is being fetched
+  if (isInitialLoading) {
+    return <LoadingScreen message="Loading task details..." />;
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">

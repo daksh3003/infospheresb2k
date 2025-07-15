@@ -29,6 +29,7 @@ import { supabase } from "@/utils/supabase";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
+import LoadingScreen from "@/components/ui/loading-screen";
 
 interface ProjectTask {
   id: string;
@@ -273,85 +274,187 @@ export default function DashboardPage() {
     {}
   );
 
+  // Function to render grouped tasks
+  const renderGroupedTasks = (tasks: ProjectTask[]) => {
+    return Object.values(projectGroups).map((group, index) => (
+      <Card key={index} className="overflow-hidden">
+        <CardHeader
+          className="cursor-pointer bg-gray-50 dark:bg-gray-800"
+          onClick={() => toggleProjectExpansion(group.projectId)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {expandedProjects.has(group.projectId) ? (
+                <ChevronUp className="h-5 w-5 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              )}
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {group.projectName}
+                </CardTitle>
+                <p className="text-sm text-gray-500">
+                  {group.completedCount} of {group.totalCount} tasks completed
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-48">
+                <Progress value={group.completionPercentage} className="h-2" />
+              </div>
+              <Badge
+                className={
+                  group.completionPercentage === 100
+                    ? "bg-green-500 text-white"
+                    : "bg-blue-500 text-white"
+                }
+              >
+                {group.completionPercentage}%
+                {group.completionPercentage === 100 && (
+                  <CheckCircle2 className="h-4 w-4 ml-1" />
+                )}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        {expandedProjects.has(group.projectId) && (
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 gap-4">
+              {group.tasks.map((task, index) => (
+                <TaskCard
+                  key={index}
+                  id={task.task_id}
+                  title={task.task_name || "Untitled Task"}
+                  description={
+                    task.client_instruction || "No description available"
+                  }
+                  dueDate={task.delivery_date}
+                  status={task.status || "pending"}
+                  priority={task.priority || "medium"}
+                />
+              ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    ));
+  };
+
+  // Function to handle task creation
+  const handleCreateTask = () => {
+    fetchTasks();
+  };
+
   if (!mounted) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <LoadingScreen message="Initializing dashboard..." />;
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Dashboard Header with Add Task Button */}
-      <div className="flex items-center justify-between w-full mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Project Manager Dashboard</h1>
-          <p className="text-gray-500">
-            Manage projects, teams, and tasks efficiently
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <Button
-            onClick={openModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Add Task
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Project Dashboard</h1>
+        <Button onClick={() => setIsModalOpen(true)}>Create New Task</Button>
       </div>
 
-      <TaskModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onTaskAdded={handleTaskAdded}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.length}</div>
+          </CardContent>
+        </Card>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative w-full md:w-2/5">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search by Project, Task ID, Instruction..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter((task) => task.status === "in-progress").length}
             </div>
+          </CardContent>
+        </Card>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-1/5">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter((task) => task.completion_status).length}
+            </div>
+          </CardContent>
+        </Card>
 
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-1/5">
-                <SelectValue placeholder="Filter by priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter((task) => task.status === "overdue").length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in-progress">In Progress</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priority</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Stages</SelectItem>
+            <SelectItem value="Processor">Processor</SelectItem>
+            <SelectItem value="QC">QC</SelectItem>
+            <SelectItem value="QA">QA</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
@@ -372,128 +475,91 @@ export default function DashboardPage() {
 
         <TabsContent value="all" className="mt-6">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
+            <LoadingScreen variant="inline" message="Loading tasks..." />
           ) : (
-            <div className="space-y-4">
-              {Object.values(projectGroups).map((group, index) => (
-                <Card key={index} className="overflow-hidden">
-                  <CardHeader
-                    className="cursor-pointer bg-gray-50 dark:bg-gray-800"
-                    onClick={() => toggleProjectExpansion(group.projectId)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        {expandedProjects.has(group.projectId) ? (
-                          <ChevronUp className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        )}
-                        <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            {group.projectName}
-                            <span className="text-sm text-gray-500">
-                              {/* ({group.projectId}) */}
-                            </span>
-                          </CardTitle>
-                          <p className="text-sm text-gray-500">
-                            {group.completedCount} of {group.totalCount} tasks
-                            completed
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-48">
-                          <Progress
-                            value={group.completionPercentage}
-                            className="h-2"
-                          />
-                        </div>
-                        <Badge
-                          className={
-                            group.completionPercentage === 100
-                              ? "bg-green-500 text-white"
-                              : "bg-blue-500 text-white"
-                          }
-                        >
-                          {group.completionPercentage}%
-                          {group.completionPercentage === 100 && (
-                            <CheckCircle2 className="h-4 w-4 ml-1" />
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {expandedProjects.has(group.projectId) && (
-                    <CardContent className="pt-4">
-                      <div className="grid grid-cols-1 gap-4">
-                        {group.tasks.map((task, index) => (
-                          <TaskCard
-                            key={index}
-                            id={task.task_id}
-                            title={task.task_name || "Untitled Task"}
-                            description={
-                              task.client_instruction ||
-                              "No description available"
-                            }
-                            dueDate={task.delivery_date}
-                            status={task.status || "pending"}
-                            priority={task.priority || "medium"}
-                          />
-                        ))}
-                      </div>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
+            <div className="grid gap-4">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    No tasks found matching your criteria.
+                  </p>
+                </div>
+              ) : (
+                renderGroupedTasks(filteredTasks)
+              )}
             </div>
           )}
         </TabsContent>
 
-        {["Processor", "QC", "QA"].map((type, index) => (
-          <TabsContent key={index} value={type} className="mt-6">
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredTasks.map((task, index) => (
-                  <TaskCard
-                    key={index}
-                    id={task.task_id}
-                    title={task.task_name || "Untitled Project"}
-                    description={
-                      task.client_instruction || "No description available"
-                    }
-                    dueDate={task.delivery_date}
-                    status={task.status || "pending"}
-                    priority={task.priority || "medium"}
-                  />
-                ))}
-                {filteredTasks.length === 0 && (
-                  <div className="col-span-full text-center py-8 text-gray-500">
-                    No tasks found matching your filters
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-        ))}
+        <TabsContent value="Processor" className="mt-6">
+          {isLoading ? (
+            <LoadingScreen
+              variant="inline"
+              message="Loading processor tasks..."
+            />
+          ) : (
+            <div className="grid gap-4">
+              {filteredTasks.filter(
+                (task) => task.current_stage === "Processor"
+              ).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No processor tasks found.</p>
+                </div>
+              ) : (
+                renderGroupedTasks(
+                  filteredTasks.filter(
+                    (task) => task.current_stage === "Processor"
+                  )
+                )
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="QC" className="mt-6">
+          {isLoading ? (
+            <LoadingScreen variant="inline" message="Loading QC tasks..." />
+          ) : (
+            <div className="grid gap-4">
+              {filteredTasks.filter((task) => task.current_stage === "QC")
+                .length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No QC tasks found.</p>
+                </div>
+              ) : (
+                renderGroupedTasks(
+                  filteredTasks.filter((task) => task.current_stage === "QC")
+                )
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="QA" className="mt-6">
+          {isLoading ? (
+            <LoadingScreen variant="inline" message="Loading QA tasks..." />
+          ) : (
+            <div className="grid gap-4">
+              {filteredTasks.filter((task) => task.current_stage === "QA")
+                .length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No QA tasks found.</p>
+                </div>
+              ) : (
+                renderGroupedTasks(
+                  filteredTasks.filter((task) => task.current_stage === "QA")
+                )
+              )}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
-      {isLoading && (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      )}
-
-      {!isLoading && filteredTasks.length === 0 && (
-        <div className="text-center py-10">
-          <p className="text-gray-500">No tasks found</p>
-        </div>
-      )}
+      <TaskModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateTask}
+      />
     </div>
   );
 }

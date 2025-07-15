@@ -1,7 +1,7 @@
 // app/dashboard/qa/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,19 +13,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { useEffect } from "react";
 import { supabase } from "@/utils/supabase";
+import LoadingScreen from "@/components/ui/loading-screen";
+
+interface QADashboardTask {
+  id: string;
+  title: string;
+  description: string;
+  status: "pending" | "in-progress" | "completed" | "overdue";
+  priority: "low" | "medium" | "high" | "critical";
+  dueDate: string;
+  assignedTo: string;
+  projectId: string;
+  projectName: string;
+  currentStage: string;
+  statusFlag: string | null;
+  iterationNumber: number;
+}
 
 export default function QADashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<QADashboardTask[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchTasks();
+  }, []);
 
   const fetchTasks = async () => {
-    // setIsLoading(true);
-    // console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from("task_iterations")
@@ -36,178 +56,159 @@ export default function QADashboard() {
           status_flag, 
           task_id, 
           iteration_number, 
-          tasks_test ( task_name, task_id ) // Minimal join
+          tasks_test ( task_name, task_id )
         `
         )
         .eq("current_stage", "QA");
 
-      console.log(data);
-
-      console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data);
-      if (error && Object.keys(error).length > 0) {
-        console.error(
-          "[PM Dashboard] ULTRA SIMPLE Query Error:",
-          JSON.stringify(error, null, 2)
-        );
+      if (error) {
+        console.error("Error fetching QA tasks:", error);
         setTasks([]);
       } else if (data && data.length > 0) {
-        console.log(
-          `[PM Dashboard] ULTRA SIMPLE Query successful, ${data.length} items found. First item:`,
-          data[0]
-        );
-        const dummyTasks: any[] = data.map((item: any) => ({
-          status: "pending", // Default status, can be updated later
-          priority: "medium", // Default priority, can be updated later
-          dueDate: "2025-04-11", // Default due date, can be updated later
-          assignedTo: `QC Iteration ${item.iteration_number || "N/A"}`, // Default assigned to, can be updated later
-          description: "No Decription ",
-          title: "No Project Name",
-          taskIterationId: item.id,
-          projectName:
-            item.tasks_test?.task_name ||
-            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
-            "No Project Name",
+        const processedTasks: QADashboardTask[] = data.map((item: any) => ({
+          id: item.id,
+          title: item.tasks_test?.task_name || "No Project Name",
+          description: `Status Flag: ${item.status_flag || "N/A"}`,
+          status: "pending",
+          priority: "medium",
+          dueDate: "",
+          assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+          projectId: item.tasks_test?.task_id || item.task_id || "unknown",
+          projectName: item.tasks_test?.task_name || "No Project Name",
           currentStage: item.current_stage,
-          calculatedStatus: "pending",
-          projectId:
-            item.tasks_test?.task_id || item.task_id || "dummy_project_id",
-          projectTaskId: item.tasks_test?.task_id || null,
-          clientInstruction: null,
-          deliveryDate: null,
-          processType: null,
-          poHours: null,
-          isProjectOverallComplete: false,
-          iterationNumber: item.iteration_number || 1,
           statusFlag: item.status_flag || null,
-          iterationNotes: null,
-          currentFileVersionId: null,
-          currentFileName: null,
-          calculatedPriority: "medium",
-          displayId: item.id,
-          displayTitle:
-            item.tasks_test?.task_name ||
-            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
-            "No Project Name",
-          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
-          displayDueDate: null,
-          displayAssignedTo: `Iter: ${item.iteration_number || "N/A"}`,
+          iterationNumber: item.iteration_number || 1,
         }));
-        setTasks(dummyTasks);
+        setTasks(processedTasks);
       } else {
-        console.log(
-          "[PM Dashboard] ULTRA SIMPLE Query returned no data or data array is empty. Error (if any):",
-          error ? JSON.stringify(error, null, 2) : "No error object"
-        );
         setTasks([]);
       }
-    } catch (err: any) {
-      console.error(
-        "[PM Dashboard] Catch block error during ULTRA SIMPLE fetch:",
-        err.message ? err.message : err,
-        err
-      );
+    } catch (error) {
+      console.error("Error in fetchTasks:", error);
       setTasks([]);
     } finally {
-      // setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    setMounted(true);
-    fetchTasks();
-  }, []);
-
-  if (!mounted) {
-    return null; // Prevents hydration mismatch
-  }
-
-  // Filter tasks based on search and filters
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
-
+      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || task.status === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || task.priority === priorityFilter;
-
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
+  if (!mounted) {
+    return <LoadingScreen message="Initializing QA dashboard..." />;
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Quality Assurance Dashboard</h1>
-        <p className="text-gray-500">
-          Track bugs, monitor quality, and ensure application readiness
-        </p>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">QA Dashboard</h1>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative w-full md:w-2/5">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search tasks..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter((task) => task.status === "pending").length}
             </div>
+          </CardContent>
+        </Card>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tasks.filter((task) => task.status === "in-progress").length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tasks Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
-            <TaskCard
-              key={task.taskIterationId}
-              id={task.projectId}
-              title={task.projectName}
-              description={task.description}
-              dueDate={task.dueDate}
-              status={task.status as any}
-              priority={task.priority as any}
-              assignedTo={task.assignedTo}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
-          ))
+          </div>
+        </div>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in-progress">In Progress</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priority</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mt-6">
+        {isLoading ? (
+          <LoadingScreen variant="inline" message="Loading QA tasks..." />
         ) : (
-          <div className="col-span-3 py-8 text-center text-gray-500">
-            <p>No tasks found matching your filters.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTasks.length === 0 ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">
+                  No tasks found matching your criteria.
+                </p>
+              </div>
+            ) : (
+              filteredTasks.map((task, index) => (
+                <TaskCard
+                  key={index}
+                  id={task.projectId}
+                  title={task.title}
+                  description={task.description}
+                  dueDate={task.dueDate}
+                  status={task.status}
+                  priority={task.priority}
+                />
+              ))
+            )}
           </div>
         )}
       </div>

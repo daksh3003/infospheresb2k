@@ -26,13 +26,14 @@ export const MainTaskCard = ({
 
   const fetchAssignedTo = async () => {
     const { data, error } = await supabase
-      .from("process_logs_test")
+      .from("files_test")
       .select("assigned_to")
       .eq("task_id", task.task_id);
     if (error) {
       console.error("Error fetching assigned to:", error);
       return;
     }
+    console.log("data: ", data);
     if (data && data.length > 0) {
       console.log("assigned to: ", data[0].assigned_to);
       setAssignedTo(data[0].assigned_to);

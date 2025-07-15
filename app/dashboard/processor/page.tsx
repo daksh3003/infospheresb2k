@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/utils/supabase"; // Adjust the import path as needed
+import { supabase } from "@/utils/supabase";
+import LoadingScreen from "@/components/ui/loading-screen";
 
 interface PMDashboardTask {
   // From projects table
@@ -54,303 +55,210 @@ interface PMDashboardTask {
   displayAssignedTo: string;
 }
 
-type DisplayStatus =
-  | "pending"
-  | "in-progress"
-  | "completed"
-  | "overdue"
-  | "returned";
-
-export default function PMDashboard() {
+export default function ProcessorDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<PMDashboardTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
 
-  // Mount tracking effect (runs only once)
   useEffect(() => {
     setMounted(true);
+    fetchTasks();
   }, []);
-
-  // Fetch tasks when statusFilter changes
-  useEffect(() => {
-    if (mounted) {
-      fetchTasks();
-    }
-  }, [statusFilter, mounted]);
-
-  if (!mounted) return null;
 
   const fetchTasks = async () => {
     setIsLoading(true);
-    // console.log("[PM Dashboard] Attempting fetch with ULTRA SIMPLE query...");
     try {
       const { data, error } = await supabase
         .from("task_iterations")
         .select(
           `
-        id, 
-        current_stage, 
-        status_flag, 
-        task_id, 
-        iteration_number, 
-        tasks_test ( task_name, task_id ) // Minimal join
-      `
+          id, 
+          current_stage, 
+          status_flag, 
+          task_id, 
+          iteration_number, 
+          tasks_test ( task_name, task_id )
+        `
         )
-        .in("current_stage", ["Processor", "PM"]);
+        .eq("current_stage", "Processor");
 
-      console.log("[PM Dashboard] ULTRA SIMPLE Query Data:", data);
-      if (error && Object.keys(error).length > 0) {
-        console.error(
-          "[PM Dashboard] ULTRA SIMPLE Query Error:",
-          JSON.stringify(error, null, 2)
-        );
+      if (error) {
+        console.error("Error fetching tasks:", error);
         setTasks([]);
       } else if (data && data.length > 0) {
-        console.log(
-          `[PM Dashboard] ULTRA SIMPLE Query successful, ${data.length} items found. First item:`,
-          data[0]
-        );
-        const dummyTasks: PMDashboardTask[] = data.map((item: any) => ({
-          taskIterationId: item.id,
-          projectName:
-            item.tasks_test?.task_name ||
-            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
-            "No Task Name",
-          currentStage: item.current_stage,
-          calculatedStatus: "pending",
-          projectId: item.tasks_test?.task_id || "dummy_project_id",
-          projectTaskId: null,
+        const processedTasks: PMDashboardTask[] = data.map((item: any) => ({
+          projectId: item.tasks_test?.task_id || item.task_id || "unknown",
+          projectName: item.tasks_test?.task_name || "No Project Name",
+          projectTaskId: item.tasks_test?.task_id || null,
           clientInstruction: null,
           deliveryDate: null,
           deliveryTime: null,
           processType: null,
           poHours: null,
           isProjectOverallComplete: false,
+          taskIterationId: item.id,
           iterationNumber: item.iteration_number || 1,
+          currentStage: item.current_stage,
           statusFlag: item.status_flag || null,
           iterationNotes: null,
           currentFileVersionId: null,
           currentFileName: null,
+          calculatedStatus: "pending",
           calculatedPriority: "medium",
           displayId: item.id,
-          displayTitle:
-            item.tasks_test?.task_name ||
-            `Task (ID: ${item.tasks_test?.task_id?.substring(0, 8)})` ||
-            "No Task Name",
+          displayTitle: item.tasks_test?.task_name || "No Project Name",
           displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
           displayDueDate: null,
-          displayAssignedTo: `Iter: ${item.iteration_number || "N/A"}`,
+          displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
         }));
-        setTasks(dummyTasks);
+        setTasks(processedTasks);
       } else {
-        console.log(
-          "[PM Dashboard] ULTRA SIMPLE Query returned no data or data array is empty. Error (if any):",
-          error ? JSON.stringify(error, null, 2) : "No error object"
-        );
         setTasks([]);
       }
-    } catch (err: any) {
-      console.error(
-        "[PM Dashboard] Catch block error during ULTRA SIMPLE fetch:",
-        err.message ? err.message : err,
-        err
-      );
+    } catch (error) {
+      console.error("Error in fetchTasks:", error);
       setTasks([]);
     } finally {
       setIsLoading(false);
     }
   };
-  // Helper function to calculate status based on delivery date
-  const calculateStatus = (
-    deliveryDate: string | null | undefined
-  ): DisplayStatus => {
-    if (!deliveryDate) return "pending";
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
-    const dueDate = new Date(deliveryDate);
-    const normalizedDueDate = new Date(
-      dueDate.getFullYear(),
-      dueDate.getMonth(),
-      dueDate.getDate()
-    );
-
-    if (normalizedDueDate < today) {
-      return "overdue";
-    }
-
-    const diffTime = normalizedDueDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 2) {
-      return "in-progress";
-    }
-    return "pending";
-  };
-
-  const calculatePriority = (
-    deliveryDate: string | null | undefined,
-    poHours: number
-  ): "low" | "medium" | "high" | "critical" => {
-    if (!deliveryDate) return "medium";
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(deliveryDate);
-    const normalizedDueDate = new Date(
-      dueDate.getFullYear(),
-      dueDate.getMonth(),
-      dueDate.getDate()
-    );
-
-    if (normalizedDueDate < today) {
-      return "critical";
-    }
-
-    const diffTime = normalizedDueDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (poHours > 20 && diffDays <= 7) return "critical";
-    if (poHours > 10 && diffDays <= 3) return "critical";
-
-    if (diffDays <= 1) {
-      return "critical";
-    } else if (diffDays <= 3) {
-      return "high";
-    } else if (diffDays <= 7) {
-      return "medium";
-    }
-    if (poHours > 15) return "medium";
-    return "low";
-  };
 
   const filteredTasks = tasks.filter((task) => {
-    const searchQueryLower = searchQuery.toLowerCase();
     const matchesSearch =
-      task.projectName?.toLowerCase().includes(searchQueryLower) ||
-      task.projectTaskId?.toLowerCase().includes(searchQueryLower) ||
-      task.clientInstruction?.toLowerCase().includes(searchQueryLower) ||
-      task.iterationNotes?.toLowerCase().includes(searchQueryLower) ||
-      task.currentFileName?.toLowerCase().includes(searchQueryLower);
-
+      task.displayTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.displayDescription
+        ?.toLowerCase()
+        .includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || task.calculatedStatus === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || task.calculatedPriority === priorityFilter;
-
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
+  if (!mounted) {
+    return <LoadingScreen message="Initializing processor dashboard..." />;
+  }
+
   return (
-    <div className="space-y-6 p-6">
-      {" "}
-      {}
-      <div className="flex items-center justify-between w-full mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Processor Dashboard</h1>
-          <p className="text-gray-500">
-            Manage projects, teams, and tasks efficiently
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Processor Dashboard
+        </h1>
       </div>
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative w-full md:w-2/5">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />{" "}
-              {/* Centered icon */}
-              <Input
-                placeholder="Search by Project, Task ID, Instruction, Notes, File..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {
+                tasks.filter((task) => task.calculatedStatus === "pending")
+                  .length
+              }
             </div>
+          </CardContent>
+        </Card>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed (Overall)</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="returned">
-                  Returned for Correction
-                </SelectItem>
-              </SelectContent>
-            </Select>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {
+                tasks.filter((task) => task.calculatedStatus === "in-progress")
+                  .length
+              }
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Filter by priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardContent>
-      </Card>
-      {/* Tasks Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-lg text-gray-700">Loading tasks...</span>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTasks.length > 0 ? (
-            filteredTasks.map((task) => (
-              <TaskCard
-                key={task.taskIterationId}
-                id={task.projectId}
-                title={task.projectName}
-                description={task.displayDescription || "No details"}
-                dueDate={
-                  task.deliveryDate || new Date().toISOString().split("T")[0]
-                }
-                status={task.calculatedStatus}
-                priority={task.calculatedPriority}
-                assignedTo={task.displayAssignedTo}
-              />
-            ))
-          ) : (
-            <div className="col-span-1 md:col-span-2 lg:col-span-3 py-8 text-center text-gray-500">
-              {" "}
-              {/* Ensure full width */}
-              <p>No tasks found matching your filters.</p>
-            </div>
-          )}
-        </div>
-      )}
-      {/* Refresh button */}
-      <div className="flex justify-center mt-6">
-        <Button
-          variant="outline"
-          onClick={fetchTasks}
-          className="flex items-center gap-2"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            "Refresh Tasks"
-          )}
-        </Button>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in-progress">In Progress</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priority</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mt-6">
+        {isLoading ? (
+          <LoadingScreen
+            variant="inline"
+            message="Loading processor tasks..."
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTasks.length === 0 ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">
+                  No tasks found matching your criteria.
+                </p>
+              </div>
+            ) : (
+              filteredTasks.map((task, index) => (
+                <TaskCard
+                  key={index}
+                  id={task.projectTaskId || task.displayId}
+                  title={task.displayTitle}
+                  description={task.displayDescription || "No description"}
+                  dueDate={task.displayDueDate || ""}
+                  status={task.calculatedStatus}
+                  priority={task.calculatedPriority}
+                />
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

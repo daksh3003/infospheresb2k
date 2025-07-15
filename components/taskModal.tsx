@@ -71,6 +71,7 @@ interface FileFormData {
     name: string;
     email: string;
     role: string;
+    assigned_at: string;
   }[];
 }
 
@@ -1188,6 +1189,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                                         name: processor.name,
                                                         email: processor.email,
                                                         role: processor.role,
+                                                        assigned_at:
+                                                          new Date().toISOString(),
                                                       },
                                                     ];
                                                   }
