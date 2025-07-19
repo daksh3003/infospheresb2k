@@ -13,6 +13,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { Comments } from "@/components/Comments";
 import { FooterButtons } from "@/components/FooterButtons";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { DownloadHistory } from "@/components/DownloadHistory";
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -83,6 +84,9 @@ export default function TaskDetailPage() {
   const [selectedUserData, setSelectedUserData] = useState<any>({});
   const [isAssigning, setIsAssigning] = useState(false);
   const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
+
+  // Download history refresh trigger
+  const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
   // Handle task actions
   const handleStartTask = async () => {
@@ -453,6 +457,75 @@ export default function TaskDetailPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+
+      // Log the download to database
+      if (currentUser) {
+        try {
+          // Generate a unique file_id based on file name and path
+          const file_id = `${storage_name}_${folder_path}_${fileName}`;
+
+          // Check if a record for this file already exists
+          const { data: existingRecord, error: checkError } = await supabase
+            .from("track_downloads")
+            .select("id, downloaded_details")
+            .eq("file_id", file_id)
+            .eq("task_id", taskId)
+            .single();
+
+          if (checkError && checkError.code !== "PGRST116") {
+            console.error("Error checking existing record:", checkError);
+            return;
+          }
+
+          const downloadDetail = {
+            name: currentUser.full_name || "Unknown User",
+            email: currentUser.email || "",
+            role: currentUser.role || "user",
+            time: new Date().toISOString(),
+          };
+
+          if (existingRecord) {
+            // Update existing record by appending to downloaded_details array
+            const updatedDetails = [
+              ...(existingRecord.downloaded_details || []),
+              downloadDetail,
+            ];
+
+            const { error: updateError } = await supabase
+              .from("track_downloads")
+              .update({ downloaded_details: updatedDetails })
+              .eq("id", existingRecord.id);
+
+            if (updateError) {
+              console.error("Error updating download record:", updateError);
+            } else {
+              // Refresh download history
+              setDownloadHistoryRefresh((prev) => prev + 1);
+            }
+          } else {
+            // Create new record
+            const { error: insertError } = await supabase
+              .from("track_downloads")
+              .insert({
+                task_id: taskId,
+                file_id: file_id,
+                file_name: fileName,
+                storage_name: storage_name,
+                folder_path: folder_path,
+                downloaded_details: [downloadDetail],
+              });
+
+            if (insertError) {
+              console.error("Error creating download record:", insertError);
+            } else {
+              // Refresh download history
+              setDownloadHistoryRefresh((prev) => prev + 1);
+            }
+          }
+        } catch (error) {
+          console.error("Error logging download:", error);
+        }
+      }
     } catch (error) {
       console.error("Error downloading file:", error);
     }
@@ -493,6 +566,33 @@ export default function TaskDetailPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+
+      // Log the download to database
+      if (currentUser) {
+        const { error: logError } = await supabase
+          .from("track_downloads")
+          .insert({
+            task_id: taskId,
+            file_name: fileName,
+            storage_name: storage_name,
+            folder_path: folder_path,
+            downloaded_details: [
+              {
+                name: currentUser.name || "Unknown User",
+                email: currentUser.email || "",
+                role: currentUser.role || "user",
+                time: new Date().toISOString(),
+              },
+            ],
+          });
+
+        if (logError) {
+          console.error("Error logging download:", logError);
+        } else {
+          // Refresh download history
+          setDownloadHistoryRefresh((prev) => prev + 1);
+        }
+      }
     } catch (error) {
       console.error("Error downloading file:", error);
     }
@@ -1047,6 +1147,12 @@ export default function TaskDetailPage() {
           onAssignTask={handleAssignTask}
         />
       </div>
+
+      {/* Download History */}
+      <DownloadHistory
+        taskId={taskId}
+        refreshTrigger={downloadHistoryRefresh}
+      />
 
       {/* Tabs navigation */}
       <div className="border-b border-gray-200 mb-6">
