@@ -36,6 +36,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUserRole, setCurrentUserRole] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleLogout = async () => {
     try {
@@ -93,6 +94,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       } = await supabase.auth.getUser();
       console.log(user?.user_metadata.role);
       setCurrentUserRole(user?.user_metadata.role);
+      // console.log(user?.user_metadata.name );
+      setCurrentUser(user);
     };
     fetchUser();
   }, []);
@@ -119,7 +122,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <Avatar>
             {/* <AvatarImage src="/avatars/user.png" /> */}
             <AvatarFallback className="bg-blue-800 text-white">
-              US
+              {currentUser?.user_metadata?.name
+                ? currentUser.user_metadata.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                : currentUser?.email?.charAt(0).toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -207,12 +216,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Avatar className="h-8 w-8 mr-3">
                       {/* <AvatarImage src="/avatars/user.png" /> */}
                       <AvatarFallback className="bg-blue-900 text-white">
-                        US
+                        {currentUser?.user_metadata?.name
+                          ? currentUser.user_metadata.name
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .join("")
+                              .toUpperCase()
+                          : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">User Name</p>
-                      <p className="text-xs text-blue-300">user@example.com</p>
+                      <p className="font-medium">
+                        {currentUser?.user_metadata?.name || "User Name"}
+                      </p>
+                      <p className="text-xs text-blue-300">
+                        {currentUser?.email || "user@example.com"}
+                      </p>
                     </div>
                   </div>
                 </Button>
@@ -254,7 +273,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Avatar>
                     {/* <AvatarImage src="/avatars/user.png" alt="User" /> */}
                     <AvatarFallback className="bg-blue-800 text-white">
-                      US
+                      {currentUser?.user_metadata?.name
+                        ? currentUser.user_metadata.name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                            .toUpperCase()
+                        : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
                 </Button>

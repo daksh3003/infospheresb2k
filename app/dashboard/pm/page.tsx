@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
@@ -142,7 +143,7 @@ export default function DashboardPage() {
             current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
           };
         });
-        console.log("processedTasks", processedTasks);
+        console.log("processedTasks : ", processedTasks);
         setTasks(processedTasks);
 
         // Get unique project IDs and fetch their names
@@ -277,49 +278,84 @@ export default function DashboardPage() {
   // Function to render grouped tasks
   const renderGroupedTasks = (tasks: ProjectTask[]) => {
     return Object.values(projectGroups).map((group, index) => (
-      <Card key={index} className="overflow-hidden">
-        <CardHeader
-          className="cursor-pointer bg-gray-50 dark:bg-gray-800"
+      <div
+        key={index}
+        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+      >
+        {/* Project Header */}
+        <div
+          className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 border-b border-gray-200 dark:border-gray-600"
           onClick={() => toggleProjectExpansion(group.projectId)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {expandedProjects.has(group.projectId) ? (
-                <ChevronUp className="h-5 w-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-gray-500" />
-              )}
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                {expandedProjects.has(group.projectId) ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </div>
               <div>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {group.projectName}
-                </CardTitle>
-                <p className="text-sm text-gray-500">
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {group.completedCount} of {group.totalCount} tasks completed
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-48">
-                <Progress value={group.completionPercentage} className="h-2" />
+            <div className="flex items-center gap-6">
+              <div className="flex flex-col items-end gap-2">
+                <div className="w-48">
+                  <Progress
+                    value={group.completionPercentage}
+                    className="h-2"
+                  />
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Progress: {group.completionPercentage}%
+                </span>
               </div>
               <Badge
-                className={
+                className={`px-3 py-1.5 text-sm font-medium ${
                   group.completionPercentage === 100
-                    ? "bg-green-500 text-white"
-                    : "bg-blue-500 text-white"
-                }
+                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
+                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                }`}
               >
-                {group.completionPercentage}%
-                {group.completionPercentage === 100 && (
-                  <CheckCircle2 className="h-4 w-4 ml-1" />
+                {group.completionPercentage === 100 ? (
+                  <span className="flex items-center">
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Complete
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    In Progress
+                  </span>
                 )}
               </Badge>
             </div>
           </div>
-        </CardHeader>
+        </div>
+
+        {/* Tasks Section */}
         {expandedProjects.has(group.projectId) && (
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 gap-4">
+          <div>
+            {/* Table Header */}
+            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="flex-1">Task Details</div>
+                <div className="min-w-[120px] text-center">Due Date</div>
+                <div className="min-w-[100px] text-center">Status</div>
+                <div className="min-w-[80px] text-center">Priority</div>
+                <div className="min-w-[140px] text-center">Actions</div>
+                <div className="min-w-[80px] text-right">Task ID</div>
+              </div>
+            </div>
+            {/* Task Rows */}
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {group.tasks.map((task, index) => (
                 <TaskCard
                   key={index}
@@ -334,9 +370,9 @@ export default function DashboardPage() {
                 />
               ))}
             </div>
-          </CardContent>
+          </div>
         )}
-      </Card>
+      </div>
     ));
   };
 
@@ -477,7 +513,7 @@ export default function DashboardPage() {
           {isLoading ? (
             <LoadingScreen variant="inline" message="Loading tasks..." />
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
@@ -498,7 +534,7 @@ export default function DashboardPage() {
               message="Loading processor tasks..."
             />
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {filteredTasks.filter(
                 (task) => task.current_stage === "Processor"
               ).length === 0 ? (
@@ -520,7 +556,7 @@ export default function DashboardPage() {
           {isLoading ? (
             <LoadingScreen variant="inline" message="Loading QC tasks..." />
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {filteredTasks.filter((task) => task.current_stage === "QC")
                 .length === 0 ? (
                 <div className="text-center py-8">
@@ -539,7 +575,7 @@ export default function DashboardPage() {
           {isLoading ? (
             <LoadingScreen variant="inline" message="Loading QA tasks..." />
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {filteredTasks.filter((task) => task.current_stage === "QA")
                 .length === 0 ? (
                 <div className="text-center py-8">
