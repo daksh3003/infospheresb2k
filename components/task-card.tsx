@@ -2,14 +2,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Clock,
   Calendar,
   ArrowRight,
@@ -35,10 +27,9 @@ interface TaskCardProps {
   title: string;
   description: string;
   dueDate: string;
+  dueTime?: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedTo?: string;
-  assignedAvatar?: string;
   onClick?: () => void;
   onSendToQC?: (taskIterationId: string) => void;
   isActionableByPM?: boolean;
@@ -50,10 +41,9 @@ export function TaskCard({
   title,
   description,
   dueDate,
+  dueTime,
   status,
   priority,
-  assignedTo,
-  assignedAvatar,
   onClick,
   onSendToQC,
   isActionableByPM,
@@ -116,9 +106,9 @@ export function TaskCard({
   return (
     <div className="w-full border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
       <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="grid grid-cols-5 gap-4 items-center">
           {/* Left side - Title and Description */}
-          <div className="flex-1 min-w-0 pr-6">
+          <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-1">
               {title}
             </h3>
@@ -127,32 +117,39 @@ export function TaskCard({
             </p>
           </div>
 
-          {/* Center - Due Date */}
-          <div className="flex items-center text-gray-600 dark:text-gray-400 min-w-[120px]">
+          {/* Due Date */}
+          <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
             <Calendar className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
-            <span className="text-xs">
-              {dueDate && dueDate !== "null" && dueDate !== "undefined"
-                ? (() => {
-                    try {
-                      const date = new Date(dueDate);
-                      if (isNaN(date.getTime())) {
+            <div className="flex flex-col items-center">
+              <span className="text-xs">
+                {dueDate && dueDate !== "null" && dueDate !== "undefined"
+                  ? (() => {
+                      try {
+                        const date = new Date(dueDate);
+                        if (isNaN(date.getTime())) {
+                          return "No due date";
+                        }
+                        return date.toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        });
+                      } catch {
                         return "No due date";
                       }
-                      return date.toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      });
-                    } catch (error) {
-                      return "No due date";
-                    }
-                  })()
-                : "No due date"}
-            </span>
+                    })()
+                  : "No due date"}
+              </span>
+              {dueTime && dueTime !== "null" && dueTime !== "undefined" && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {dueTime}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Status Badge */}
-          <div className="flex items-center min-w-[100px] justify-center">
+          <div className="flex items-center justify-center">
             <Badge
               className={`${
                 statusColor[status] || statusColor["pending"]
@@ -167,7 +164,7 @@ export function TaskCard({
           </div>
 
           {/* Priority Badge */}
-          <div className="flex items-center min-w-[80px] justify-center">
+          <div className="flex items-center justify-center">
             <Badge
               className={`${
                 priorityColor[priority] || priorityColor["medium"]
@@ -177,30 +174,8 @@ export function TaskCard({
             </Badge>
           </div>
 
-          {/* Assignment */}
-          {assignedTo && (
-            <div className="flex items-center min-w-[120px] justify-center">
-              <div className="flex items-center">
-                {assignedAvatar ? (
-                  <img
-                    src={assignedAvatar}
-                    alt={assignedTo.substring(0, 15)}
-                    className="w-5 h-5 rounded-full mr-2 border border-gray-200 dark:border-gray-600"
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center text-xs font-medium mr-2">
-                    {assignedTo.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="text-xs text-gray-700 dark:text-gray-300 truncate max-w-[80px]">
-                  {assignedTo}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Actions */}
-          <div className="flex items-center space-x-2 min-w-[140px] justify-end">
+          <div className="flex items-center justify-center space-x-2">
             <Button
               variant="ghost"
               size="sm"
@@ -227,11 +202,6 @@ export function TaskCard({
                 {isLoadingAction ? "..." : "QC"}
               </Button>
             )}
-          </div>
-
-          {/* Task ID */}
-          <div className="text-xs text-gray-400 dark:text-gray-500 font-mono min-w-[80px] text-right">
-            {id}
           </div>
         </div>
       </div>

@@ -49,6 +49,8 @@ interface ProjectTask {
   priority?: "low" | "medium" | "high" | "critical";
   current_stage?: "Processor" | "QC" | "QA";
   type: "pm" | "qc" | "qa";
+  project_delivery_date?: string;
+  project_delivery_time?: string;
 }
 
 interface ProjectGroup {
@@ -73,9 +75,13 @@ export default function DashboardPage() {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     new Set()
   );
-  const [projectNames, setProjectNames] = useState<{ [key: string]: string }>(
-    {}
-  );
+  const [projectNames, setProjectNames] = useState<{
+    [key: string]: {
+      name: string;
+      delivery_date: string;
+      delivery_time: string;
+    };
+  }>({});
 
   const router = useRouter();
 
@@ -88,14 +94,27 @@ export default function DashboardPage() {
     try {
       const { data, error } = await supabase
         .from("projects_test")
-        .select("project_id, project_name")
+        .select("project_id, project_name, delivery_date, delivery_time")
         .in("project_id", projectIds);
 
       if (error) throw error;
 
       const projectNameMap = data.reduce(
-        (acc: { [key: string]: string }, project) => {
-          acc[project.project_id] = project.project_name;
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              delivery_date: string;
+              delivery_time: string;
+            };
+          },
+          project
+        ) => {
+          acc[project.project_id] = {
+            name: project.project_name,
+            delivery_date: project.delivery_date,
+            delivery_time: project.delivery_time,
+          };
           return acc;
         },
         {}
@@ -255,7 +274,7 @@ export default function DashboardPage() {
       if (!groups[projectId]) {
         groups[projectId] = {
           projectId,
-          projectName: projectNames[projectId] || "Unnamed Project",
+          projectName: projectNames[projectId]?.name || "Unnamed Project",
           tasks: [],
           completedCount: 0,
           totalCount: 0,
@@ -345,13 +364,12 @@ export default function DashboardPage() {
           <div>
             {/* Table Header */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                <div className="flex-1">Task Details</div>
-                <div className="min-w-[120px] text-center">Due Date</div>
-                <div className="min-w-[100px] text-center">Status</div>
-                <div className="min-w-[80px] text-center">Priority</div>
-                <div className="min-w-[140px] text-center">Actions</div>
-                <div className="min-w-[80px] text-right">Task ID</div>
+              <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="col-span-2">Task Details</div>
+                <div className="text-center">Due Date</div>
+                <div className="text-center">Status</div>
+                <div className="text-center">Priority</div>
+                <div className="text-center">Actions</div>
               </div>
             </div>
             {/* Task Rows */}
@@ -364,7 +382,8 @@ export default function DashboardPage() {
                   description={
                     task.client_instruction || "No description available"
                   }
-                  dueDate={task.delivery_date}
+                  dueDate={projectNames[task.project_id]?.delivery_date || ""}
+                  dueTime={projectNames[task.project_id]?.delivery_time || ""}
                   status={task.status || "pending"}
                   priority={task.priority || "medium"}
                 />
@@ -594,7 +613,7 @@ export default function DashboardPage() {
       <TaskModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateTask}
+        onTaskAdded={handleCreateTask}
       />
     </div>
   );

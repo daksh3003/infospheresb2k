@@ -66,11 +66,54 @@ export default function QCDashboard() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<QCDashboardTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [projectNames, setProjectNames] = useState<{
+    [key: string]: {
+      name: string;
+      delivery_date: string;
+      delivery_time: string;
+    };
+  }>({});
 
   useEffect(() => {
     setMounted(true);
     fetchTasks();
   }, []);
+
+  const fetchProjectNames = async (projectIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from("projects_test")
+        .select("project_id, project_name, delivery_date, delivery_time")
+        .in("project_id", projectIds);
+
+      if (error) throw error;
+
+      const projectNameMap = data.reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              delivery_date: string;
+              delivery_time: string;
+            };
+          },
+          project
+        ) => {
+          acc[project.project_id] = {
+            name: project.project_name,
+            delivery_date: project.delivery_date,
+            delivery_time: project.delivery_time,
+          };
+          return acc;
+        },
+        {}
+      );
+
+      setProjectNames(projectNameMap);
+    } catch (error) {
+      console.error("Error fetching project names:", error);
+    }
+  };
 
   const fetchTasks = async () => {
     setIsLoading(true);
@@ -84,7 +127,7 @@ export default function QCDashboard() {
           status_flag, 
           task_id, 
           iteration_number, 
-          tasks_test ( task_name, task_id )
+          tasks_test ( task_name, task_id, project_id )
         `
         )
         .eq("current_stage", "QC");
@@ -94,7 +137,7 @@ export default function QCDashboard() {
         setTasks([]);
       } else if (data && data.length > 0) {
         const processedTasks: QCDashboardTask[] = data.map((item: any) => ({
-          projectId: item.tasks_test?.task_id || item.task_id || "unknown",
+          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
           projectName: item.tasks_test?.task_name || "No Project Name",
           projectTaskId: item.tasks_test?.task_id || null,
           clientInstruction: null,
@@ -125,6 +168,12 @@ export default function QCDashboard() {
         }));
         console.log("processedTasks : ", processedTasks);
         setTasks(processedTasks);
+
+        // Get unique project IDs and fetch their names and delivery info
+        const uniqueProjectIds = [
+          ...new Set(processedTasks.map((task) => task.projectId)),
+        ];
+        await fetchProjectNames(uniqueProjectIds);
       } else {
         setTasks([]);
       }
@@ -248,7 +297,8 @@ export default function QCDashboard() {
                   id={task.projectTaskId || task.displayId}
                   title={task.title}
                   description={task.description}
-                  dueDate={task.dueDate}
+                  dueDate={projectNames[task.projectId]?.delivery_date || ""}
+                  dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.status}
                   priority={task.priority}
                 />
