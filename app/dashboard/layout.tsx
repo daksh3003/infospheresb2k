@@ -25,7 +25,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { supabase } from "@/utils/supabase"; // Import supabase
+import { api } from "@/utils/api";
+import { supabase } from "@/utils/supabase";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -125,7 +126,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {currentUser?.user_metadata?.name
                 ? currentUser.user_metadata.name
                     .split(" ")
-                    .map((n) => n[0])
+                    .map((n: string) => n[0])
                     .join("")
                     .toUpperCase()
                 : currentUser?.email?.charAt(0).toUpperCase() || "U"}

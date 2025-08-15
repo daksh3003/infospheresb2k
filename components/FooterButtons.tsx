@@ -8,6 +8,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { ArrowBigUpDashIcon } from "lucide-react";
+import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 import {
   DropdownMenu,
@@ -56,50 +57,22 @@ export const FooterButtons = ({
 
   const fetchAvailableUsers = async () => {
     try {
-      const { data: users, error } = await supabase
-        .from("profiles")
-        .select("*");
-
-      if (error) {
-        console.error("Error fetching users:", error);
-        return;
-      }
-
-      // Filter users based on current stage
-      const filteredUsers = users?.filter((user) => {
-        switch (currentStage) {
-          case "Processor":
-            return user.role === "processor";
-          case "QC":
-            return user.role === "qcTeam";
-          case "QA":
-            return user.role === "qaTeam";
-          default:
-            return true;
-        }
-      });
-
-      setAvailableUsers(filteredUsers || []);
+      const result = await api.getAvailableUsers(currentStage);
+      setAvailableUsers(result.users || []);
     } catch (error) {
       console.error("Error in fetchAvailableUsers:", error);
     }
   };
 
   const fetchAssignedTo = async () => {
-    const { data, error } = await supabase
-      .from("files_test")
-      .select("assigned_to")
-      .eq("task_id", taskId)
-      .single();
-
-    if (error && error.code !== "PGRST116") {
+    try {
+      const result = await api.getTaskDetails(taskId);
+      const assignedUsers = result.assignedTo || [];
+      setAssignedTo(assignedUsers);
+      setHasAssignedUsers(assignedUsers.length > 0);
+    } catch (error) {
       console.error("Error fetching assigned to:", error);
-      return;
     }
-
-    const assignedUsers = data?.assigned_to || [];
-    setAssignedTo(assignedUsers);
-    setHasAssignedUsers(assignedUsers.length > 0);
   };
 
   // const handleAssignUser = async (user: any) => {
@@ -146,54 +119,7 @@ export const FooterButtons = ({
 
     setIsPickingUp(true);
     try {
-      const now = new Date().toISOString();
-
-      // Create assignment entry in the same format as handleAssignTask
-      const newAssignment = {
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role,
-        user_id: currentUser.id,
-        assigned_at: now,
-      };
-
-      const logData = {
-        task_id: taskId,
-        assigned_to: [newAssignment],
-      };
-
-      // Check if record exists
-      const { data: existingLog, error: fetchError } = await supabase
-        .from("files_test")
-        .select("assigned_to")
-        .eq("task_id", taskId)
-        .single();
-
-      if (fetchError && fetchError.code !== "PGRST116") {
-        throw fetchError;
-      }
-
-      if (existingLog) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from("files_test")
-          .update({ assigned_to: logData.assigned_to })
-          .eq("task_id", taskId);
-
-        if (updateError) {
-          throw updateError;
-        }
-      } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from("files_test")
-          .insert(logData);
-
-        if (insertError) {
-          throw insertError;
-        }
-      }
-
+      await api.pickupTask(taskId, currentUser);
       toast.success("Task picked up successfully!");
       setShowPickupDialog(false);
       await fetchAssignedTo(); // Refresh the assigned users

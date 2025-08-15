@@ -7,6 +7,7 @@ import {
   X,
   AlertCircle,
 } from "lucide-react";
+import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 
 interface DownloadDetail {
@@ -43,46 +44,8 @@ export const DownloadHistory: React.FC<DownloadHistoryProps> = ({
 
   const fetchDownloadHistory = async () => {
     try {
-      const { data, error } = await supabase
-        .from("track_downloads")
-        .select(
-          `
-          id,
-          task_id,
-          file_id,
-          file_name,
-          storage_name,
-          folder_path,
-          downloaded_details
-        `
-        )
-        .eq("task_id", taskId)
-        .order("file_name", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching download history:", error);
-        return;
-      }
-
-      // Sort downloaded_details by time (latest first) for each record
-      const sortedData = (data as DownloadRecord[]).map((record) => ({
-        ...record,
-        downloaded_details:
-          record.downloaded_details?.sort(
-            (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
-          ) || [],
-      }));
-
-      // Sort files by their latest download time (most recent first)
-      const filesSortedByLatestDownload = sortedData.sort((a, b) => {
-        const aLatestTime = a.downloaded_details?.[0]?.time || "1970-01-01";
-        const bLatestTime = b.downloaded_details?.[0]?.time || "1970-01-01";
-        return (
-          new Date(bLatestTime).getTime() - new Date(aLatestTime).getTime()
-        );
-      });
-
-      setDownloadHistory(filesSortedByLatestDownload);
+      const result = await api.getDownloadHistory(taskId);
+      setDownloadHistory(result.downloadHistory);
     } catch (error) {
       console.error("Error fetching download history:", error);
     } finally {

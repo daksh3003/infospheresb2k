@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../utils/supabase";
+import { api } from "../../../utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 export default function Signup() {
@@ -46,35 +46,7 @@ export default function Signup() {
     setError(null);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-            role: role,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      // Create a profile record
-      if (data.user) {
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: data.user.id,
-          name: formData.name,
-          email: formData.email,
-          role: role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-          // Continue even if profile creation fails
-        }
-      }
+      await api.signup(formData.email, formData.password, formData.name, role);
 
       // Redirect to verify email page
       router.push(

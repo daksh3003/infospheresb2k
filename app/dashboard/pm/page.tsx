@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
-import { supabase } from "@/utils/supabase";
+import { api } from "@/utils/api";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
@@ -90,87 +90,12 @@ export default function DashboardPage() {
     fetchTasks();
   }, []);
 
-  const fetchProjectNames = async (projectIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
-        .in("project_id", projectIds);
-
-      if (error) throw error;
-
-      const projectNameMap = data.reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              delivery_date: string;
-              delivery_time: string;
-            };
-          },
-          project
-        ) => {
-          acc[project.project_id] = {
-            name: project.project_name,
-            delivery_date: project.delivery_date,
-            delivery_time: project.delivery_time,
-          };
-          return acc;
-        },
-        {}
-      );
-
-      setProjectNames(projectNameMap);
-    } catch (error) {
-      console.error("Error fetching project names:", error);
-    }
-  };
-
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      // First get all projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from("tasks_test")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (projectsError) throw projectsError;
-
-      // Then get the current stage for each project
-      const { data: iterationsData, error: iterationsError } = await supabase
-        .from("task_iterations")
-        .select("task_id, current_stage");
-
-      if (iterationsError) throw iterationsError;
-
-      // Create a map of project_id to current_stage
-      const stageMap = iterationsData.reduce((acc: any, curr) => {
-        acc[curr.task_id] = curr.current_stage;
-        return acc;
-      }, {});
-
-      console.log("stageMap", stageMap);
-
-      if (projectsData) {
-        const processedTasks = projectsData.map((task) => {
-          return {
-            ...task,
-            status: calculateStatus(task.delivery_date, task.completion_status),
-            priority: calculatePriority(task.delivery_date, task.po_hours),
-            type: getTaskType(task.process_type),
-            current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
-          };
-        });
-        console.log("processedTasks : ", processedTasks);
-        setTasks(processedTasks);
-
-        // Get unique project IDs and fetch their names
-        const uniqueProjectIds = [
-          ...new Set(processedTasks.map((task) => task.project_id)),
-        ];
-        await fetchProjectNames(uniqueProjectIds);
-      }
+      const result = await api.getPMDashboard();
+      setTasks(result.tasks);
+      setProjectNames(result.projectNames);
     } catch (error) {
       console.error("Error fetching tasks:", error);
     } finally {

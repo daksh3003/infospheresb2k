@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { supabase } from "@/utils/supabase";
+import { api } from "@/utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface QCDashboardTask {
@@ -79,106 +79,14 @@ export default function QCDashboard() {
     fetchTasks();
   }, []);
 
-  const fetchProjectNames = async (projectIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
-        .in("project_id", projectIds);
-
-      if (error) throw error;
-
-      const projectNameMap = data.reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              delivery_date: string;
-              delivery_time: string;
-            };
-          },
-          project
-        ) => {
-          acc[project.project_id] = {
-            name: project.project_name,
-            delivery_date: project.delivery_date,
-            delivery_time: project.delivery_time,
-          };
-          return acc;
-        },
-        {}
-      );
-
-      setProjectNames(projectNameMap);
-    } catch (error) {
-      console.error("Error fetching project names:", error);
-    }
-  };
-
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("task_iterations")
-        .select(
-          `
-          id, 
-          current_stage, 
-          status_flag, 
-          task_id, 
-          iteration_number, 
-          tasks_test ( task_name, task_id, project_id )
-        `
-        )
-        .eq("current_stage", "QC");
-
-      if (error) {
-        console.error("Error fetching QC tasks:", error);
-        setTasks([]);
-      } else if (data && data.length > 0) {
-        const processedTasks: QCDashboardTask[] = data.map((item: any) => ({
-          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
-          projectName: item.tasks_test?.task_name || "No Project Name",
-          projectTaskId: item.tasks_test?.task_id || null,
-          clientInstruction: null,
-          deliveryDate: null,
-          processType: null,
-          poHours: null,
-          isProjectOverallComplete: false,
-          taskIterationId: item.id,
-          iterationNumber: item.iteration_number || 1,
-          currentStage: item.current_stage,
-          statusFlag: item.status_flag || null,
-          iterationNotes: null,
-          currentFileVersionId: null,
-          currentFileName: null,
-          calculatedStatus: "pending",
-          calculatedPriority: "medium",
-          displayId: item.id,
-          displayTitle: item.tasks_test?.task_name || "No Project Name",
-          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
-          displayDueDate: null,
-          displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
-          title: item.tasks_test?.task_name || "No Project Name",
-          description: `Status Flag: ${item.status_flag || "N/A"}`,
-          status: "pending",
-          priority: "medium",
-          dueDate: "",
-          assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
-        }));
-        console.log("processedTasks : ", processedTasks);
-        setTasks(processedTasks);
-
-        // Get unique project IDs and fetch their names and delivery info
-        const uniqueProjectIds = [
-          ...new Set(processedTasks.map((task) => task.projectId)),
-        ];
-        await fetchProjectNames(uniqueProjectIds);
-      } else {
-        setTasks([]);
-      }
+      const result = await api.getQCDashboard();
+      setTasks(result.tasks);
+      setProjectNames(result.projectNames);
     } catch (error) {
-      console.error("Error in fetchTasks:", error);
+      console.error("Error fetching tasks:", error);
       setTasks([]);
     } finally {
       setIsLoading(false);

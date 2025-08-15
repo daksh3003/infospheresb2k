@@ -7,6 +7,7 @@ import Modal from "@mui/material/Modal";
 import { Clock, DownloadCloud, Paperclip, CheckCircle } from "react-feather";
 import { ChevronDown, ChevronUp } from "react-feather";
 import "./Timeline.css";
+import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 import { useParams } from "next/navigation";
 
@@ -62,96 +63,12 @@ export default function TimelineModal({
   const [timelineItems, setTimelineItems] = React.useState<any[]>([]);
 
   const fetchTimelineItems = async () => {
-    const { data: stages, error: timelineError } = await supabase
-      .from("task_iterations")
-      .select("stages")
-      .eq("task_id", taskId)
-      .single();
-    if (timelineError) {
-      console.log("Error fetching timeline items:", timelineError);
-      return;
+    try {
+      const result = await api.getTaskTimeline(taskId);
+      setTimelineItems(result.timelineItems || []);
+    } catch (error) {
+      console.log("Error fetching timeline items:", error);
     }
-    console.log("stages : ", stages);
-    const stagesArray = stages.stages;
-    const len = stagesArray.length;
-
-    let timelineItems: any[] = [];
-
-    let cnt_of_processor = 1;
-
-    for (let i = 0; i < len; i++) {
-      console.log("i : ", i);
-
-      let folder_path = "";
-      let storage_name = "";
-      let current_stage = "";
-
-      if (stagesArray[i] === "PM") {
-        folder_path = taskId;
-        storage_name = "task-files";
-        current_stage = "PM";
-      } else if (stagesArray[i] === "Processor") {
-        if (stagesArray[i - 1] === "PM") {
-          folder_path = `PM_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        } else if (stagesArray[i - 1] === "QC") {
-          folder_path = `QC_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        } else if (stagesArray[i - 1] === "QA") {
-          folder_path = `QA_${taskId}`;
-          storage_name = "processor-files";
-          current_stage = "Processor (" + cnt_of_processor + ")";
-        }
-        cnt_of_processor++;
-      } else if (stagesArray[i] === "QC") {
-        folder_path = taskId;
-        storage_name = "qc-files";
-        current_stage = "QC";
-      } else if (stagesArray[i] === "QA") {
-        folder_path = taskId;
-        storage_name = "qa-files";
-        current_stage = "QA";
-      } else if (stagesArray[i] === "Delivery") {
-        // console.log("cnt_of_processor : ", cnt_of_processor);
-        if (cnt_of_processor == 2) {
-          folder_path = `PM_${taskId}`;
-        } else if (cnt_of_processor == 3) {
-          folder_path = `QC_${taskId}`;
-        } else if (cnt_of_processor == 4) {
-          folder_path = `QA_${taskId}`;
-        }
-        storage_name = "processor-files";
-        current_stage = "Delivery";
-      }
-
-      const { data: uploadedFiles, error: uploadedFilesError } =
-        await supabase.storage.from(storage_name).list(folder_path);
-      if (uploadedFilesError) {
-        console.log("Error fetching uploaded files:" + i, uploadedFilesError);
-        return;
-      }
-
-      const timelineItem = {
-        id: taskId,
-        title: current_stage,
-        content: uploadedFiles.map((file, index) => ({
-          name: file.name,
-          onClick: () => {
-            handleDownload(file.name, storage_name, folder_path, index);
-          },
-        })),
-        completed: true,
-        date: new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        }),
-      };
-
-      timelineItems.push(timelineItem);
-    }
-    console.log("timelineItems : ", timelineItems);
-    setTimelineItems(timelineItems);
   };
 
   const toggleCard = (id: number) => {
@@ -159,40 +76,6 @@ export default function TimelineModal({
       ...prev,
       [id]: !prev[id],
     }));
-  };
-
-  const ProcessForDownload = (
-    itemIdx: any,
-    fileIdx: number,
-    fileName: string
-  ) => {
-    let storage_name = "";
-    let folder_path = "";
-    if (timelineItems[itemIdx].title === "PM") {
-      storage_name = "task-files";
-      folder_path = timelineItems[itemIdx].id;
-    } else if (
-      timelineItems[itemIdx].title === "Processor (1)"
-      // items[itemIdx - 1].title === "PM"
-    ) {
-      storage_name = "processor-files";
-      folder_path = `PM_${timelineItems[itemIdx].id}`;
-    } else if (
-      timelineItems[itemIdx].title === "Processor (2)"
-      // items[itemIdx - 1].title === "QC"
-    ) {
-      storage_name = "processor-files";
-      folder_path = `QC_${timelineItems[itemIdx].id}`;
-    } else if (
-      timelineItems[itemIdx].title === "Processor (3)"
-      // items[itemIdx - 1].title === "QA"
-    ) {
-      storage_name = "processor-files";
-      folder_path = `QA_${timelineItems[itemIdx].id}`;
-    } else if (timelineItems[itemIdx].title === "QA") {
-    }
-
-    handleDownload(fileName, storage_name, folder_path, fileIdx);
   };
 
   useEffect(() => {
@@ -324,10 +207,11 @@ export default function TimelineModal({
                                 </div>
                                 <button
                                   onClick={() =>
-                                    ProcessForDownload(
-                                      index,
-                                      fileIdx,
-                                      file.name
+                                    handleDownload(
+                                      file.name,
+                                      file.storage_name,
+                                      file.folder_path,
+                                      file.index
                                     )
                                   }
                                   className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"

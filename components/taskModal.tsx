@@ -31,6 +31,7 @@ import { Badge } from "./ui/badge";
 import type { SelectedItems } from "@heroui/react";
 import { Select, SelectItem, Avatar, Chip } from "@heroui/react";
 
+import { api } from "../utils/api";
 import { supabase } from "../utils/supabase";
 
 interface TaskModalProps {
@@ -189,13 +190,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     const fetchProcessors = async () => {
       try {
-        const { data: processorData, error } = await supabase
-          .from("profiles")
-          .select("id, name, email, role")
-          .eq("role", "processor");
-
-        if (error) throw error;
-        setProcessors(processorData);
+        const result = await api.getAvailableUsers("Processor");
+        setProcessors(result.users || []);
       } catch (error) {
         console.error("Error fetching processors:", error);
         toast.error("Failed to load processors");
@@ -436,168 +432,19 @@ const TaskModal: React.FC<TaskModalProps> = ({
         return;
       }
 
-      // 1. Create project in projects_test table
-      const { data: projectResult, error: projectError } = await supabase
-        .from("projects_test")
-        .insert([
-          {
-            ...projectData,
-            list_of_files: selectedFiles.map((f) => f.name),
-          },
-        ])
-        .select("project_id")
-        .single();
+      await api.createProject(
+        projectData,
+        fileGroups,
+        selectedFiles,
+        currentUser
+      );
 
-      if (projectError) {
-        console.error("Error creating project:", projectError);
-        toast.error(`Failed to create project: ${projectError.message}`);
-        return;
-      }
-
-      const projectId = projectResult.project_id;
-
-      // 2. Create tasks and files for each group
-      for (let groupIndex = 0; groupIndex < fileGroups.length; groupIndex++) {
-        const group = fileGroups[groupIndex];
-
-        // Create task
-        const { data: taskResult, error: taskError } = await supabase
-          .from("tasks_test")
-          .insert([
-            {
-              ...group.taskData,
-              project_id: projectId,
-            },
-          ])
-          .select("task_id")
-          .single();
-
-        if (taskError) {
-          console.error("Error creating task:", taskError);
-          toast.error(
-            `Failed to create task ${groupIndex + 1}: ${taskError.message}`
-          );
-          continue;
-        }
-
-        const taskId = taskResult.task_id;
-
-        const { data: taskIterationResult, error: taskIterationError } =
-          await supabase.from("task_iterations").insert([
-            {
-              task_id: taskId,
-              iteration_number: 1,
-              current_stage: "Processor",
-              sent_by: "PM",
-              stages: ["PM"],
-              notes: "",
-            },
-          ]);
-
-        if (taskIterationError) {
-          console.error("Error creating task iteration:", taskIterationError);
-          toast.error(
-            `Failed to create task iteration: ${taskIterationError.message}`
-          );
-          continue;
-        }
-
-        const { data: process_logs, error: process_logsError } = await supabase
-          .from("process_logs_test")
-          .insert([
-            {
-              task_id: taskId,
-              current_stage: "Processor",
-              sent_by: "PM",
-              assigned_to: [],
-            },
-          ]);
-
-        if (process_logsError) {
-          console.error("Error creating process logs:", process_logsError);
-          toast.error(
-            `Failed to create process logs: ${process_logsError.message}`
-          );
-          continue;
-        }
-
-        // Upload files and create file records
-        for (let fileIndex = 0; fileIndex < group.files.length; fileIndex++) {
-          const file = group.files[fileIndex];
-          const fileData = group.filesData[fileIndex];
-
-          // Upload file to storage
-          let date = new Date().toLocaleString("en-IN", {
-            timeZone: "Asia/Kolkata",
-          });
-          date = date.replaceAll("/", "-");
-          const filePathInStorage = `${taskId}/${date}_${file.name}`;
-
-          const { data: uploadData, error: uploadError } =
-            await supabase.storage
-              .from("task-files")
-              .upload(filePathInStorage, file, {
-                contentType: file.type,
-                upsert: true,
-              });
-
-          if (uploadError) {
-            console.error("Error uploading file:", uploadError);
-            toast.error(
-              `Failed to upload file ${file.name}: ${uploadError.message}`
-            );
-            continue;
-          }
-
-          console.log("fileData", fileData);
-
-          // Create file record
-          const { error: fileRecordError } = await supabase
-            .from("files_test")
-            .insert([
-              {
-                ...fileData,
-                task_id: taskId,
-                file_name: file.name,
-              },
-            ]);
-
-          if (fileRecordError) {
-            console.error("Error creating file record:", fileRecordError);
-            toast.error(
-              `Failed to create file record for ${file.name}: ${fileRecordError.message}`
-            );
-          }
-        }
-      }
-
-      toast.success("Project and tasks created successfully!");
-
-      // Reset form
-      setProjectData({
-        project_name: "",
-        po_hours: "",
-        mail_instruction: "",
-        list_of_files: "",
-        reference_file: "",
-        delivery_date: "",
-        delivery_time: "",
-        completion_status: false,
-        created_by: currentUser.id,
-      });
-      setSelectedFiles([]);
-      setFileGroups([]);
-      setCurrentStep(1);
-
-      if (onTaskAdded) {
-        onTaskAdded();
-      }
+      toast.success("Project created successfully!");
+      onTaskAdded();
       onClose();
-    } catch (error) {
-      console.error("Unexpected error during submission:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "An unknown error occurred";
-      toast.error(`An unexpected error occurred: ${errorMessage}`);
+    } catch (error: any) {
+      console.error("Error creating project:", error);
+      toast.error(error.message || "Failed to create project");
     } finally {
       setIsSubmitting(false);
     }
