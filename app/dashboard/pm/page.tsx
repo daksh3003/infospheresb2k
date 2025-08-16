@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
-import { supabase } from "@/utils/supabase";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
@@ -92,12 +91,11 @@ export default function DashboardPage() {
 
   const fetchProjectNames = async (projectIds: string[]) => {
     try {
-      const { data, error } = await supabase
-        .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
-        .in("project_id", projectIds);
-
-      if (error) throw error;
+      const response = await fetch("/api/projects/names", {
+        method: "POST",
+        body: JSON.stringify({ projectIds }),
+      });
+      const data = await response.json();
 
       const projectNameMap = data.reduce(
         (
@@ -108,7 +106,12 @@ export default function DashboardPage() {
               delivery_time: string;
             };
           },
-          project
+          project: {
+            project_id: string;
+            project_name: string;
+            delivery_date: string;
+            delivery_time: string;
+          }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
@@ -128,24 +131,21 @@ export default function DashboardPage() {
 
   const fetchTasks = async () => {
     setIsLoading(true);
+
     try {
-      // First get all projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from("tasks_test")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const response = await fetch("/api/tasks", {
+        method: "GET",
+      });
 
-      if (projectsError) throw projectsError;
+      const projectsData = await response.json();
 
-      // Then get the current stage for each project
-      const { data: iterationsData, error: iterationsError } = await supabase
-        .from("task_iterations")
-        .select("task_id, current_stage");
-
-      if (iterationsError) throw iterationsError;
+      const iterationsResponse = await fetch("/api/tasks/current_stage", {
+        method: "GET",
+      });
+      const iterationsData = await iterationsResponse.json();
 
       // Create a map of project_id to current_stage
-      const stageMap = iterationsData.reduce((acc: any, curr) => {
+      const stageMap = iterationsData.reduce((acc: any, curr: any) => {
         acc[curr.task_id] = curr.current_stage;
         return acc;
       }, {});
@@ -153,7 +153,7 @@ export default function DashboardPage() {
       console.log("stageMap", stageMap);
 
       if (projectsData) {
-        const processedTasks = projectsData.map((task) => {
+        const processedTasks = projectsData.map((task: any) => {
           return {
             ...task,
             status: calculateStatus(task.delivery_date, task.completion_status),
@@ -167,9 +167,9 @@ export default function DashboardPage() {
 
         // Get unique project IDs and fetch their names
         const uniqueProjectIds = [
-          ...new Set(processedTasks.map((task) => task.project_id)),
+          ...new Set(processedTasks.map((task: any) => task.project_id)),
         ];
-        await fetchProjectNames(uniqueProjectIds);
+        await fetchProjectNames(uniqueProjectIds as string[]);
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
