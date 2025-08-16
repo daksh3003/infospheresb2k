@@ -81,7 +81,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "Processing Team", href: "/dashboard/processor", icon: Cpu },
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
   const toggleSidebar = () => {
@@ -100,6 +99,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
     fetchUser();
   }, []);
+
+  const handleMetricsReport = async () => {
+    if (pathname === "/metrics") {
+      router.push("/dashboard/pm");
+    } else {
+      router.push("/metrics");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -265,6 +272,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Button variant="outline" size="icon">
               <Bell size={20} />
             </Button>
+            <Button variant="outline" onClick={handleMetricsReport}>
+              <div className="flex items-center justify-center gap-2">
+                <p>
+                  {pathname === "/metrics"
+                    ? "Back to PM Dashboard"
+                    : "Metrics Report"}
+                </p>
+                <Cpu size={20} className="text-gray-500" />
+              </div>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -289,7 +306,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
+                {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-500"
