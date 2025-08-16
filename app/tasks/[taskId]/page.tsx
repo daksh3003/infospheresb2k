@@ -4,6 +4,7 @@ import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, Fragment, use, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 import TimelineModal from "@/components/Timeline/TimelineModal";
 import Dialog from "@/components/Dialog";
@@ -90,23 +91,33 @@ export default function TaskDetailPage() {
 
   // Handle task actions
   const handleStartTask = async () => {
-    const { data: response, error: error } = await supabase
-      .from("process_logs_test")
-      .update({
-        started_at: new Date(),
-      })
-      .eq("task_id", taskId);
+    try {
+      // This would need a new API endpoint for starting tasks
+      // For now, we'll keep the direct call but mark it for future API migration
+      const { data: response, error: error } = await supabase
+        .from("process_logs_test")
+        .update({
+          started_at: new Date(),
+        })
+        .eq("task_id", taskId);
 
-    if (error) {
+      if (error) {
+        toast("Failed to start task", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      setStatus("in-progress");
+      setProgress(5);
+    } catch (error) {
+      console.error("Error starting task:", error);
       toast("Failed to start task", {
         type: "error",
         position: "top-right",
       });
-      return;
     }
-
-    setStatus("in-progress");
-    setProgress(5);
   };
 
   const handlePauseResumeTask = () => {
@@ -933,6 +944,8 @@ export default function TaskDetailPage() {
     console.log("roleToFetch : ", roleToFetch);
 
     try {
+      // This would need a new API endpoint for fetching users by role
+      // For now, we'll keep the direct call but mark it for future API migration
       const { data: users, error } = await supabase
         .from("profiles")
         .select("*")
@@ -1022,26 +1035,7 @@ export default function TaskDetailPage() {
         assigned_to: assignedToArray,
       };
 
-      if (existingLog) {
-        const { error: upsertError } = await supabase
-          .from("files_test")
-          .update({ assigned_to: logData.assigned_to })
-          .eq("task_id", taskId);
-
-        if (upsertError) {
-          throw upsertError;
-        }
-      } else {
-        const { error: upsertError } = await supabase
-          .from("files_test")
-          .insert(logData);
-
-        if (upsertError) {
-          throw upsertError;
-        }
-      }
-      // Upsert the record
-
+      await api.assignTask(taskId, assignedToArray);
       toast.success("Task assigned successfully!");
       await fetchData(); // Refresh the data
     } catch (error) {

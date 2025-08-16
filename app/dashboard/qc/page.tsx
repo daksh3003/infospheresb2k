@@ -170,7 +170,7 @@ export default function QCDashboard() {
         setTasks([]);
       }
     } catch (error) {
-      console.error("Error in fetchTasks:", error);
+      console.error("Error fetching tasks:", error);
       setTasks([]);
     } finally {
       setIsLoading(false);

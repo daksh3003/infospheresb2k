@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../utils/supabase";
+import { api } from "../../../utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 export default function Login() {
@@ -33,66 +33,18 @@ export default function Login() {
     setError(null);
 
     try {
-      // Timeout to handle login requests upto 2s
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error("Login request timed out. Please try again.")),
-          2000
-        );
-      });
+      const result = await api.login(formData.email, formData.password);
 
-      const { data, error } = (await Promise.race([
-        supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        }),
-        timeoutPromise,
-      ])) as any;
-
-      if (error) throw error;
-
-      if (!data || !data.user) {
+      if (!result.user) {
         throw new Error("Authentication failed. Please try again.");
       }
 
-      // Create a new session entry when user logs in
-      const { error: sessionError } = await supabase
-        .from("user_sessions")
-        .insert({
-          user_id: data.user.id,
-          login_time: new Date().toISOString(),
-          session_date: new Date().toISOString().split("T")[0],
-        });
-
-      if (sessionError) {
-        console.error("Error creating session record:", sessionError);
-        // Continue login process even if session recording fails
-      }
-
-      if (!data.user.email_confirmed_at) {
+      if (!result.user.email_confirmed_at) {
         router.push("/auth/verify-email");
         return;
       }
 
-      // Try to get role from user metadata first (faster)
-      let userRole = data.user.user_metadata?.role;
-
-      // Only fetch profile if role isn't in metadata
-      if (!userRole) {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profileError) throw profileError;
-        userRole = profileData?.role;
-
-        // Update user metadata with the role for faster access next time
-        await supabase.auth.updateUser({
-          data: { role: userRole },
-        });
-      }
+      const userRole = result.role;
 
       // Determine redirect path based on role : useful in the case of redirecting to respective dashboards based on the roles.
       let redirectPath = "/dashboard";

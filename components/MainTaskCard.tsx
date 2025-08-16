@@ -3,6 +3,7 @@ import React from "react";
 import { getPriorityBadge } from "./task/priority";
 import { getStatusBadge } from "./task/status";
 import { useState } from "react";
+import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 import { useEffect } from "react";
 import {
@@ -25,18 +26,13 @@ export const MainTaskCard = ({
   const [assignedTo, setAssignedTo] = useState<any[]>([]);
 
   const fetchAssignedTo = async () => {
-    const { data, error } = await supabase
-      .from("files_test")
-      .select("assigned_to")
-      .eq("task_id", task.task_id);
-    if (error) {
+    try {
+      const result = await api.getTaskDetails(task.task_id);
+      if (result.assignedTo) {
+        setAssignedTo(result.assignedTo);
+      }
+    } catch (error) {
       console.error("Error fetching assigned to:", error);
-      return;
-    }
-    console.log("data: ", data);
-    if (data && data.length > 0) {
-      console.log("assigned to: ", data[0].assigned_to);
-      setAssignedTo(data[0].assigned_to);
     }
   };
 
