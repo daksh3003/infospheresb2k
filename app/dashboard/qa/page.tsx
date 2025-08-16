@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { api } from "@/utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface QADashboardTask {
@@ -53,8 +52,39 @@ export default function QADashboard() {
 
   const fetchProjectNames = async (projectIds: string[]) => {
     try {
-      const result = await api.getProjectNames(projectIds);
-      setProjectNames(result.projectNames || {});
+      const data = await fetch("/api/projects/names", {
+        method: "POST",
+        body: JSON.stringify({ projectIds }),
+      });
+      const projectNamesData = await data.json();
+
+      const projectNameMap = projectNamesData.reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              delivery_date: string;
+              delivery_time: string;
+            };
+          },
+          project: {
+            project_id: string;
+            project_name: string;
+            delivery_date: string;
+            delivery_time: string;
+          }
+        ) => {
+          acc[project.project_id] = {
+            name: project.project_name,
+            delivery_date: project.delivery_date,
+            delivery_time: project.delivery_time,
+          };
+          return acc;
+        },
+        {}
+      );
+
+      setProjectNames(projectNameMap);
     } catch (error) {
       console.error("Error fetching project names:", error);
     }
@@ -63,8 +93,27 @@ export default function QADashboard() {
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const result = await api.getQADashboard();
-      setTasks(result.tasks || []);
+      const response = await fetch("/api/tasks/current_stage/qa", {
+        method: "GET",
+      });
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const processedTasks: QADashboardTask[] = data.map((item: any) => ({
+          id: item.id,
+          title: item.tasks_test?.task_name || "No Project Name",
+          description: `Status Flag: ${item.status_flag || "N/A"}`,
+          status: "pending",
+          priority: "medium",
+          dueDate: "",
+          assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
+          projectName: item.tasks_test?.task_name || "No Project Name",
+          currentStage: item.current_stage,
+          statusFlag: item.status_flag || null,
+          iterationNumber: item.iteration_number || 1,
+        }));
+        setTasks(processedTasks);
 
       // Get unique project IDs and fetch their names and delivery info
       const uniqueProjectIds = [

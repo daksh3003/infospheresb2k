@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api } from "@/utils/api";
+
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface PMDashboardTask {
@@ -75,12 +75,93 @@ export default function ProcessorDashboard() {
     fetchTasks();
   }, []);
 
+  const fetchProjectNames = async (projectIds: string[]) => {
+
+    try {
+      const data = await fetch("/api/projects/names", {
+        method: "POST",
+        body: JSON.stringify({ projectIds }),
+      });
+
+      const projectNamesData = await data.json();
+
+      const projectNameMap = projectNamesData.reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              delivery_date: string;
+              delivery_time: string;
+            };
+          },
+          project: {
+            project_id: string;
+            project_name: string;
+            delivery_date: string;
+            delivery_time: string;
+          }
+        ) => {
+          acc[project.project_id] = {
+            name: project.project_name,
+            delivery_date: project.delivery_date,
+            delivery_time: project.delivery_time,
+          };
+          return acc;
+        },
+        {}
+      );
+
+      setProjectNames(projectNameMap);
+    } catch (error) {
+      console.error("Error fetching project names:", error);
+    }
+  };
+
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const result = await api.getProcessorDashboard();
-      setTasks(result.tasks);
-      setProjectNames(result.projectNames);
+      const response = await fetch("/api/tasks/current_stage/processor", {
+        method: "GET",
+      });
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const processedTasks: PMDashboardTask[] = data.map((item: any) => ({
+          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
+          projectName: item.tasks_test?.task_name || "No Project Name",
+          projectTaskId: item.tasks_test?.task_id || null,
+          clientInstruction: null,
+          deliveryDate: null,
+          deliveryTime: null,
+          processType: null,
+          poHours: null,
+          isProjectOverallComplete: false,
+          taskIterationId: item.id,
+          iterationNumber: item.iteration_number || 1,
+          currentStage: item.current_stage,
+          statusFlag: item.status_flag || null,
+          iterationNotes: null,
+          currentFileVersionId: null,
+          currentFileName: null,
+          calculatedStatus: "pending",
+          calculatedPriority: "medium",
+          displayId: item.id,
+          displayTitle: item.tasks_test?.task_name || "No Project Name",
+          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+          displayDueDate: null,
+          displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+        }));
+        setTasks(processedTasks);
+
+        // Get unique project IDs and fetch their names and delivery info
+        const uniqueProjectIds = [
+          ...new Set(processedTasks.map((task) => task.projectId)),
+        ];
+        await fetchProjectNames(uniqueProjectIds);
+      } else {
+        console.log("No tasks found");
+        setTasks([]);
+      }
     } catch (error) {
       console.error("Error fetching tasks:", error);
       setTasks([]);
