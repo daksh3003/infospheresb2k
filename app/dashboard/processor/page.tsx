@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/utils/supabase";
+
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface PMDashboardTask {
@@ -76,15 +76,16 @@ export default function ProcessorDashboard() {
   }, []);
 
   const fetchProjectNames = async (projectIds: string[]) => {
+
     try {
-      const { data, error } = await supabase
-        .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
-        .in("project_id", projectIds);
+      const data = await fetch("/api/projects/names", {
+        method: "POST",
+        body: JSON.stringify({ projectIds }),
+      });
 
-      if (error) throw error;
+      const projectNamesData = await data.json();
 
-      const projectNameMap = data.reduce(
+      const projectNameMap = projectNamesData.reduce(
         (
           acc: {
             [key: string]: {
@@ -93,7 +94,12 @@ export default function ProcessorDashboard() {
               delivery_time: string;
             };
           },
-          project
+          project: {
+            project_id: string;
+            project_name: string;
+            delivery_date: string;
+            delivery_time: string;
+          }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
@@ -114,24 +120,12 @@ export default function ProcessorDashboard() {
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("task_iterations")
-        .select(
-          `
-          id, 
-          current_stage, 
-          status_flag, 
-          task_id, 
-          iteration_number, 
-          tasks_test ( task_name, task_id, project_id )
-        `
-        )
-        .eq("current_stage", "Processor");
+      const response = await fetch("/api/tasks/current_stage/processor", {
+        method: "GET",
+      });
+      const data = await response.json();
 
-      if (error) {
-        console.error("Error fetching tasks:", error);
-        setTasks([]);
-      } else if (data && data.length > 0) {
+      if (data && data.length > 0) {
         const processedTasks: PMDashboardTask[] = data.map((item: any) => ({
           projectId: item.tasks_test?.project_id || item.task_id || "unknown",
           projectName: item.tasks_test?.task_name || "No Project Name",
@@ -165,6 +159,7 @@ export default function ProcessorDashboard() {
         ];
         await fetchProjectNames(uniqueProjectIds);
       } else {
+        console.log("No tasks found");
         setTasks([]);
       }
     } catch (error) {

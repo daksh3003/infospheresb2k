@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { supabase } from "@/utils/supabase";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface QADashboardTask {
@@ -53,14 +52,13 @@ export default function QADashboard() {
 
   const fetchProjectNames = async (projectIds: string[]) => {
     try {
-      const { data, error } = await supabase
-        .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
-        .in("project_id", projectIds);
+      const data = await fetch("/api/projects/names", {
+        method: "POST",
+        body: JSON.stringify({ projectIds }),
+      });
+      const projectNamesData = await data.json();
 
-      if (error) throw error;
-
-      const projectNameMap = data.reduce(
+      const projectNameMap = projectNamesData.reduce(
         (
           acc: {
             [key: string]: {
@@ -69,7 +67,12 @@ export default function QADashboard() {
               delivery_time: string;
             };
           },
-          project
+          project: {
+            project_id: string;
+            project_name: string;
+            delivery_date: string;
+            delivery_time: string;
+          }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
@@ -90,24 +93,12 @@ export default function QADashboard() {
   const fetchTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("task_iterations")
-        .select(
-          `
-          id, 
-          current_stage, 
-          status_flag, 
-          task_id, 
-          iteration_number, 
-          tasks_test ( task_name, task_id, project_id )
-        `
-        )
-        .eq("current_stage", "QA");
+      const response = await fetch("/api/tasks/current_stage/qa", {
+        method: "GET",
+      });
+      const data = await response.json();
 
-      if (error) {
-        console.error("Error fetching QA tasks:", error);
-        setTasks([]);
-      } else if (data && data.length > 0) {
+      if (data && data.length > 0) {
         const processedTasks: QADashboardTask[] = data.map((item: any) => ({
           id: item.id,
           title: item.tasks_test?.task_name || "No Project Name",
