@@ -1,6 +1,5 @@
 // app/dashboard/layout.tsx
 "use client";
-
 import { useState, ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -87,18 +86,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setSidebarOpen(!sidebarOpen);
   };
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      console.log(user?.user_metadata.role);
-      setCurrentUserRole(user?.user_metadata.role);
-      // console.log(user?.user_metadata.name );
-      setCurrentUser(user);
-    };
-    fetchUser();
-  }, []);
+useEffect(() => {
+  const fetchUser = async () => {
+    const result = await supabase.auth.getUser();
+    console.log("Supabase getUser result:", result);
+    setCurrentUserRole(result.data.user?.user_metadata.role);
+    setCurrentUser(result.data.user);
+  };
+  fetchUser();
+}, []);
 
   const handleMetricsReport = async () => {
     if (pathname === "/metrics") {
@@ -124,9 +120,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
         <div className="flex items-center space-x-4">
-          <button className="text-gray-500 focus:outline-none">
-            <Bell size={20} />
-          </button>
           <Avatar>
             {/* <AvatarImage src="/avatars/user.png" /> */}
             <AvatarFallback className="bg-blue-800 text-white">
@@ -247,8 +240,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-500"
@@ -269,19 +260,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <header className="hidden lg:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-6">
           <h1 className="text-2xl font-bold text-blue-800">B2K Dashboard</h1>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="icon">
-              <Bell size={20} />
-            </Button>
-            <Button variant="outline" onClick={handleMetricsReport}>
-              <div className="flex items-center justify-center gap-2">
-                <p>
-                  {pathname === "/metrics"
-                    ? "Back to PM Dashboard"
-                    : "Metrics Report"}
-                </p>
-                <Cpu size={20} className="text-gray-500" />
-              </div>
-            </Button>
+            {currentUserRole === "projectManager" && (
+              <Button variant="outline" onClick={handleMetricsReport}>
+                <div className="flex items-center justify-center gap-2">
+                  <p>
+                    {pathname === "/metrics"
+                      ? "Back to PM Dashboard"
+                      : "Metrics Report"}
+                  </p>
+                  <Cpu size={20} className="text-gray-500" />
+                </div>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -305,7 +295,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
                 {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
