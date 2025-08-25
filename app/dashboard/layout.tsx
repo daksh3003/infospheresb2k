@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
+import { authManager, type AuthUser } from "@/utils/auth";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -35,38 +36,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const [currentUserRole, setCurrentUserRole] = useState<any>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   const handleLogout = async () => {
     try {
-      // Get the current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        // Update the most recent session with logout time
-        const { error: sessionError } = await supabase
-          .from("user_sessions")
-          .update({
-            logout_time: new Date().toISOString(),
-          })
-          .eq("user_id", user.id)
-          .is("logout_time", null);
-
-        if (sessionError) {
-          console.error("Error updating logout time:", sessionError);
-        }
-      }
-
-      // Sign out from Supabase auth
-      await supabase.auth.signOut();
-
-      // Clear local storage and session storage as in your original code
-      localStorage.removeItem("userRole");
-      sessionStorage.clear();
-      // Navigate to login page
+      await authManager.signOut();
       router.push("/auth/login");
     } catch (error) {
       console.error("Error during logout:", error);
@@ -86,15 +61,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setSidebarOpen(!sidebarOpen);
   };
 
-useEffect(() => {
-  const fetchUser = async () => {
-    const result = await supabase.auth.getUser();
-    console.log("Supabase getUser result:", result);
-    setCurrentUserRole(result.data.user?.user_metadata.role);
-    setCurrentUser(result.data.user);
-  };
-  fetchUser();
-}, []);
+  useEffect(() => {
+    // Check current auth status on mount
+    authManager.checkAuthStatus();
+
+    // Listen for auth state changes
+    const unsubscribe = authManager.onAuthStateChange((user) => {
+      setCurrentUser(user);
+      setCurrentUserRole(user?.role || null);
+
+      console.log("user", user);
+
+      // If user is not authenticated, redirect to login
+      if (!user) {
+        router.push("/auth/login");
+      }
+    });
+
+    return unsubscribe;
+  }, [router]);
 
   const handleMetricsReport = async () => {
     if (pathname === "/metrics") {

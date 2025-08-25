@@ -1,5 +1,9 @@
 import { Paperclip, DownloadCloud, Upload, X } from "lucide-react";
 
+interface FileWithPageCount extends File {
+  pageCount?: number;
+}
+
 export const FileUpload = ({
   handleFileUpload,
   uploadedFiles,
@@ -7,13 +11,15 @@ export const FileUpload = ({
   handleDownloadOffilesToBeUploaded,
   handleRemoveFile,
   handleSubmitFileUpload,
+  updateFilePageCount,
 }: {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   uploadedFiles: string[] | null;
-  filesToBeUploaded: File[];
+  filesToBeUploaded: FileWithPageCount[];
   handleDownloadOffilesToBeUploaded: (item: string, index: number) => void;
   handleRemoveFile: (index: number) => void;
   handleSubmitFileUpload: () => void;
+  updateFilePageCount: (index: number, pageCount: number) => void;
 }) => {
   return (
     <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
@@ -78,6 +84,7 @@ export const FileUpload = ({
 
         {/* Uploaded files list */}
         {filesToBeUploaded.length > 0 && (
+          
           <div className="space-y-2 mt-4">
             <h3 className="text-sm font-medium mb-2">Files to be uploaded</h3>
 
@@ -91,15 +98,29 @@ export const FileUpload = ({
                   <Paperclip className="h-4 w-4 text-gray-500" />
                   <div>
                     <p className="font-medium">{file.name}</p>
-                    <p className="text-xs text-gray-500">{file.size}</p>
+                    <p className="text-xs text-gray-500">{file.size} bytes</p>
                   </div>
                 </div>
-                <button
-                  className="text-red-500 hover:text-red-700 p-1"
-                  onClick={() => handleRemoveFile(idx)}
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Pages:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Count"
+                      value={(file as FileWithPageCount).pageCount || ''}
+                      className="w-20 px-2 py-1 text-sm border rounded"
+                      onChange={(e) => updateFilePageCount(idx, parseInt(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                  <button
+                    className="text-red-500 hover:text-red-700 p-1"
+                    onClick={() => handleRemoveFile(idx)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

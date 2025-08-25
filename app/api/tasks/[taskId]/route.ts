@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: { taskId: string } }
 ) {
   try {
-    const { taskId } = params;
+    const { taskId } = await params;
 
     if (!taskId) {
       return NextResponse.json(
@@ -57,9 +57,12 @@ export async function GET(
 
     // Fetch stages
     const { data: stages, error: stagesError } = await supabase
-      .from("stages")
-      .select("*")
-      .order("stage_order", { ascending: true });
+      .from("task_iterations")
+      .select("stages")
+      .eq("task_id", taskId)
+      .single();
+
+    console.log("stages", stages?.stages);
 
     if (stagesError) {
       console.error("Error fetching stages:", stagesError);
@@ -109,7 +112,7 @@ export async function POST(
   { params }: { params: { taskId: string } }
 ) {
   try {
-    const { taskId } = params;
+    const { taskId } = await params;
     const { action, data } = await request.json();
 
     if (!taskId) {

@@ -1,22 +1,61 @@
 // API utility functions to replace direct Supabase calls
+import { supabase } from "./supabase";
 
 export const api = {
   // Authentication
   login: async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
+    // Import supabase here to avoid circular dependency
+    
+    
+    // Authenticate directly with Supabase client to establish session
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+
+    if (error) {
+      throw new Error(error.message);
     }
-    
-    return response.json();
+
+    if (!data || !data.user) {
+      throw new Error('Authentication failed. Please try again.');
+    }
+
+    // Get user role from profile
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching profile:", profileError);
+    }
+
+    const userRole = profileData?.role || data.user.user_metadata?.role;
+
+    // Create session record on server via API call
+    try {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId: data.user.id,
+          sessionOnly: true // Flag to indicate we only want session tracking
+        }),
+      });
+    } catch (sessionError) {
+      console.error('Error tracking session:', sessionError);
+      // Continue even if session tracking fails
+    }
+
+    return {
+      user: data.user,
+      session: data.session,
+      role: userRole,
+    };
   },
 
   signup: async (email: string, password: string, name: string, role: string) => {

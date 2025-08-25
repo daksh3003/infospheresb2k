@@ -29,7 +29,10 @@ export default function TaskDetailPage() {
     "pending" | "in-progress" | "paused" | "completed"
   >("pending");
   const [progress, setProgress] = useState<number>(0);
-  const [filesToBeUploaded, setfilesToBeUploaded] = useState<File[]>([]);
+  interface FileWithPageCount extends File {
+    pageCount?: number;
+  }
+  const [filesToBeUploaded, setfilesToBeUploaded] = useState<FileWithPageCount[]>([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<string[] | null>([]);
@@ -88,6 +91,15 @@ export default function TaskDetailPage() {
 
   // Download history refresh trigger
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
+
+  // Handle file page count updates
+  const handleUpdateFilePageCount = (index: number, pageCount: number) => {
+    setfilesToBeUploaded(files => {
+      const newFiles = [...files];
+      (newFiles[index] as FileWithPageCount).pageCount = pageCount;
+      return newFiles;
+    });
+  };
 
   // Handle task actions
   const handleStartTask = async () => {
@@ -747,7 +759,18 @@ export default function TaskDetailPage() {
       return;
     }
     try {
-      filesToBeUploaded.map(async (file) => {
+      // Check if all files have page counts
+      for (const file of filesToBeUploaded) {
+        if (!(file as FileWithPageCount).pageCount) {
+          toast("Please enter page count for all files", {
+            type: "error",
+            position: "top-right",
+          });
+          return;
+        }
+      }
+
+      for (const file of filesToBeUploaded) {
         let date = new Date().toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
         });
@@ -767,17 +790,38 @@ export default function TaskDetailPage() {
           storage_name = "qa-files";
         }
 
-        const { data: StoreFiles, error } = await supabase.storage
+        // Upload the file
+        const { data: StoreFiles, error: uploadError } = await supabase.storage
           .from(storage_name)
           .upload(file_path, file, {
             contentType: file.type,
             upsert: true,
           });
-        if (error) {
-          console.error("Error uploading file:", error);
+        if (uploadError) {
+          console.error("Error uploading file:", uploadError);
           return;
         }
-      });
+
+        // Store the file information in files_test table
+        const { error: fileInfoError } = await supabase
+          .from('files_test')
+          .insert({
+            task_id: taskId,
+            file_name: file.name,
+            page_count: (file as FileWithPageCount).pageCount,
+            taken_by: currentUser?.id || null,
+            assigned_to: [] // Empty array for initial upload
+          });
+
+        if (fileInfoError) {
+          console.error("Error storing file information:", fileInfoError);
+          toast("Error saving file information", {
+            type: "error",
+            position: "top-right"
+          });
+          return;
+        }
+      }
 
       fetchData();
       toast("Selected files uploaded successfully!", {
@@ -1199,6 +1243,7 @@ export default function TaskDetailPage() {
             }
             handleRemoveFile={handleRemoveFile}
             handleSubmitFileUpload={handleSubmitFileUpload}
+            updateFilePageCount={handleUpdateFilePageCount}
           />
         </div>
       )}
