@@ -158,10 +158,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 .filter((item) => {
                   if (item.name === "Settings") return true;
                   if (currentUserRole === "projectManager") return true;
-                  return (
-                    pathname.startsWith(item.href) &&
-                    item.href.includes(currentUserRole || "")
-                  );
+                  
+                  // Check if the user role matches the dashboard
+                  // Allow access based on role mapping
+                  const roleMapping: { [key: string]: string[] } = {
+                    "projectManager": ["/dashboard/pm", "/dashboard/processor", "/dashboard/qc", "/dashboard/qa"],
+                    "processor": ["/dashboard/processor"],
+                    "qcTeam": ["/dashboard/qc"],
+                    "qaTeam": ["/dashboard/qa"],
+                  };
+                  
+                  const allowedPaths = roleMapping[currentUserRole || ""] || [];
+                  return allowedPaths.includes(item.href);
                 })
                 .map((item) => {
                   const isActive =

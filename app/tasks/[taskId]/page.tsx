@@ -39,7 +39,6 @@ export default function TaskDetailPage() {
     FileWithPageCount[]
   >([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
-  const [newComment, setNewComment] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<
     { name: string; pageCount: number | null }[] | null
   >([]);
@@ -68,10 +67,11 @@ export default function TaskDetailPage() {
     assignedTo: "",
     createdBy: "",
     attachments: [],
-    comments: [],
     createdDate: "",
     estimatedHours: 0,
     project_id: "",
+    overall_completion_status: false,
+    completion_status: false,
   });
 
   // file states :
@@ -607,22 +607,6 @@ export default function TaskDetailPage() {
     const newFiles = [...filesToBeUploaded];
     newFiles.splice(index, 1);
     setfilesToBeUploaded(newFiles);
-  };
-
-  const handleSubmitComment = () => {
-    if (newComment.trim() === "") return;
-
-    const now = new Date();
-    const formattedTime = now.toLocaleString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-    setNewComment("");
   };
 
   const handleDownloadOffilesToBeUploaded = async (
@@ -1242,9 +1226,13 @@ export default function TaskDetailPage() {
         return;
       }
 
+
+      // Set task with creator info
+      const taskData = {
+
       // Set task with creator info and extract status
       setTask((prev: any) => ({
-        ...prev,
+        ...prev, main
         task_id: simpleTaskData.task_id,
         project_id: simpleTaskData.project_id,
         title: simpleTaskData.task_name,
@@ -1266,7 +1254,12 @@ export default function TaskDetailPage() {
         comments: simpleTaskData.comments || [],
         createdDate: simpleTaskData.created_at,
         overall_completion_status: simpleTaskData.overall_completion_status,
-      }));
+        completion_status: simpleTaskData.completion_status,
+        attachments: simpleTaskData.attachments || [],
+        estimatedHours: simpleTaskData.estimated_hours || 0,
+      };
+      
+      setTask(taskData);
 
       // Set real status from database
       if (simpleTaskData.status) {
@@ -1466,6 +1459,43 @@ export default function TaskDetailPage() {
     }
   };
 
+  // Fetch task details from API
+  const fetchTaskDetails = async () => {
+    try {
+      const taskDetails = await api.getTaskDetails(taskId);
+      if (taskDetails.task) {
+        setTask({
+          task_id: taskDetails.task.task_id || taskId,
+          title: taskDetails.task.task_name || taskDetails.task.title || "",
+          client_instruction: taskDetails.task.client_instruction || "",
+          mail_instruction: taskDetails.task.mail_instruction || "",
+          estimated_hours_qc: taskDetails.task.estimated_hours_qc || 0,
+          estimated_hours_qa: taskDetails.task.estimated_hours_qa || 0,
+          estimated_hours_ocr: taskDetails.task.estimated_hours_ocr || 0,
+          priority: taskDetails.task.priority || "low",
+          dueDate: taskDetails.task.delivery_date || taskDetails.task.dueDate || "",
+          deliveryTime: taskDetails.task.delivery_time || taskDetails.task.deliveryTime || "",
+          assignedTo: taskDetails.task.assigned_to || taskDetails.task.assignedTo || "",
+          createdBy: taskDetails.task.created_by || taskDetails.task.createdBy || "",
+          attachments: taskDetails.task.attachments || [],
+          createdDate: taskDetails.task.created_at || taskDetails.task.createdDate || "",
+          estimatedHours: taskDetails.task.estimated_hours || taskDetails.task.estimatedHours || 0,
+          project_id: taskDetails.task.project_id || "",
+          overall_completion_status: taskDetails.task.overall_completion_status || false,
+          completion_status: taskDetails.task.completion_status || false,
+        });
+
+        // Also set available users if provided
+        if (taskDetails.availableUsers) {
+          setAvailableUsers(taskDetails.availableUsers);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching task details:", error);
+      toast.error("Failed to load task details");
+    }
+  };
+
   // useEffect hooks :
   useEffect(() => {
     const initializeData = async () => {
@@ -1627,10 +1657,7 @@ export default function TaskDetailPage() {
 
       {activeTab === "comments" && (
         <Comments
-          task={task}
-          newComment={newComment}
-          setNewComment={setNewComment}
-          handleSubmitComment={handleSubmitComment}
+          taskId={taskId}
         />
       )}
 

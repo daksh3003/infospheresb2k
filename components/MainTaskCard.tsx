@@ -241,7 +241,9 @@ export const MainTaskCard = ({
               <h3 className="text-sm font-medium text-gray-500 mb-1">
                 Mail Instructions
               </h3>
-              <p className="text-gray-900">{task.mail_instruction}</p>
+              <p className="text-gray-900">
+                {task.mail_instruction || "No mail instructions provided"}
+              </p>
             </div>
           </div>
 
@@ -355,7 +357,23 @@ export const MainTaskCard = ({
                 </h3>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-900">{task.dueDate}</span>
+                  <span className="text-gray-900">
+                    {task.dueDate 
+                      ? (() => {
+                          try {
+                            const date = new Date(task.dueDate);
+                            return date.toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            });
+                          } catch (error) {
+                            return task.dueDate;
+                          }
+                        })()
+                      : "Not set"
+                    }
+                  </span>
                 </div>
               </div>
 
@@ -368,7 +386,18 @@ export const MainTaskCard = ({
                   <span className="text-gray-900">
                     {task.deliveryTime
                       ? (() => {
-                          const timeStr = task.deliveryTime.substring(11, 16);
+                          let timeStr;
+                          // Handle different time formats
+                          if (task.deliveryTime.includes('T')) {
+                            // Full datetime format (2023-01-01T14:30:00)
+                            timeStr = task.deliveryTime.substring(11, 16);
+                          } else if (task.deliveryTime.includes(':')) {
+                            // Time only format (14:30:00 or 14:30)
+                            timeStr = task.deliveryTime.substring(0, 5);
+                          } else {
+                            return task.deliveryTime;
+                          }
+                          
                           const [hours, minutes] = timeStr.split(":");
                           const hour = parseInt(hours);
                           const ampm = hour >= 12 ? "PM" : "AM";
