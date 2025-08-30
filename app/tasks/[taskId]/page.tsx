@@ -38,7 +38,9 @@ export default function TaskDetailPage() {
   >([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
-  const [uploadedFiles, setUploadedFiles] = useState<string[] | null>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { name: string; pageCount: number | null }[] | null
+  >([]);
   const [currentStage, setCurrentStage] = useState<string>("");
   const [sentBy, setSentBy] = useState<string>("");
   const [completionStatus, setCompletionStatus] = useState<boolean>(false);
@@ -71,9 +73,15 @@ export default function TaskDetailPage() {
   });
 
   // file states :
-  const [PMFiles, setPMFiles] = useState<string[]>([]);
-  const [correctionFiles, setCorrectionFiles] = useState<string[]>([]);
-  const [processorFiles, setProcessorFiles] = useState<string[]>([]);
+  const [PMFiles, setPMFiles] = useState<
+    { name: string; pageCount: number | null }[]
+  >([]);
+  const [correctionFiles, setCorrectionFiles] = useState<
+    { name: string; pageCount: number | null }[]
+  >([]);
+  const [processorFiles, setProcessorFiles] = useState<
+    { name: string; pageCount: number | null }[]
+  >([]);
 
   // user states :
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -824,7 +832,39 @@ export default function TaskDetailPage() {
 
       console.log("processorFiles : ", processorFiles);
 
-      setProcessorFiles(processorFiles.map((file) => file.name));
+      // Fetch page counts from files_test table for processor files
+      const processorFilesWithPageCount = await Promise.all(
+        processorFiles.map(async (file) => {
+          try {
+            const { data: fileInfo, error: fileInfoError } = await supabase
+              .from("files_test")
+              .select("page_count")
+              .eq("task_id", taskId)
+              .eq("file_name", file.name)
+              .single();
+
+            if (fileInfoError && fileInfoError.code !== "PGRST116") {
+              console.warn(
+                `Error fetching page count for ${file.name}:`,
+                fileInfoError
+              );
+            }
+
+            return {
+              name: file.name,
+              pageCount: fileInfo?.page_count || null,
+            };
+          } catch (error) {
+            console.warn(`Failed to fetch page count for ${file.name}:`, error);
+            return {
+              name: file.name,
+              pageCount: null,
+            };
+          }
+        })
+      );
+
+      setProcessorFiles(processorFilesWithPageCount);
 
       console.log("Processor Files:", processorFiles);
     }
@@ -971,7 +1011,41 @@ export default function TaskDetailPage() {
         return;
       }
 
-      setPMFiles(PMFiles.map((file) => file.name));
+      // Fetch page counts from files_test table for PM files
+      const pmFilesWithPageCount = await Promise.all(
+        PMFiles.map(async (file) => {
+          try {
+            const { data: fileInfo, error: fileInfoError } = await supabase
+              .from("files_test")
+              .select("page_count")
+              .eq("task_id", taskId)
+              .eq("file_name", file.name)
+              .single();
+
+            if (fileInfoError && fileInfoError.code !== "PGRST116") {
+              console.warn(
+                `Error fetching page count for ${file.name}:`,
+                fileInfoError
+              );
+            }
+
+            console.log(`Fetched page count for ${file.name}:`, fileInfo);
+
+            return {
+              name: file.name,
+              pageCount: fileInfo?.page_count || null,
+            };
+          } catch (error) {
+            console.warn(`Failed to fetch page count for ${file.name}:`, error);
+            return {
+              name: file.name,
+              pageCount: null,
+            };
+          }
+        })
+      );
+      console.log("PM Files with page count:", PMFiles);
+      setPMFiles(pmFilesWithPageCount);
 
       var folder_path_correction = "";
       var storage_name_correction = "";
@@ -999,7 +1073,43 @@ export default function TaskDetailPage() {
           console.log("Error fetching correction files:", correctionError);
           // return;
         }
-        setCorrectionFiles(correctionFiles?.map((file) => file.name) || []);
+
+        // Fetch page counts from files_test table for correction files
+        const correctionFilesWithPageCount = await Promise.all(
+          (correctionFiles || []).map(async (file) => {
+            try {
+              const { data: fileInfo, error: fileInfoError } = await supabase
+                .from("files_test")
+                .select("page_count")
+                .eq("task_id", taskId)
+                .eq("file_name", file.name)
+                .single();
+
+              if (fileInfoError && fileInfoError.code !== "PGRST116") {
+                console.warn(
+                  `Error fetching page count for ${file.name}:`,
+                  fileInfoError
+                );
+              }
+
+              return {
+                name: file.name,
+                pageCount: fileInfo?.page_count || null,
+              };
+            } catch (error) {
+              console.warn(
+                `Failed to fetch page count for ${file.name}:`,
+                error
+              );
+              return {
+                name: file.name,
+                pageCount: null,
+              };
+            }
+          })
+        );
+
+        setCorrectionFiles(correctionFilesWithPageCount);
         // }
       }
 
@@ -1076,7 +1186,39 @@ export default function TaskDetailPage() {
       }
       console.log(uploadedFiles);
 
-      setUploadedFiles(uploadedFiles.map((file) => file.name));
+      // Fetch page counts from files_test table for uploaded files
+      const uploadedFilesWithPageCount = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          try {
+            const { data: fileInfo, error: fileInfoError } = await supabase
+              .from("files_test")
+              .select("page_count")
+              .eq("task_id", taskId)
+              .eq("file_name", file.name)
+              .single();
+
+            if (fileInfoError && fileInfoError.code !== "PGRST116") {
+              console.warn(
+                `Error fetching page count for ${file.name}:`,
+                fileInfoError
+              );
+            }
+
+            return {
+              name: file.name,
+              pageCount: fileInfo?.page_count || null,
+            };
+          } catch (error) {
+            console.warn(`Failed to fetch page count for ${file.name}:`, error);
+            return {
+              name: file.name,
+              pageCount: null,
+            };
+          }
+        })
+      );
+
+      setUploadedFiles(uploadedFilesWithPageCount);
     } catch (error) {
       console.error("Error in fetchData:", error);
     }

@@ -14,7 +14,7 @@ export const FileUpload = ({
   updateFilePageCount,
 }: {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  uploadedFiles: string[] | null;
+  uploadedFiles: { name: string; pageCount: number | null }[] | null;
   filesToBeUploaded: FileWithPageCount[];
   handleDownloadOffilesToBeUploaded: (item: string, index: number) => void;
   handleRemoveFile: (index: number) => void;
@@ -57,20 +57,27 @@ export const FileUpload = ({
               {uploadedFiles && uploadedFiles.length > 0 && (
                 <h3 className="text-sm font-medium mb-2">Files Uploaded</h3>
               )}
-              {uploadedFiles?.map((item: string, index: number) => (
+              {uploadedFiles?.map((item, index: number) => (
                 <div
-                  key={item}
+                  key={item.name}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                 >
                   <div className="flex items-center gap-3">
                     <Paperclip className="h-4 w-4 text-gray-500" />
                     <div>
-                      <p className="font-medium">{item.split("/").pop()}</p>
+                      <p className="font-medium">
+                        {item.name.split("/").pop()}
+                      </p>
+                      {item.pageCount && (
+                        <p className="text-xs text-gray-500">
+                          Pages: {item.pageCount}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button
                     onClick={() =>
-                      handleDownloadOffilesToBeUploaded(item, index)
+                      handleDownloadOffilesToBeUploaded(item.name, index)
                     }
                     className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                   >

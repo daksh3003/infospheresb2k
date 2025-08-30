@@ -11,9 +11,9 @@ export const TaskAttachments = ({
   storage_name,
   folder_path,
 }: {
-  PMFiles: string[];
-  processorFiles: string[];
-  correctionFiles: string[];
+  PMFiles: { name: string; pageCount: number | null }[];
+  processorFiles: { name: string; pageCount: number | null }[];
+  correctionFiles: { name: string; pageCount: number | null }[];
   version: number;
   taskId: string;
   handleDownload: (
@@ -41,21 +41,27 @@ export const TaskAttachments = ({
               Client Files
             </h3>
             <div className="space-y-2">
-              {PMFiles.map((item: string, index: number) => (
+              {PMFiles.map((item, index: number) => (
                 <div
-                  key={item}
+                  key={item.name}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                 >
                   <div className="flex items-center gap-3">
                     <Paperclip className="h-4 w-4 text-gray-500" />
                     <div>
-                      <p className="font-medium">{item.split("/").pop()}</p>
-                      
+                      <p className="font-medium">
+                        {item.name.split("/").pop()}
+                      </p>
+                      {item.pageCount && (
+                        <p className="text-xs text-gray-500">
+                          Pages: {item.pageCount}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button
                     onClick={() =>
-                      handleDownload(item, "task-files", taskId, index)
+                      handleDownload(item.name, "task-files", taskId, index)
                     }
                     className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                   >
@@ -74,20 +80,32 @@ export const TaskAttachments = ({
                   Processor Files {"v" + version}
                 </h3>
                 <div className="space-y-2">
-                  {processorFiles.map((item: string, index: number) => (
+                  {processorFiles.map((item, index: number) => (
                     <div
-                      key={item}
+                      key={item.name}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
                       <div className="flex items-center gap-3">
                         <Paperclip className="h-4 w-4 text-gray-500" />
                         <div>
-                          <p className="font-medium">{item.split("/").pop()}</p>
+                          <p className="font-medium">
+                            {item.name.split("/").pop()}
+                          </p>
+                          {item.pageCount && (
+                            <p className="text-xs text-gray-500">
+                              Pages: {item.pageCount}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
                         onClick={() =>
-                          handleDownload(item, storage_name, folder_path, index)
+                          handleDownload(
+                            item.name,
+                            storage_name,
+                            folder_path,
+                            index
+                          )
                         }
                         className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                       >
@@ -108,20 +126,32 @@ export const TaskAttachments = ({
                   Correction Files
                 </h3>
                 <div className="space-y-2">
-                  {correctionFiles.map((item: string, index: number) => (
+                  {correctionFiles.map((item, index: number) => (
                     <div
-                      key={item}
+                      key={item.name}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
                       <div className="flex items-center gap-3">
                         <Paperclip className="h-4 w-4 text-gray-500" />
                         <div>
-                          <p className="font-medium">{item.split("/").pop()}</p>
+                          <p className="font-medium">
+                            {item.name.split("/").pop()}
+                          </p>
+                          {item.pageCount && (
+                            <p className="text-xs text-gray-500">
+                              Pages: {item.pageCount}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
                         onClick={() =>
-                          handleDownload(item, storage_name, folder_path, index)
+                          handleDownload(
+                            item.name,
+                            storage_name,
+                            folder_path,
+                            index
+                          )
                         }
                         className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
                       >
