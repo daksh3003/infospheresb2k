@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
             task_id: taskId,
             current_stage: "Processor",
             sent_by: "PM",
-            project_id: projectId,
+            // project_id: projectId,
             assigned_to: [],
           },
         ]);

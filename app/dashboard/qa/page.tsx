@@ -115,11 +115,12 @@ export default function QADashboard() {
         }));
         setTasks(processedTasks);
 
-      // Get unique project IDs and fetch their names and delivery info
-      const uniqueProjectIds = [
-        ...new Set(result.tasks.map((task: any) => task.projectId)),
-      ];
-      await fetchProjectNames(uniqueProjectIds);
+        // Get unique project IDs and fetch their names and delivery info
+        const uniqueProjectIds = [
+          ...new Set(processedTasks.map((task: any) => task.projectId)),
+        ];
+        await fetchProjectNames(uniqueProjectIds);
+      }
     } catch (error) {
       console.error("Error in fetchTasks:", error);
       setTasks([]);
