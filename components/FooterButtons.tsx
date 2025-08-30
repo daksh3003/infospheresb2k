@@ -10,6 +10,7 @@ import {
 import { ArrowBigUpDashIcon } from "lucide-react";
 import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
+import { logTaskAction, getTaskActions } from "@/utils/taskActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,12 +67,58 @@ export const FooterButtons = ({
 
   const fetchAssignedTo = async () => {
     try {
-      const result = await api.getTaskDetails(taskId);
-      const assignedUsers = result.assignedTo || [];
-      setAssignedTo(assignedUsers);
-      setHasAssignedUsers(assignedUsers.length > 0);
+      // Get task actions with filter for 'taken_by' and 'assigned_to' actions
+      const actionsResult = await getTaskActions({
+        task_id: taskId,
+        action_type: ["taken_by", "assigned_to"],
+      });
+
+      if (!actionsResult.success || !actionsResult.data) {
+        console.error("Failed to fetch task actions:", actionsResult.error);
+        setAssignedTo([]);
+        setHasAssignedUsers(false);
+        return;
+      }
+
+      // Process the task actions to get assigned users
+      const assignedUsers = actionsResult.data.map((action: any) => ({
+        user_id: action.user_id,
+        name: action.metadata?.user_name || action.user_id,
+        email: action.metadata?.user_email || "",
+        role: action.metadata?.user_role || "",
+        action_type: action.action_type,
+        assigned_at: action.created_at,
+        stage: action.metadata?.stage || currentStage,
+      }));
+
+      // Remove duplicates based on user_id and keep the latest action
+      const uniqueAssignedUsers = assignedUsers.reduce(
+        (acc: any[], current: any) => {
+          const existingIndex = acc.findIndex(
+            (user) => user.user_id === current.user_id
+          );
+          if (existingIndex === -1) {
+            acc.push(current);
+          } else {
+            // Keep the latest assignment
+            if (
+              new Date(current.assigned_at) >
+              new Date(acc[existingIndex].assigned_at)
+            ) {
+              acc[existingIndex] = current;
+            }
+          }
+          return acc;
+        },
+        []
+      );
+
+      setAssignedTo(uniqueAssignedUsers);
+      setHasAssignedUsers(uniqueAssignedUsers.length > 0);
     } catch (error) {
       console.error("Error fetching assigned to:", error);
+      setAssignedTo([]);
+      setHasAssignedUsers(false);
     }
   };
 
@@ -119,6 +166,25 @@ export const FooterButtons = ({
 
     setIsPickingUp(true);
     try {
+      // Log the taken_by action
+      const actionResult = await logTaskAction({
+        user_id: currentUser.id,
+        task_id: taskId,
+        action_type: "taken_by",
+        metadata: {
+          stage: currentStage,
+          user_name: currentUser.name || currentUser.email,
+          user_role: currentUser.role,
+          assigned_by: sentBy,
+          pickup_timestamp: new Date().toISOString(),
+        },
+      });
+
+      if (!actionResult.success) {
+        console.error("Failed to log taken_by action:", actionResult.error);
+        toast.warning("Task picked up but action logging failed");
+      }
+
       await api.pickupTask(taskId, currentUser);
       toast.success("Task picked up successfully!");
       setShowPickupDialog(false);

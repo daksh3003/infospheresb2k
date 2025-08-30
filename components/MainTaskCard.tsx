@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
 import { useEffect } from "react";
+import { getTaskActions } from "@/utils/taskActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,18 +28,61 @@ export const MainTaskCard = ({
 
   const fetchAssignedTo = async () => {
     try {
-      const result = await api.getTaskDetails(task.task_id);
-      if (result.assignedTo) {
-        setAssignedTo(result.assignedTo);
+      // Get task actions with filter for 'taken_by' and 'assigned_to' actions
+      const actionsResult = await getTaskActions({
+        task_id: task.task_id,
+        action_type: ["taken_by", "assigned_to"],
+      });
+
+      if (!actionsResult.success || !actionsResult.data) {
+        console.error("Failed to fetch task actions:", actionsResult.error);
+        setAssignedTo([]);
+        return;
       }
+
+      // Process the task actions to get assigned users
+      const assignedUsers = actionsResult.data.map((action: any) => ({
+        user_id: action.user_id,
+        name: action.metadata?.user_name || action.user_id,
+        email: action.metadata?.user_email || "",
+        role: action.metadata?.user_role || "",
+        action_type: action.action_type,
+        assigned_at: action.created_at,
+        stage: action.metadata?.stage || action.metadata?.current_stage,
+      }));
+
+      // Remove duplicates based on user_id and keep the latest action
+      const uniqueAssignedUsers = assignedUsers.reduce(
+        (acc: any[], current: any) => {
+          const existingIndex = acc.findIndex(
+            (user) => user.user_id === current.user_id
+          );
+          if (existingIndex === -1) {
+            acc.push(current);
+          } else {
+            // Keep the latest assignment
+            if (
+              new Date(current.assigned_at) >
+              new Date(acc[existingIndex].assigned_at)
+            ) {
+              acc[existingIndex] = current;
+            }
+          }
+          return acc;
+        },
+        []
+      );
+
+      setAssignedTo(uniqueAssignedUsers);
     } catch (error) {
       console.error("Error fetching assigned to:", error);
+      setAssignedTo([]);
     }
   };
 
   useEffect(() => {
     fetchAssignedTo();
-  }, [onAssignTask]);
+  }, [task.task_id]);
 
   return (
     <>

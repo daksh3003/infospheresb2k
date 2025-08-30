@@ -73,6 +73,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       console.log("user", user);
 
       // If user is not authenticated, redirect to login
+      
       if (!user) {
         router.push("/auth/login");
       }

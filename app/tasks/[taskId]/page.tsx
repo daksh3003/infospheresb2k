@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { api } from "@/utils/api";
 import { supabase } from "@/utils/supabase";
+import { logTaskAction, createTaskActionMetadata } from "@/utils/taskActions";
 import TimelineModal from "@/components/Timeline/TimelineModal";
 import Dialog from "@/components/Dialog";
 import { MainTaskCard } from "@/components/MainTaskCard";
@@ -32,7 +33,9 @@ export default function TaskDetailPage() {
   interface FileWithPageCount extends File {
     pageCount?: number;
   }
-  const [filesToBeUploaded, setfilesToBeUploaded] = useState<FileWithPageCount[]>([]);
+  const [filesToBeUploaded, setfilesToBeUploaded] = useState<
+    FileWithPageCount[]
+  >([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
   const [newComment, setNewComment] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<string[] | null>([]);
@@ -94,7 +97,7 @@ export default function TaskDetailPage() {
 
   // Handle file page count updates
   const handleUpdateFilePageCount = (index: number, pageCount: number) => {
-    setfilesToBeUploaded(files => {
+    setfilesToBeUploaded((files) => {
       const newFiles = [...files];
       (newFiles[index] as FileWithPageCount).pageCount = pageCount;
       return newFiles;
@@ -102,8 +105,50 @@ export default function TaskDetailPage() {
   };
 
   // Handle task actions
+  const logTaskActionHelper = async (
+    actionType:
+      | "start"
+      | "pause"
+      | "resume"
+      | "complete"
+      | "send_to"
+      | "download"
+      | "upload"
+      | "taken_by"
+      | "assigned_to",
+    additionalMetadata?: any
+  ) => {
+    if (!currentUser || !taskId) return;
+
+    try {
+      const metadata = createTaskActionMetadata(
+        currentUser,
+        taskId,
+        currentStage,
+        sentBy,
+        additionalMetadata
+      );
+
+      const result = await logTaskAction({
+        user_id: currentUser.id,
+        task_id: taskId,
+        action_type: actionType,
+        metadata: metadata,
+      });
+
+      if (!result.success) {
+        console.error("Failed to log task action:", result.error);
+      }
+    } catch (error) {
+      console.error("Error in logTaskActionHelper:", error);
+    }
+  };
+
   const handleStartTask = async () => {
     try {
+      // Log the start action
+      await logTaskActionHelper("start", { previous_status: status });
+
       // This would need a new API endpoint for starting tasks
       // For now, we'll keep the direct call but mark it for future API migration
       const { data: response, error: error } = await supabase
@@ -132,15 +177,38 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handlePauseResumeTask = () => {
+  const handlePauseResumeTask = async () => {
+    const previousStatus = status;
+    let newStatus: "pending" | "in-progress" | "paused" | "completed";
+    let actionType: string;
+
     if (status === "in-progress") {
-      setStatus("paused");
+      newStatus = "paused";
+      actionType = "pause";
     } else if (status === "paused") {
-      setStatus("in-progress");
+      newStatus = "in-progress";
+      actionType = "resume";
+    } else {
+      return;
     }
+
+    // Log the pause/resume action
+    await logTaskActionHelper(actionType as "pause" | "resume", {
+      previous_status: previousStatus,
+      new_status: newStatus,
+    });
+
+    setStatus(newStatus);
   };
 
   const handleCompleteTask = async () => {
+    // Log the complete action
+    await logTaskActionHelper("complete", {
+      previous_status: status,
+      completion_status: completionStatus,
+      files_uploaded: uploadedFiles?.length || 0,
+    });
+
     const { data: response, error: error } = await supabase
       .from("process_logs_test")
       .update({
@@ -338,6 +406,14 @@ export default function TaskDetailPage() {
       next_sent_by = "QA";
     }
 
+    // Log the send to action
+    await logTaskActionHelper("send_to", {
+      from_stage: currentStage,
+      to_stage: next_current_stage,
+      sent_by: next_sent_by,
+      submit_to: SubmitTo,
+    });
+
     const { data: stages, error: stagesError } = await supabase
       .from("task_iterations")
       .select("stages")
@@ -443,6 +519,14 @@ export default function TaskDetailPage() {
     index: number
   ) => {
     try {
+      // Log the download action
+      await logTaskActionHelper("download", {
+        file_name: fileName,
+        file_index: index,
+        storage_stage: currentStage,
+        download_type: "uploaded_file",
+      });
+
       let storage_name = "";
       let folder_path = "";
 
@@ -561,6 +645,15 @@ export default function TaskDetailPage() {
     index: number
   ) => {
     try {
+      // Log the download action
+      await logTaskActionHelper("download", {
+        file_name: fileName,
+        storage_name: storage_name,
+        folder_path: folder_path,
+        file_index: index,
+        download_type: "task_file",
+      });
+
       const { data, error } = await supabase.storage
         .from(storage_name)
         .download(`${folder_path}/${fileName}`);
@@ -770,6 +863,18 @@ export default function TaskDetailPage() {
         }
       }
 
+      // Log the upload action
+      await logTaskActionHelper("upload", {
+        files_count: filesToBeUploaded.length,
+        files_info: filesToBeUploaded.map((file) => ({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          page_count: (file as FileWithPageCount).pageCount,
+        })),
+        upload_stage: currentStage,
+      });
+
       for (const file of filesToBeUploaded) {
         let date = new Date().toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
@@ -804,20 +909,22 @@ export default function TaskDetailPage() {
 
         // Store the file information in files_test table
         const { error: fileInfoError } = await supabase
-          .from('files_test')
+          .from("files_test")
           .insert({
             task_id: taskId,
-            file_name: file.name,
+            file_name: `${date}_${file.name}`,
             page_count: (file as FileWithPageCount).pageCount,
             taken_by: currentUser?.id || null,
-            assigned_to: [] // Empty array for initial upload
+            assigned_to: [], // Empty array for initial upload
+            storage_name: storage_name,
+            file_path: file_path,
           });
 
         if (fileInfoError) {
           console.error("Error storing file information:", fileInfoError);
           toast("Error saving file information", {
             type: "error",
-            position: "top-right"
+            position: "top-right",
           });
           return;
         }
@@ -1017,6 +1124,15 @@ export default function TaskDetailPage() {
 
     setIsAssigning(true);
     try {
+      // Log the assignment action
+      await logTaskActionHelper("assigned_to", {
+        assigned_to_user_id: selectedUserData.id,
+        assigned_to_user_name: selectedUserData.name,
+        assigned_to_user_email: selectedUserData.email,
+        assigned_to_user_role: selectedUserData.role,
+        assignment_stage: currentStage,
+      });
+
       // First, check if there's an existing record
       const { data: existingLog, error: fetchError } = await supabase
         .from("files_test")

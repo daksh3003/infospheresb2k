@@ -84,7 +84,6 @@ export const FileUpload = ({
 
         {/* Uploaded files list */}
         {filesToBeUploaded.length > 0 && (
-          
           <div className="space-y-2 mt-4">
             <h3 className="text-sm font-medium mb-2">Files to be uploaded</h3>
 
@@ -108,9 +107,11 @@ export const FileUpload = ({
                       type="number"
                       min="1"
                       placeholder="Count"
-                      value={(file as FileWithPageCount).pageCount || ''}
+                      value={(file as FileWithPageCount).pageCount || ""}
                       className="w-20 px-2 py-1 text-sm border rounded"
-                      onChange={(e) => updateFilePageCount(idx, parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        updateFilePageCount(idx, parseInt(e.target.value) || 0)
+                      }
                       required
                     />
                   </div>

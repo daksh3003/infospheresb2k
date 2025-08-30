@@ -50,6 +50,7 @@ export const TaskAttachments = ({
                     <Paperclip className="h-4 w-4 text-gray-500" />
                     <div>
                       <p className="font-medium">{item.split("/").pop()}</p>
+                      
                     </div>
                   </div>
                   <button
