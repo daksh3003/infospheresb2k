@@ -955,6 +955,73 @@ export default function TaskDetailPage() {
 
       console.log("Processor Files:", processorFiles);
     }
+
+    // Fetch task data and set task state
+    const { data: simpleTaskData, error: simpleError } = await supabase
+      .from("tasks_test")
+      .select("*")
+      .eq("task_id", taskId)
+      .single();
+
+    if (simpleError) {
+      console.error("Error fetching simple task data:", simpleError);
+      return;
+    }
+
+    // Fetch creator info separately
+    const { data: creatorData, error: creatorError } = await supabase
+      .from("profiles")
+      .select("id, name, email, role")
+      .eq("id", simpleTaskData.created_by)
+      .single();
+
+    if (creatorError) {
+      console.error("Error fetching creator data:", creatorError);
+      return;
+    }
+
+    // Set task with creator info
+    const taskData = {
+      task_id: simpleTaskData.task_id,
+      project_id: simpleTaskData.project_id,
+      title: simpleTaskData.task_name,
+      client_instruction: simpleTaskData.client_instruction || "",
+      mail_instruction: simpleTaskData.mail_instruction || "",
+      estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
+      estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
+      estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
+      priority: simpleTaskData.priority || "low",
+      dueDate: simpleTaskData.delivery_date || "",
+      deliveryTime: simpleTaskData.delivery_time || "",
+      assignedTo: "",
+      createdBy: {
+        id: creatorData.id,
+        name: creatorData.name,
+        email: creatorData.email,
+        role: creatorData.role,
+      },
+      comments: simpleTaskData.comments || [],
+      createdDate: simpleTaskData.created_at,
+      overall_completion_status: simpleTaskData.overall_completion_status,
+      completion_status: simpleTaskData.completion_status,
+      attachments: simpleTaskData.attachments || [],
+      estimatedHours: simpleTaskData.estimated_hours || 0,
+    };
+    
+    setTask(taskData);
+
+    // Set real status from database
+    if (simpleTaskData.status) {
+      setStatus(
+        simpleTaskData.status as
+          | "pending"
+          | "in-progress"
+          | "paused"
+          | "completed"
+          | "overdue"
+          | "returned"
+      );
+    }
   };
 
   const handleSubmitFileUpload = async () => {
@@ -1199,136 +1266,6 @@ export default function TaskDetailPage() {
         setCorrectionFiles(correctionFilesWithPageCount);
         // }
       }
-
-      let folder_path = "";
-      let storage_name = "";
-
-      const { data: simpleTaskData, error: simpleError } = await supabase
-        .from("tasks_test")
-        .select("*")
-        .eq("task_id", taskId)
-        .single();
-
-      if (simpleError) {
-        console.error("Error fetching simple task data:", simpleError);
-        return;
-      }
-
-      // Fetch creator info separately
-      const { data: creatorData, error: creatorError } = await supabase
-        .from("profiles")
-        .select("id,  name, email, role")
-        .eq("id", simpleTaskData.created_by)
-        .single();
-
-      if (creatorError) {
-        console.error("Error fetching creator data:", creatorError);
-        return;
-      }
-
-
-      // Set task with creator info
-      const taskData = {
-
-      // Set task with creator info and extract status
-      setTask((prev: any) => ({
-        ...prev, main
-        task_id: simpleTaskData.task_id,
-        project_id: simpleTaskData.project_id,
-        title: simpleTaskData.task_name,
-        client_instruction: simpleTaskData.client_instruction || "",
-        mail_instruction: simpleTaskData.mail_instruction || "",
-        estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
-        estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
-        estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
-        priority: simpleTaskData.priority || "low",
-        dueDate: simpleTaskData.delivery_date || "",
-        deliveryTime: simpleTaskData.delivery_time || "",
-        assignedTo: "",
-        createdBy: {
-          id: creatorData.id,
-          name: creatorData.name,
-          email: creatorData.email,
-          role: creatorData.role,
-        },
-        comments: simpleTaskData.comments || [],
-        createdDate: simpleTaskData.created_at,
-        overall_completion_status: simpleTaskData.overall_completion_status,
-        completion_status: simpleTaskData.completion_status,
-        attachments: simpleTaskData.attachments || [],
-        estimatedHours: simpleTaskData.estimated_hours || 0,
-      };
-      
-      setTask(taskData);
-
-      // Set real status from database
-      if (simpleTaskData.status) {
-        setRealStatus(simpleTaskData.status);
-        setStatus(
-          simpleTaskData.status as
-            | "pending"
-            | "in-progress"
-            | "paused"
-            | "completed"
-            | "overdue"
-            | "returned"
-        );
-      }
-
-      if (current_stage === "Processor") {
-        folder_path = `${sent_by}_${taskId}`;
-        storage_name = "processor-files";
-      } else if (current_stage === "QC") {
-        folder_path = taskId;
-        storage_name = "qc-files";
-      } else if (current_stage === "QA") {
-        folder_path = taskId;
-        storage_name = "qa-files";
-      }
-      console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
-      console.log("current_stage : ", current_stage);
-
-      const { data: uploadedFiles, error: uploadedError } =
-        await supabase.storage.from(storage_name).list(folder_path);
-      if (uploadedError) {
-        console.log("Error fetching uploaded files:", uploadedError);
-        return;
-      }
-      console.log(uploadedFiles);
-
-      // Fetch page counts from files_test table for uploaded files
-      const uploadedFilesWithPageCount = await Promise.all(
-        uploadedFiles.map(async (file) => {
-          try {
-            const { data: fileInfo, error: fileInfoError } = await supabase
-              .from("files_test")
-              .select("page_count")
-              .eq("task_id", taskId)
-              .eq("file_name", file.name)
-              .single();
-
-            if (fileInfoError && fileInfoError.code !== "PGRST116") {
-              console.warn(
-                `Error fetching page count for ${file.name}:`,
-                fileInfoError
-              );
-            }
-
-            return {
-              name: file.name,
-              pageCount: fileInfo?.page_count || null,
-            };
-          } catch (error) {
-            console.warn(`Failed to fetch page count for ${file.name}:`, error);
-            return {
-              name: file.name,
-              pageCount: null,
-            };
-          }
-        })
-      );
-
-      setUploadedFiles(uploadedFilesWithPageCount);
     } catch (error) {
       console.error("Error in fetchData:", error);
     }
