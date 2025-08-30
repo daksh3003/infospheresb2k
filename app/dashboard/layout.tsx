@@ -74,9 +74,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       // If user is not authenticated, redirect to login
       
-      if (!user) {
-        router.push("/auth/login");
-      }
+      // if (!user) {
+      //   router.push("/auth/login");
+      // }
     });
 
     return unsubscribe;

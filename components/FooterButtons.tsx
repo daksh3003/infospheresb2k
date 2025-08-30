@@ -6,6 +6,12 @@ import {
   Share2,
   ChevronDown,
   UserPlus,
+  Clock,
+  CircleDashed,
+  AlertCircle,
+  AlertTriangle,
+  Pause,
+  RefreshCw,
 } from "lucide-react";
 import { ArrowBigUpDashIcon } from "lucide-react";
 import { api } from "@/utils/api";
@@ -35,6 +41,7 @@ export const FooterButtons = ({
   status,
   SubmitTo,
   onAssignTask,
+  onStatusUpdate,
 }: {
   currentUser: any;
   currentStage: string;
@@ -49,12 +56,72 @@ export const FooterButtons = ({
   status: string;
   SubmitTo: string;
   onAssignTask: (user: any) => void;
+  onStatusUpdate?: () => void;
 }) => {
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [assignedTo, setAssignedTo] = useState<any[]>([]);
   const [showPickupDialog, setShowPickupDialog] = useState(false);
   const [isPickingUp, setIsPickingUp] = useState(false);
   const [hasAssignedUsers, setHasAssignedUsers] = useState(false);
+  const [realStatus, setRealStatus] = useState<string>(status);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Status configuration
+  const statusConfig = {
+    pending: {
+      icon: <CircleDashed className="h-4 w-4" />,
+      color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+      label: "Pending",
+    },
+    "in-progress": {
+      icon: <Clock className="h-4 w-4" />,
+      color: "bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100",
+      label: "In Progress",
+    },
+    completed: {
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      color:
+        "bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100",
+      label: "Completed",
+    },
+    overdue: {
+      icon: <AlertCircle className="h-4 w-4 text-red-600" />,
+      color: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
+      label: "Overdue",
+    },
+    returned: {
+      icon: <AlertTriangle className="h-4 w-4 text-yellow-600" />,
+      color:
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50",
+      label: "Returned",
+    },
+    paused: {
+      icon: <Pause className="h-4 w-4" />,
+      color:
+        "bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-100",
+      label: "Paused",
+    },
+  };
+
+  // const fetchRealStatus = async () => {
+  //   try {
+  //     setStatusLoading(true);
+  //     const response = await fetch(`/api/tasks/${taskId}/status`);
+
+  //     if (response.ok) {
+  //       const result = await response.json();
+  //       if (result.success && result.data?.status) {
+  //         console.log("Fetched real status:", result.data.status);
+  //         setRealStatus(result.data.status);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching real status:", error);
+  //     // Keep using prop status on error
+  //   } finally {
+  //     setStatusLoading(false);
+  //   }
+  // };
 
   const fetchAvailableUsers = async () => {
     try {
@@ -189,6 +256,8 @@ export const FooterButtons = ({
       toast.success("Task picked up successfully!");
       setShowPickupDialog(false);
       await fetchAssignedTo(); // Refresh the assigned users
+      // await fetchRealStatus(); // Refresh the status display
+      onStatusUpdate?.(); // Notify parent component to refresh status
     } catch (error) {
       console.error("Error picking up task:", error);
       toast.error("Failed to pick up task. Please try again.");
@@ -216,7 +285,16 @@ export const FooterButtons = ({
   useEffect(() => {
     fetchAvailableUsers();
     fetchAssignedTo();
+    // fetchRealStatus();
   }, [currentStage, taskId]);
+
+  // Sync realStatus with status prop when it changes
+  useEffect(() => {
+    if (status && status !== realStatus) {
+      console.log(`FooterButtons: Status updated from ${realStatus} to ${status}`);
+      setRealStatus(status);
+    }
+  }, [status]);
 
   return (
     <>
@@ -271,15 +349,23 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {status === "pending" && (
+          {realStatus === "pending" && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              onClick={handleStartTask}
+              onClick={async () => {
+                await handleStartTask();
+                // await fetchRealStatus(); // Refresh local status
+                onStatusUpdate?.(); // Notify parent component
+              }}
             >
               <Play className="h-4 w-4" /> Start Task
             </button>
           )}
-          {getPauseResumeButton(status, handlePauseResumeTask)}
+          {getPauseResumeButton(realStatus, async () => {
+            await handlePauseResumeTask();
+            // await fetchRealStatus(); // Refresh local status
+            onStatusUpdate?.(); // Notify parent component
+          })}
 
           <button
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
@@ -288,7 +374,7 @@ export const FooterButtons = ({
             <Share2 className="h-4 w-4" /> Handover
           </button>
 
-          {status !== "completed" && (
+          {realStatus !== "completed" && (
             <button
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               onClick={() => setShowCompleteDialog(true)}
@@ -296,7 +382,7 @@ export const FooterButtons = ({
               <CheckCircle2 className="h-4 w-4" /> Mark Complete
             </button>
           )}
-          {showSubmitToButton && status === "completed" && (
+          {showSubmitToButton && realStatus === "completed" && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               onClick={() => handleSendTo()}

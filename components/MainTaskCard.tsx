@@ -25,34 +25,105 @@ export const MainTaskCard = ({
   onAssignTask: (user: any) => void;
 }) => {
   const [assignedTo, setAssignedTo] = useState<any[]>([]);
+  const [realStatus, setRealStatus] = useState<string>(status);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Fetch real status from database
+  // const fetchRealStatus = async () => {
+  //   if (!task.task_id) return;
+
+  //   try {
+  //     setStatusLoading(true);
+  //     const response = await fetch(`/api/tasks/${task.task_id}/status`);
+
+  //     if (response.ok) {
+  //       const result = await response.json();
+  //       if (result.success && result.data?.status) {
+  //         setRealStatus(result.data.status);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching real status:', error);
+  //     // Keep using prop status on error
+  //   } finally {
+  //     setStatusLoading(false);
+  //   }
+  // };
 
   const fetchAssignedTo = async () => {
     try {
-      // Get task actions with filter for 'taken_by' and 'assigned_to' actions
+      // Fetch from task_actions table for 'taken_by' and 'assigned_to' actions
       const actionsResult = await getTaskActions({
         task_id: task.task_id,
         action_type: ["taken_by", "assigned_to"],
       });
 
-      if (!actionsResult.success || !actionsResult.data) {
-        console.error("Failed to fetch task actions:", actionsResult.error);
-        setAssignedTo([]);
-        return;
+      let taskActionsUsers: any[] = [];
+      
+      if (actionsResult.success && actionsResult.data) {
+        // Process task actions to get assigned users
+        taskActionsUsers = actionsResult.data.map((action: any) => ({
+          user_id: action.user_id,
+          name: action.metadata?.user_name || action.user_id,
+          email: action.metadata?.user_email || "",
+          role: action.metadata?.user_role || "",
+          action_type: action.action_type,
+          assigned_at: action.created_at,
+          stage: action.metadata?.stage || action.metadata?.current_stage,
+          source: 'task_actions'
+        }));
       }
 
-      // Process the task actions to get assigned users
-      const assignedUsers = actionsResult.data.map((action: any) => ({
-        user_id: action.user_id,
-        name: action.metadata?.user_name || action.user_id,
-        email: action.metadata?.user_email || "",
-        role: action.metadata?.user_role || "",
-        action_type: action.action_type,
-        assigned_at: action.created_at,
-        stage: action.metadata?.stage || action.metadata?.current_stage,
-      }));
+      // Fetch from files_test table
+      const { data: filesData, error: filesError } = await supabase
+        .from("files_test")
+        .select("taken_by, assigned_to, created_at")
+        .eq("task_id", task.task_id);
+
+      let filesUsers: any[] = [];
+
+      if (!filesError && filesData) {
+        // Process files_test data
+        filesData.forEach((file: any) => {
+          // Process taken_by field
+          if (file.taken_by) {
+            filesUsers.push({
+              user_id: file.taken_by,
+              name: file.taken_by, // This might need to be resolved to actual name
+              email: "",
+              role: "",
+              action_type: "taken_by",
+              assigned_at: file.created_at,
+              stage: "",
+              source: 'files_test'
+            });
+          }
+
+          // Process assigned_to array
+          if (file.assigned_to && Array.isArray(file.assigned_to)) {
+            file.assigned_to.forEach((assignment: any) => {
+              if (assignment && typeof assignment === 'object') {
+                filesUsers.push({
+                  user_id: assignment.user_id || assignment.id,
+                  name: assignment.name || assignment.user_id || assignment.id,
+                  email: assignment.email || "",
+                  role: assignment.role || "",
+                  action_type: "assigned_to",
+                  assigned_at: assignment.assigned_at || file.created_at,
+                  stage: "",
+                  source: 'files_test'
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Combine both sources
+      const allUsers = [...taskActionsUsers, ...filesUsers];
 
       // Remove duplicates based on user_id and keep the latest action
-      const uniqueAssignedUsers = assignedUsers.reduce(
+      const uniqueAssignedUsers = allUsers.reduce(
         (acc: any[], current: any) => {
           const existingIndex = acc.findIndex(
             (user) => user.user_id === current.user_id
@@ -73,7 +144,34 @@ export const MainTaskCard = ({
         []
       );
 
-      setAssignedTo(uniqueAssignedUsers);
+      // Resolve user names for user_ids that don't have names
+      const usersWithResolvedNames = await Promise.all(
+        uniqueAssignedUsers.map(async (user) => {
+          if (!user.name || user.name === user.user_id) {
+            try {
+              const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select("name, email, role")
+                .eq("id", user.user_id)
+                .single();
+
+              if (!profileError && profileData) {
+                return {
+                  ...user,
+                  name: profileData.name || user.name,
+                  email: profileData.email || user.email,
+                  role: profileData.role || user.role,
+                };
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch profile for user ${user.user_id}:`, error);
+            }
+          }
+          return user;
+        })
+      );
+
+      setAssignedTo(usersWithResolvedNames);
     } catch (error) {
       console.error("Error fetching assigned to:", error);
       setAssignedTo([]);
@@ -82,7 +180,18 @@ export const MainTaskCard = ({
 
   useEffect(() => {
     fetchAssignedTo();
+    // fetchRealStatus();
   }, [task.task_id]);
+
+  // Sync realStatus with status prop when it changes
+  useEffect(() => {
+    // if (status && status !== realStatus) {
+    //   console.log(
+    //     `MainTaskCard: Status updated from ${realStatus} to ${status}`
+    //   );
+      setRealStatus(status);
+    // }
+  }, [status]);
 
   return (
     <>
@@ -93,7 +202,11 @@ export const MainTaskCard = ({
             <p className="mt-1 text-gray-500">Created on {task.createdDate}</p>
           </div>
           <div className="flex items-center gap-2">
-            {getStatusBadge(status)}
+            {statusLoading ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            ) : (
+              getStatusBadge(realStatus)
+            )}
             {getPriorityBadge(task.priority)}
           </div>
         </div>

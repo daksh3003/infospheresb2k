@@ -11,12 +11,15 @@ import {
   AlertTriangle,
   Send,
   Loader2,
+  Pause,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 type TaskStatus =
   | "pending"
   | "in-progress"
+  | "paused"
   | "completed"
   | "overdue"
   | "returned";
@@ -42,7 +45,7 @@ export function TaskCard({
   description,
   dueDate,
   dueTime,
-  status,
+  status: propStatus,
   priority,
   onClick,
   onSendToQC,
@@ -50,6 +53,46 @@ export function TaskCard({
   isLoadingAction, // Optional
 }: TaskCardProps) {
   const router = useRouter();
+  const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Fetch real status from tasks_test table
+  useEffect(() => {
+    const fetchRealStatus = async () => {
+      try {
+        setStatusLoading(true);
+        const response = await fetch(`/api/tasks/${id}/status`);
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data?.status) {
+            console.log("Fetched real status:", result.data.status);
+            setRealStatus(result.data.status as TaskStatus);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching real status:", error);
+        // Keep using prop status on error
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchRealStatus();
+    }
+  }, [id, propStatus]);
+
+  // Sync realStatus with propStatus when it changes
+  useEffect(() => {
+    if (propStatus && propStatus !== realStatus) {
+      console.log(`TaskCard: Status updated from ${realStatus} to ${propStatus}`);
+      setRealStatus(propStatus);
+    }
+  }, [propStatus]);
+
+  // Use real status from database, fallback to prop status
+  const status = realStatus;
 
   const statusIcon = {
     pending: <CircleDashed className="h-4 w-4" />,
@@ -57,6 +100,7 @@ export function TaskCard({
     completed: <CheckCircle2 className="h-4 w-4" />,
     overdue: <AlertCircle className="h-4 w-4 text-red-600" />,
     returned: <AlertTriangle className="h-4 w-4 text-yellow-600" />,
+    paused: <Pause className="h-4 w-4" />,
   };
 
   const statusColor = {
@@ -68,6 +112,8 @@ export function TaskCard({
     overdue: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
     returned:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50",
+    paused:
+      "bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-100",
   };
 
   const priorityColor = {

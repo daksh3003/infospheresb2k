@@ -27,8 +27,10 @@ export default function TaskDetailPage() {
 
   // state hooks  :
   const [status, setStatus] = useState<
-    "pending" | "in-progress" | "paused" | "completed"
+    "pending" | "in-progress" | "paused" | "completed" | "overdue" | "returned"
   >("pending");
+  const [realStatus, setRealStatus] = useState<string>("pending");
+  const [statusLoading, setStatusLoading] = useState(false);
   const [progress, setProgress] = useState<number>(0);
   interface FileWithPageCount extends File {
     pageCount?: number;
@@ -103,6 +105,40 @@ export default function TaskDetailPage() {
   // Download history refresh trigger
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
+  // Fetch real status from database
+  const fetchRealStatus = async () => {
+    try {
+      setStatusLoading(true);
+      const { data: taskData, error } = await supabase
+        .from("tasks_test")
+        .select("status")
+        .eq("task_id", taskId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching task status:", error);
+        return;
+      }
+
+      if (taskData?.status) {
+        setRealStatus(taskData.status);
+        setStatus(
+          taskData.status as
+            | "pending"
+            | "in-progress"
+            | "paused"
+            | "completed"
+            | "overdue"
+            | "returned"
+        );
+      }
+    } catch (error) {
+      console.error("Error in fetchRealStatus:", error);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   // Handle file page count updates
   const handleUpdateFilePageCount = (index: number, pageCount: number) => {
     setfilesToBeUploaded((files) => {
@@ -155,10 +191,24 @@ export default function TaskDetailPage() {
   const handleStartTask = async () => {
     try {
       // Log the start action
-      await logTaskActionHelper("start", { previous_status: status });
+      await logTaskActionHelper("start", { previous_status: realStatus });
 
-      // This would need a new API endpoint for starting tasks
-      // For now, we'll keep the direct call but mark it for future API migration
+      // Update the task status in tasks_test table
+      const { error: statusError } = await supabase
+        .from("tasks_test")
+        .update({ status: "in-progress" })
+        .eq("task_id", taskId);
+
+      if (statusError) {
+        console.error("Error updating task status:", statusError);
+        toast("Failed to update task status", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      // Update process_logs_test for legacy support
       const { data: response, error: error } = await supabase
         .from("process_logs_test")
         .update({
@@ -174,7 +224,8 @@ export default function TaskDetailPage() {
         return;
       }
 
-      setStatus("in-progress");
+      // Refresh the real status from database
+      await fetchRealStatus();
       setProgress(5);
     } catch (error) {
       console.error("Error starting task:", error);
@@ -186,36 +237,88 @@ export default function TaskDetailPage() {
   };
 
   const handlePauseResumeTask = async () => {
-    const previousStatus = status;
-    let newStatus: "pending" | "in-progress" | "paused" | "completed";
+    console.log("pressed");
+    const previousStatus = realStatus;
+    let newStatus:
+      | "pending"
+      | "in-progress"
+      | "paused"
+      | "completed"
+      | "overdue"
+      | "returned";
     let actionType: string;
 
-    if (status === "in-progress") {
+    if (realStatus === "in-progress") {
       newStatus = "paused";
       actionType = "pause";
-    } else if (status === "paused") {
+    } else if (realStatus === "paused") {
       newStatus = "in-progress";
       actionType = "resume";
     } else {
       return;
     }
 
-    // Log the pause/resume action
-    await logTaskActionHelper(actionType as "pause" | "resume", {
-      previous_status: previousStatus,
-      new_status: newStatus,
-    });
+    try {
+      // Log the pause/resume action
+      await logTaskActionHelper(actionType as "pause" | "resume", {
+        previous_status: previousStatus,
+        new_status: newStatus,
+      });
 
-    setStatus(newStatus);
+      // Update the task status in tasks_test table
+      const { error: statusError } = await supabase
+        .from("tasks_test")
+        .update({ status: newStatus })
+        .eq("task_id", taskId);
+
+      if (statusError) {
+        console.error("Error updating task status:", statusError);
+        toast("Failed to update task status", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      // Refresh the real status from database
+      await fetchRealStatus();
+      
+      // Show success toast
+      toast(`Task ${actionType}d successfully!`, {
+        type: "success",
+        position: "top-right",
+      });
+    } catch (error) {
+      console.error("Error in handlePauseResumeTask:", error);
+      toast("Failed to update task status", {
+        type: "error",
+        position: "top-right",
+      });
+    }
   };
 
   const handleCompleteTask = async () => {
     // Log the complete action
     await logTaskActionHelper("complete", {
-      previous_status: status,
+      previous_status: realStatus,
       completion_status: completionStatus,
       files_uploaded: uploadedFiles?.length || 0,
     });
+
+    // Update the task status in tasks_test table
+    const { error: statusError } = await supabase
+      .from("tasks_test")
+      .update({ status: "completed" })
+      .eq("task_id", taskId);
+
+    if (statusError) {
+      console.error("Error updating task status:", statusError);
+      toast("Failed to update task status", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
 
     const { data: response, error: error } = await supabase
       .from("process_logs_test")
@@ -370,8 +473,8 @@ export default function TaskDetailPage() {
         setShowSubmitToButton(false);
       }
 
-      // Update local state
-      setStatus("completed");
+      // Refresh status from database and update local state
+      await fetchRealStatus();
       setProgress(100);
       setShowCompleteDialog(false);
     } catch (error) {
@@ -458,7 +561,7 @@ export default function TaskDetailPage() {
       return;
     }
 
-    if (status !== "completed") {
+    if (realStatus !== "completed") {
       toast("Task not completed", {
         type: "error",
         position: "top-right",
@@ -1123,8 +1226,13 @@ export default function TaskDetailPage() {
         return;
       }
 
+
       // Set task with creator info
       const taskData = {
+
+      // Set task with creator info and extract status
+      setTask((prev: any) => ({
+        ...prev, main
         task_id: simpleTaskData.task_id,
         project_id: simpleTaskData.project_id,
         title: simpleTaskData.task_name,
@@ -1152,6 +1260,20 @@ export default function TaskDetailPage() {
       };
       
       setTask(taskData);
+
+      // Set real status from database
+      if (simpleTaskData.status) {
+        setRealStatus(simpleTaskData.status);
+        setStatus(
+          simpleTaskData.status as
+            | "pending"
+            | "in-progress"
+            | "paused"
+            | "completed"
+            | "overdue"
+            | "returned"
+        );
+      }
 
       if (current_stage === "Processor") {
         folder_path = `${sent_by}_${taskId}`;
@@ -1402,6 +1524,7 @@ export default function TaskDetailPage() {
           fetchCurrentUser(),
           fetchProcessorFiles(),
           fetchData(),
+          fetchRealStatus(), // Add fetchRealStatus to initial data loading
         ]);
       } catch (error) {
         console.error("Error initializing data:", error);
@@ -1446,7 +1569,7 @@ export default function TaskDetailPage() {
         {/* Main task card */}
         <MainTaskCard
           task={task}
-          status={status}
+          status={realStatus}
           progress={progress}
           onAssignTask={handleAssignTask}
         />
@@ -1463,9 +1586,10 @@ export default function TaskDetailPage() {
           showSubmitToButton={showSubmitToButton}
           setShowHandoverDialog={setShowHandoverDialog}
           setShowCompleteDialog={setShowCompleteDialog}
-          status={status}
+          status={realStatus}
           SubmitTo={SubmitTo}
           onAssignTask={handleAssignTask}
+          onStatusUpdate={fetchRealStatus}
         />
       </div>
 

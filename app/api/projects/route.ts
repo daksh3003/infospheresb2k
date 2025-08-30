@@ -24,6 +24,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Creating project with data:', {
+      // projectData,
+      fileGroups: fileGroups[1].filesData,
+      // selectedFiles,
+      // currentUser
+    });
+
     // 1. Create project in projects_test table
     const { data: projectResult, error: projectError } = await supabase
       .from("projects_test")
@@ -101,7 +108,6 @@ export async function POST(request: NextRequest) {
             task_id: taskId,
             current_stage: "Processor",
             sent_by: "PM",
-            project_id: projectId,
             assigned_to: [],
           },
         ]);
@@ -115,34 +121,35 @@ export async function POST(request: NextRequest) {
       }
 
       // Upload files to storage
-      for (const file of group.files) {
-        const filePath = `${projectId}/${taskId}/${file.name}`;
-        
+      // for (const file of group.filesData) {
+
+        const filePath = `${taskId}/${group.filesData[0].file_name}`;
+
         const { error: uploadError } = await supabase.storage
-          .from("project-files")
-          .upload(filePath, file);
+          .from("task-files")
+          .upload(filePath, group.filesData[0].file_name);
 
         if (uploadError) {
           console.error("Error uploading file:", uploadError);
           return NextResponse.json(
-            { error: `Failed to upload file ${file.name}: ${uploadError.message}` },
+            { error: `Failed to upload file ${group.filesData[0].file_name}: ${uploadError.message}` },
             { status: 400 }
           );
         }
 
         // Create file record
+        // console.log(file)
+        // console.log(file.filesData)
         const { error: fileRecordError } = await supabase
           .from("files_test")
           .insert([
             {
               task_id: taskId,
-              file_name: file.name,
-              storage_name: "project-files",
-              folder_path: `${projectId}/${taskId}`,
-              file_size: file.size,
-              file_type: file.type,
-              uploaded_by: currentUser.id,
-              uploaded_at: new Date().toISOString(),
+              file_name: group.filesData[0].file_name,
+              storage_name: "task-files",
+              assigned_to: group.filesData[0].assigned_to,
+              file_path: `${taskId}`,
+              page_count: group.filesData[0].page_count,
             },
           ]);
 
@@ -153,7 +160,7 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-      }
+      // }
     }
 
     return NextResponse.json({
