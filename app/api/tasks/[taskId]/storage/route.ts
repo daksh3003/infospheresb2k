@@ -1,7 +1,7 @@
 // import { supabase } from "@/utils/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/utils/supabase";
-import { createClient } from "@supabase/supabase-js";
+
 
 
 export async function POST(request: NextRequest) {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
         const {file, file_path} = body;
 
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
         .from(storage_name)
         .upload(file_path, file, {
             contentType: file.type,

@@ -67,9 +67,13 @@ export default function Login() {
 
       // Direct redirect without prefetch for faster response
       router.push(redirectPath);
-    } catch (error: any) {
-      console.error("Error logging in:", error.message);
-      setError(error.message || "Login failed. Please try again.");
+    } catch (error: unknown) {
+      console.error("Error logging in:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Login failed. Please try again.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -196,7 +200,7 @@ export default function Login() {
 
                   <div className="mt-6">
                     <p className="text-center text-sm text-gray-600">
-                      Don't have an account?{" "}
+                      Don&apos;t have an account?{" "}
                       <Link
                         href="/auth/signup"
                         className="font-medium text-blue-600 hover:text-blue-500"

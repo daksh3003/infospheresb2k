@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: { user } });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = authHeader.substring(7);
+    authHeader.substring(7);
     
     // Get session from token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ data: { session } });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

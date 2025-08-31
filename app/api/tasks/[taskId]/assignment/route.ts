@@ -9,7 +9,7 @@ const supabase = createClient(
 // GET - Fetch task assignment
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -25,7 +25,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -36,7 +36,7 @@ export async function GET(
 // POST - Create or update task assignment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -84,7 +84,7 @@ export async function POST(
 
       return NextResponse.json({ data });
     }
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

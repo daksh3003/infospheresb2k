@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -98,10 +98,11 @@ export async function GET(
       availableUsers: users || [],
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Task detail error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -109,7 +110,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -134,16 +135,17 @@ export async function POST(
         );
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Task action error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
 
-async function handleTaskAssignment(taskId: string, selectedUserData: any) {
+async function handleTaskAssignment(taskId: string, selectedUserData: { id: string; name: string; email: string }) {
   try {
     if (!selectedUserData) {
       return NextResponse.json(
@@ -191,16 +193,19 @@ async function handleTaskAssignment(taskId: string, selectedUserData: any) {
 
     return NextResponse.json({ message: 'Task assigned successfully' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Task assignment error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to assign task';
     return NextResponse.json(
-      { error: error.message || 'Failed to assign task' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
 
-async function handleTaskPickup(taskId: string, currentUser: any) {
+async function handleTaskPickup(taskId: string, currentUser: {
+  role: string; id: string; name: string; email: string 
+}) {
   try {
     if (!currentUser) {
       return NextResponse.json(
@@ -259,10 +264,11 @@ async function handleTaskPickup(taskId: string, currentUser: any) {
 
     return NextResponse.json({ message: 'Task picked up successfully' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Task pickup error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to pick up task';
     return NextResponse.json(
-      { error: error.message || 'Failed to pick up task' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

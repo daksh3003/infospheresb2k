@@ -1,7 +1,7 @@
 // app/dashboard/qa/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,7 @@ export default function QADashboard() {
   useEffect(() => {
     setMounted(true);
     fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProjectNames = async (projectIds: string[]) => {
@@ -90,7 +91,7 @@ export default function QADashboard() {
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch("/api/tasks/current_stage/qa", {
@@ -99,25 +100,40 @@ export default function QADashboard() {
       const data = await response.json();
 
       if (data && data.length > 0) {
-        const processedTasks: QADashboardTask[] = data.map((item: any) => ({
-          id: item.id,
-          title: item.tasks_test?.task_name || "No Project Name",
-          description: `Status Flag: ${item.status_flag || "N/A"}`,
-          status: "pending",
-          priority: "medium",
-          dueDate: "",
-          assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
-          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
-          projectName: item.tasks_test?.task_name || "No Project Name",
-          currentStage: item.current_stage,
-          statusFlag: item.status_flag || null,
-          iterationNumber: item.iteration_number || 1,
-        }));
+        const processedTasks: QADashboardTask[] = data.map(
+          (item: {
+            id: number;
+            current_stage: string;
+            status_flag: string | null;
+            task_id: string;
+            iteration_number: number | null;
+            tasks_test: {
+              task_name: string;
+              task_id: string;
+              project_id: string;
+            } | null;
+          }) => ({
+            id: item.id,
+            title: item.tasks_test?.task_name || "No Project Name",
+            description: `Status Flag: ${item.status_flag || "N/A"}`,
+            status: "pending",
+            priority: "medium",
+            dueDate: "",
+            assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+            projectId: item.tasks_test?.project_id || item.task_id || "unknown",
+            projectName: item.tasks_test?.task_name || "No Project Name",
+            currentStage: item.current_stage,
+            statusFlag: item.status_flag || null,
+            iterationNumber: item.iteration_number || 1,
+          })
+        );
         setTasks(processedTasks);
 
         // Get unique project IDs and fetch their names and delivery info
         const uniqueProjectIds = [
-          ...new Set(processedTasks.map((task: any) => task.projectId)),
+          ...new Set(
+            processedTasks.map((task: { projectId: string }) => task.projectId)
+          ),
         ];
         await fetchProjectNames(uniqueProjectIds);
       }
@@ -127,7 +143,7 @@ export default function QADashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =

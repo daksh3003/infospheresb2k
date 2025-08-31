@@ -1,7 +1,7 @@
 // // app/dashboard/pm/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
 
 import LoadingScreen from "@/components/ui/loading-screen";
 
@@ -73,10 +72,10 @@ export default function ProcessorDashboard() {
   useEffect(() => {
     setMounted(true);
     fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProjectNames = async (projectIds: string[]) => {
-
     try {
       const data = await fetch("/api/projects/names", {
         method: "POST",
@@ -117,7 +116,7 @@ export default function ProcessorDashboard() {
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch("/api/tasks/current_stage/processor", {
@@ -126,31 +125,44 @@ export default function ProcessorDashboard() {
       const data = await response.json();
 
       if (data && data.length > 0) {
-        const processedTasks: PMDashboardTask[] = data.map((item: any) => ({
-          projectId: item.tasks_test?.project_id || item.task_id || "unknown",
-          projectName: item.tasks_test?.task_name || "No Project Name",
-          projectTaskId: item.tasks_test?.task_id || null,
-          clientInstruction: null,
-          deliveryDate: null,
-          deliveryTime: null,
-          processType: null,
-          poHours: null,
-          isProjectOverallComplete: false,
-          taskIterationId: item.id,
-          iterationNumber: item.iteration_number || 1,
-          currentStage: item.current_stage,
-          statusFlag: item.status_flag || null,
-          iterationNotes: null,
-          currentFileVersionId: null,
-          currentFileName: null,
-          calculatedStatus: "pending",
-          calculatedPriority: "medium",
-          displayId: item.id,
-          displayTitle: item.tasks_test?.task_name || "No Project Name",
-          displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
-          displayDueDate: null,
-          displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
-        }));
+        const processedTasks: PMDashboardTask[] = data.map(
+          (item: {
+            id: number;
+            current_stage: string;
+            status_flag: string | null;
+            task_id: string;
+            iteration_number: number | null;
+            tasks_test: {
+              task_name: string;
+              task_id: string;
+              project_id: string;
+            } | null;
+          }) => ({
+            projectId: item.tasks_test?.project_id || item.task_id || "unknown",
+            projectName: item.tasks_test?.task_name || "No Project Name",
+            projectTaskId: item.tasks_test?.task_id || null,
+            clientInstruction: null,
+            deliveryDate: null,
+            deliveryTime: null,
+            processType: null,
+            poHours: null,
+            isProjectOverallComplete: false,
+            taskIterationId: item.id,
+            iterationNumber: item.iteration_number || 1,
+            currentStage: item.current_stage,
+            statusFlag: item.status_flag || null,
+            iterationNotes: null,
+            currentFileVersionId: null,
+            currentFileName: null,
+            calculatedStatus: "pending",
+            calculatedPriority: "medium",
+            displayId: item.id,
+            displayTitle: item.tasks_test?.task_name || "No Project Name",
+            displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+            displayDueDate: null,
+            displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+          })
+        );
         setTasks(processedTasks);
 
         // Get unique project IDs and fetch their names and delivery info
@@ -168,7 +180,7 @@ export default function ProcessorDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =

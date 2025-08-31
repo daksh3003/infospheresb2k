@@ -9,7 +9,7 @@ const supabase = createClient(
 // GET - Fetch current user profile
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params: _params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -45,7 +45,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data: profile });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

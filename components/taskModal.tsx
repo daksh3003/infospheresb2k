@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   ChevronRight,
@@ -15,10 +15,8 @@ import {
   Split,
   Info,
   Users,
-  Clock,
   Hash,
   User,
-  Check,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -27,9 +25,6 @@ import { Tooltip } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-
-import type { SelectedItems } from "@heroui/react";
-import { Select, SelectItem, Avatar, Chip } from "@heroui/react";
 
 import { api } from "../utils/api";
 import { supabase } from "../utils/supabase";
@@ -82,7 +77,7 @@ interface FileGroup {
   filesData: FileFormData[];
 }
 
-interface TaskIteration {
+interface _TaskIteration {
   task_id: string;
   iteration_number: number;
   current_stage: string;
@@ -442,9 +437,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
       toast.success("Project created successfully!");
       onTaskAdded();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating project:", error);
-      toast.error(error.message || "Failed to create project");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create project";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

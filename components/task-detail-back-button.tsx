@@ -36,13 +36,15 @@ export function TaskDetailBackButton() {
     if (source === "global") {
       return "Back to Global Dashboard";
     }
-    return source ? `Back to ${source.toUpperCase()} Dashboard` : "Back to Dashboard";
+    return source
+      ? `Back to ${source.toUpperCase()} Dashboard`
+      : "Back to Dashboard";
   };
 
   return (
-    <Button 
-      variant="ghost" 
-      className="flex items-center text-gray-600 hover:text-gray-900" 
+    <Button
+      variant="ghost"
+      className="flex items-center text-gray-600 hover:text-gray-900"
       onClick={handleBackClick}
     >
       <ChevronLeft className="mr-1 h-4 w-4" />
@@ -51,8 +53,8 @@ export function TaskDetailBackButton() {
   );
 }
 
-function formatSourceName(path: string): string {
-  const segments = path.replace(/^\//, '').split('/');
+function _formatSourceName(path: string): string {
+  const segments = path.replace(/^\//, "").split("/");
 
   if (segments[0] === "dashboard") {
     if (segments.length > 1) {

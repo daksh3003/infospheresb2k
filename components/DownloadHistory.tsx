@@ -8,7 +8,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
 
 interface DownloadDetail {
   name: string;

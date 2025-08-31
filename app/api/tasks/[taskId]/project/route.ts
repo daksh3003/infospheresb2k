@@ -9,10 +9,10 @@ const supabase = createClient(
 // GET - Fetch project tasks completion status
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
-    const { taskId } = await params;
+    await params;
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
 
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -44,10 +44,10 @@ export async function GET(
 // PATCH - Update project completion status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
-    const { taskId } = await params;
+    await params;
     const body = await request.json();
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
@@ -71,7 +71,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

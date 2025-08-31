@@ -1,4 +1,4 @@
-import React from "react";
+import React, { use, useEffect } from "react";
 import { Paperclip, DownloadCloud } from "lucide-react";
 
 export const TaskAttachments = ({
@@ -10,6 +10,7 @@ export const TaskAttachments = ({
   handleDownload,
   storage_name,
   folder_path,
+  fetchProcessorFiles,
 }: {
   PMFiles: { name: string; pageCount: number | null }[];
   processorFiles: { name: string; pageCount: number | null }[];
@@ -24,7 +25,25 @@ export const TaskAttachments = ({
   ) => void;
   storage_name: string;
   folder_path: string;
+  fetchProcessorFiles: () => void;
 }) => {
+  console.log("Task Attachments Props:", {
+    PMFiles,
+    processorFiles,
+    correctionFiles,
+    version,
+    taskId,
+    storage_name,
+    folder_path,
+  });
+
+  useEffect(() => {
+    // processorFiles.forEach((file) => {
+    //   console.log("Processor file:", file);
+    // });
+    fetchProcessorFiles();
+  }, [taskId]);
+
   return (
     <>
       <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">

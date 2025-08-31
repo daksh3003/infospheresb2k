@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     const { taskId, action } = await request.json();
 
     if (action === "start") {
-        const { data: response, error: error } = await supabase
+        const { error } = await supabase
             .from("process_logs_test")
             .update({
                 started_at: new Date(),
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         }
     }
     else if (action === "pause") {
-        const { data: response, error: error } = await supabase
+        const { error } = await supabase
             .from("process_logs_test")
             .update({
                 paused_at: new Date(),
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         }
     }
     else if (action === "resume") {
-        const { data: response, error: error } = await supabase
+        const { error } = await supabase
             .from("process_logs_test")
             .update({
                 resumed_at: new Date(),
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         }
     }
     else if (action === "complete") {
-        const { data: response, error: error } = await supabase
+        const { error } = await supabase
             .from("process_logs_test")
             .update({
                 ended_at: new Date(),

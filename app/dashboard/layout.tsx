@@ -7,14 +7,12 @@ import {
   ClipboardCheck,
   ShieldCheck,
   Users,
-  Settings,
   LogOut,
   Menu,
   X,
-  Bell,
   Cpu,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,8 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
+
 import { authManager, type AuthUser } from "@/utils/auth";
 
 interface DashboardLayoutProps {
@@ -73,7 +70,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       console.log("user", user);
 
       // If user is not authenticated, redirect to login
-      
+
       // if (!user) {
       //   router.push("/auth/login");
       // }
@@ -158,16 +155,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 .filter((item) => {
                   if (item.name === "Settings") return true;
                   if (currentUserRole === "projectManager") return true;
-                  
+
                   // Check if the user role matches the dashboard
                   // Allow access based on role mapping
                   const roleMapping: { [key: string]: string[] } = {
-                    "projectManager": ["/dashboard/pm", "/dashboard/processor", "/dashboard/qc", "/dashboard/qa"],
-                    "processor": ["/dashboard/processor"],
-                    "qcTeam": ["/dashboard/qc"],
-                    "qaTeam": ["/dashboard/qa"],
+                    projectManager: [
+                      "/dashboard/pm",
+                      "/dashboard/processor",
+                      "/dashboard/qc",
+                      "/dashboard/qa",
+                    ],
+                    processor: ["/dashboard/processor"],
+                    qcTeam: ["/dashboard/qc"],
+                    qaTeam: ["/dashboard/qa"],
                   };
-                  
+
                   const allowedPaths = roleMapping[currentUserRole || ""] || [];
                   return allowedPaths.includes(item.href);
                 })

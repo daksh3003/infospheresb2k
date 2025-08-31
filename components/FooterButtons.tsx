@@ -3,7 +3,6 @@ import { getPauseResumeButton } from "./task/taskAction";
 import {
   CheckCircle2,
   Play,
-  Share2,
   ChevronDown,
   UserPlus,
   Clock,
@@ -11,11 +10,9 @@ import {
   AlertCircle,
   AlertTriangle,
   Pause,
-  RefreshCw,
 } from "lucide-react";
 import { ArrowBigUpDashIcon } from "lucide-react";
 import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
 import { logTaskAction, getTaskActions } from "@/utils/taskActions";
 import {
   DropdownMenu,
@@ -36,14 +33,14 @@ export const FooterButtons = ({
   handlePauseResumeTask,
   handleSendTo,
   showSubmitToButton,
-  setShowHandoverDialog,
+  // setShowHandoverDialog,
   setShowCompleteDialog,
   status,
   SubmitTo,
   onAssignTask,
   onStatusUpdate,
 }: {
-  currentUser: any;
+  currentUser: { id: string; name: string; email: string; role: string };
   currentStage: string;
   sentBy: string;
   taskId: string;
@@ -51,23 +48,32 @@ export const FooterButtons = ({
   handlePauseResumeTask: () => void;
   handleSendTo: () => void;
   showSubmitToButton: boolean;
-  setShowHandoverDialog: (value: boolean) => void;
+  // setShowHandoverDialog: (value: boolean) => void;
   setShowCompleteDialog: (value: boolean) => void;
   status: string;
   SubmitTo: string;
-  onAssignTask: (user: any) => void;
+  onAssignTask: (user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }) => void;
   onStatusUpdate?: () => void;
 }) => {
-  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
-  const [assignedTo, setAssignedTo] = useState<any[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<
+    { id: string; name: string; email: string; role: string }[]
+  >([]);
+  const [_assignedTo, _setAssignedTo] = useState<
+    { user_id: string; name: string; email: string; role: string }[]
+  >([]);
   const [showPickupDialog, setShowPickupDialog] = useState(false);
   const [isPickingUp, setIsPickingUp] = useState(false);
   const [hasAssignedUsers, setHasAssignedUsers] = useState(false);
   const [realStatus, setRealStatus] = useState<string>(status);
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [_statusLoading, _setStatusLoading] = useState(false);
 
   // Status configuration
-  const statusConfig = {
+  const _statusConfig = {
     pending: {
       icon: <CircleDashed className="h-4 w-4" />,
       color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
@@ -142,25 +148,56 @@ export const FooterButtons = ({
 
       if (!actionsResult.success || !actionsResult.data) {
         console.error("Failed to fetch task actions:", actionsResult.error);
-        setAssignedTo([]);
+        _setAssignedTo([]);
         setHasAssignedUsers(false);
         return;
       }
 
       // Process the task actions to get assigned users
-      const assignedUsers = actionsResult.data.map((action: any) => ({
-        user_id: action.user_id,
-        name: action.metadata?.user_name || action.user_id,
-        email: action.metadata?.user_email || "",
-        role: action.metadata?.user_role || "",
-        action_type: action.action_type,
-        assigned_at: action.created_at,
-        stage: action.metadata?.stage || currentStage,
-      }));
+      const assignedUsers = actionsResult.data.map(
+        (action: {
+          user_id: string;
+          action_type: string;
+          created_at: string;
+          metadata?: {
+            user_name?: string;
+            user_email?: string;
+            user_role?: string;
+            stage?: string;
+          };
+        }) => ({
+          user_id: action.user_id,
+          name: action.metadata?.user_name || action.user_id,
+          email: action.metadata?.user_email || "",
+          role: action.metadata?.user_role || "",
+          action_type: action.action_type,
+          assigned_at: action.created_at,
+          stage: action.metadata?.stage || currentStage,
+        })
+      );
 
       // Remove duplicates based on user_id and keep the latest action
       const uniqueAssignedUsers = assignedUsers.reduce(
-        (acc: any[], current: any) => {
+        (
+          acc: {
+            user_id: string;
+            name: string;
+            email: string;
+            role: string;
+            action_type: string;
+            assigned_at: string;
+            stage: string;
+          }[],
+          current: {
+            user_id: string;
+            name: string;
+            email: string;
+            role: string;
+            action_type: string;
+            assigned_at: string;
+            stage: string;
+          }
+        ) => {
           const existingIndex = acc.findIndex(
             (user) => user.user_id === current.user_id
           );
@@ -180,11 +217,11 @@ export const FooterButtons = ({
         []
       );
 
-      setAssignedTo(uniqueAssignedUsers);
+      _setAssignedTo(uniqueAssignedUsers);
       setHasAssignedUsers(uniqueAssignedUsers.length > 0);
     } catch (error) {
       console.error("Error fetching assigned to:", error);
-      setAssignedTo([]);
+      _setAssignedTo([]);
       setHasAssignedUsers(false);
     }
   };
@@ -369,12 +406,12 @@ export const FooterButtons = ({
             onStatusUpdate?.(); // Notify parent component
           })}
 
-          <button
+          {/* <button
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
             onClick={() => setShowHandoverDialog(true)}
           >
             <Share2 className="h-4 w-4" /> Handover
-          </button>
+          </button> */}
 
           {realStatus !== "completed" && (
             <button

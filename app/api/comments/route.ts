@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
       comments: comments || [],
       taskId: taskId
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
@@ -144,10 +144,10 @@ export async function POST(request: NextRequest) {
 
     console.log("Comment saved successfully:", data);
     return NextResponse.json({ comment: data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
@@ -237,10 +237,10 @@ export async function PUT(request: NextRequest) {
 
     console.log("Comment updated successfully:", data);
     return NextResponse.json({ comment: data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
@@ -306,10 +306,10 @@ export async function DELETE(request: NextRequest) {
 
     console.log("Comment deleted successfully");
     return NextResponse.json({ message: 'Comment deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

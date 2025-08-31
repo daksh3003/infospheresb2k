@@ -8,7 +8,6 @@ import { Clock, DownloadCloud, Paperclip, CheckCircle } from "react-feather";
 import { ChevronDown, ChevronUp } from "react-feather";
 import "./Timeline.css";
 import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
 import { useParams } from "next/navigation";
 
 const style = {
@@ -27,7 +26,7 @@ const style = {
   overflow: "auto",
 };
 
-interface TimelineItem {
+interface _TimelineItem {
   id: string;
   title: string;
   content: [];
@@ -60,7 +59,19 @@ export default function TimelineModal({
   const handleClose = () => setOpen(false);
 
   const { taskId } = useParams() as { taskId: string };
-  const [timelineItems, setTimelineItems] = React.useState<any[]>([]);
+  const [timelineItems, setTimelineItems] = React.useState<
+    {
+      id: string;
+      title: string;
+      content: {
+        name: string;
+        storage_name: string;
+        folder_path: string;
+        index: number;
+      }[];
+      completed: boolean;
+    }[]
+  >([]);
 
   const fetchTimelineItems = async () => {
     try {
@@ -194,32 +205,43 @@ export default function TimelineModal({
                           </h3>
                         ) : (
                           <>
-                            {item.content.map((file: any, fileIdx: number) => (
-                              <div
-                                key={fileIdx}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <Paperclip className="h-4 w-4 text-gray-500" />
-                                  <div>
-                                    <p className="font-medium">{file.name}</p>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    handleDownload(
-                                      file.name,
-                                      file.storage_name,
-                                      file.folder_path,
-                                      file.index
-                                    )
-                                  }
-                                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                            {item.content.map(
+                              (
+                                file: {
+                                  name: string;
+                                  storage_name: string;
+                                  folder_path: string;
+                                  index: number;
+                                },
+                                fileIdx: number
+                              ) => (
+                                <div
+                                  key={fileIdx}
+                                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                                 >
-                                  <DownloadCloud className="h-4 w-4" /> Download
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-3">
+                                    <Paperclip className="h-4 w-4 text-gray-500" />
+                                    <div>
+                                      <p className="font-medium">{file.name}</p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handleDownload(
+                                        file.name,
+                                        file.storage_name,
+                                        file.folder_path,
+                                        file.index
+                                      )
+                                    }
+                                    className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                                  >
+                                    <DownloadCloud className="h-4 w-4" />{" "}
+                                    Download
+                                  </button>
+                                </div>
+                              )
+                            )}
                           </>
                         )}
                       </div>

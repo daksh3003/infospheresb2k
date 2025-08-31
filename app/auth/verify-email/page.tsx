@@ -2,13 +2,12 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 export default function VerifyEmail() {
-  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
+
   const searchParams = useSearchParams();
 
   const emailFromUrl = searchParams?.get("email") || "";
@@ -61,7 +60,7 @@ export default function VerifyEmail() {
           Check your email
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          We've sent a verification link to{" "}
+          We&apos;ve sent a verification link to{" "}
           <span className="font-semibold">
             {emailFromUrl || "your email address"}
           </span>
@@ -85,7 +84,7 @@ export default function VerifyEmail() {
               </button>
 
               <div className="text-sm text-gray-500">
-                <p>Didn't receive the email? Check your spam folder or</p>
+                <p>Didn&apos;t receive the email? Check your spam folder or</p>
                 <button
                   onClick={() => {
                     // Here you could add resend email logic

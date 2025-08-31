@@ -72,10 +72,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ files });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('File fetch error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -187,10 +188,11 @@ export async function POST(request: NextRequest) {
       fileRecord,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('File upload error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

@@ -9,7 +9,7 @@ const supabase = createClient(
 // GET - Fetch task iteration data
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -27,7 +27,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -38,7 +38,7 @@ export async function GET(
 // PATCH - Update task iteration
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { taskId } = await params;
@@ -56,7 +56,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

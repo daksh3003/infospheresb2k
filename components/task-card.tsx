@@ -54,7 +54,7 @@ export function TaskCard({
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [_statusLoading, setStatusLoading] = useState(false);
 
   // Fetch real status from tasks_test table
   useEffect(() => {

@@ -52,9 +52,13 @@ export default function Signup() {
       router.push(
         `/auth/verify-email?email=${encodeURIComponent(formData.email)}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error signing up:", error);
-      setError(error.message || "An error occurred during signup");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An error occurred during signup";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

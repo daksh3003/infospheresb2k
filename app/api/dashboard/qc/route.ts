@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -6,7 +6,7 @@ const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const { data, error } = await supabase
       .from("task_iterations")
@@ -30,10 +30,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (data && data.length > 0) {
-      const processedTasks = data.map((item: any) => ({
-        projectId: item.tasks_test?.project_id || item.task_id || "unknown",
-        projectName: item.tasks_test?.task_name || "No Project Name",
-        projectTaskId: item.tasks_test?.task_id || null,
+      const processedTasks = data.map((item: { id: number; current_stage: string; status_flag: string | null; task_id: string; iteration_number: number | null; tasks_test: { task_name: string; task_id: string; project_id: string }[] | null }) => ({
+        projectId: item.tasks_test?.[0]?.project_id || item.task_id || "unknown",
+        projectName: item.tasks_test?.[0]?.task_name || "No Project Name",
+        projectTaskId: item.tasks_test?.[0]?.task_id || null,
         clientInstruction: null,
         deliveryDate: null,
         processType: null,
@@ -49,11 +49,11 @@ export async function GET(request: NextRequest) {
         calculatedStatus: "pending",
         calculatedPriority: "medium",
         displayId: item.id,
-        displayTitle: item.tasks_test?.task_name || "No Project Name",
+        displayTitle: item.tasks_test?.[0]?.task_name || "No Project Name",
         displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
         displayDueDate: null,
         displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
-        title: item.tasks_test?.task_name || "No Project Name",
+        title: item.tasks_test?.[0]?.task_name || "No Project Name",
         description: `Status Flag: ${item.status_flag || "N/A"}`,
         status: "pending",
         priority: "medium",
@@ -107,10 +107,11 @@ export async function GET(request: NextRequest) {
       projectNames: {},
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('QC Dashboard error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

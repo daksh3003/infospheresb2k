@@ -1,7 +1,7 @@
 "use client";
 
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
-import React, { useState, Fragment, use, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { api } from "@/utils/api";
@@ -17,6 +17,89 @@ import { FooterButtons } from "@/components/FooterButtons";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { DownloadHistory } from "@/components/DownloadHistory";
 
+// Updated interfaces based on actual database schema
+interface TaskFromDB {
+  task_id: string;
+  task_name: string;
+  client_instruction: string | null;
+  processor_type: string | null;
+  estimated_hours_ocr: number | null;
+  estimated_hours_qc: number | null;
+  estimated_hours_qa: number | null;
+  completion_status: boolean | null;
+  project_id: string | null;
+  created_at: string | null;
+  created_by: string | null;
+  status: string | null;
+  updated_at: string | null;
+  feedback: string | null;
+}
+
+interface ProjectFromDB {
+  project_id: string;
+  project_name: string;
+  po_hours: number | null;
+  mail_instruction: string | null;
+  list_of_files: string[] | null;
+  reference_file: string | null;
+  delivery_date: string | null;
+  delivery_time: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  completion_status: boolean | null;
+  created_by: string | null;
+}
+
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+// Combined task interface for frontend use
+interface Task {
+  // From tasks_test
+  task_id: string;
+  task_name: string;
+  client_instruction: string;
+  processor_type: string;
+  estimated_hours_ocr: number;
+  estimated_hours_qc: number;
+  estimated_hours_qa: number;
+  completion_status: boolean;
+  created_at: string;
+  status: string;
+  feedback: string;
+
+  // From projects_test
+  project_id: string;
+  project_name: string;
+  po_hours: number;
+  mail_instruction: string;
+  list_of_files: string[];
+  reference_file: string;
+  delivery_date: string;
+  delivery_time: string;
+
+  // Creator information
+  created_by: UserProfile;
+
+  // Frontend display properties
+  title: string; // Will map to task_name
+  priority: string; // Will derive from processor_type or default
+  dueDate: string; // Will map to delivery_date
+  deliveryTime: string; // Will map to delivery_time
+  assignedTo: string;
+  attachments: string[];
+  estimatedHours: number; // Will sum all estimated hours
+  overall_completion_status: boolean;
+}
+
+interface FileWithPageCount extends File {
+  pageCount?: number;
+}
+
 export default function TaskDetailPage() {
   const params = useParams();
   const taskId = params.taskId as string;
@@ -26,20 +109,18 @@ export default function TaskDetailPage() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // state hooks  :
-  const [status, setStatus] = useState<
+  const [_status, _setStatus] = useState<
     "pending" | "in-progress" | "paused" | "completed" | "overdue" | "returned"
   >("pending");
   const [realStatus, setRealStatus] = useState<string>("pending");
-  const [statusLoading, setStatusLoading] = useState(false);
+  const [_statusLoading, _setStatusLoading] = useState(false);
   const [progress, setProgress] = useState<number>(0);
-  interface FileWithPageCount extends File {
-    pageCount?: number;
-  }
+
   const [filesToBeUploaded, setfilesToBeUploaded] = useState<
     FileWithPageCount[]
   >([]);
   const [activeTab, setActiveTab] = useState<"files" | "comments">("files");
-  const [uploadedFiles, setUploadedFiles] = useState<
+  const [uploadedFiles, _setUploadedFiles] = useState<
     { name: string; pageCount: number | null }[] | null
   >([]);
   const [currentStage, setCurrentStage] = useState<string>("");
@@ -52,26 +133,36 @@ export default function TaskDetailPage() {
   const [showSubmitToButton, setShowSubmitToButton] = useState(false);
   const [SubmitTo, setSubmitTo] = useState("QC");
 
-  // task states :
-  const [task, setTask] = useState<any>({
+  // Updated task state with proper typing
+  const [task, setTask] = useState<Task>({
     task_id: taskId,
+    task_name: "",
     title: "",
     client_instruction: "",
-    mail_instruction: "",
+    processor_type: "",
+    estimated_hours_ocr: 0,
     estimated_hours_qc: 0,
     estimated_hours_qa: 0,
-    estimated_hours_ocr: 0,
+    completion_status: false,
+    created_at: "",
+    status: "pending",
+    feedback: "",
+    project_id: "",
+    project_name: "",
+    po_hours: 0,
+    mail_instruction: "",
+    list_of_files: [],
+    reference_file: "",
+    delivery_date: "",
+    delivery_time: "",
+    created_by: { id: "", name: "", email: "", role: "" },
     priority: "low",
     dueDate: "",
     deliveryTime: "",
     assignedTo: "",
-    createdBy: "",
     attachments: [],
-    createdDate: "",
     estimatedHours: 0,
-    project_id: "",
     overall_completion_status: false,
-    completion_status: false,
   });
 
   // file states :
@@ -86,8 +177,8 @@ export default function TaskDetailPage() {
   >([]);
 
   // user states :
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isQcinLoop, setIsQcinLoop] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [_isQcinLoop, _setIsQcinLoop] = useState<boolean>(true);
 
   // file states :
   const [storage_name, setStorageName] = useState<string>("");
@@ -95,20 +186,125 @@ export default function TaskDetailPage() {
   const [version, setVersion] = useState<number>(1);
 
   // user states :
-
-  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
-
-  const [selectedUserData, setSelectedUserData] = useState<any>({});
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [isTaskPickedUp, setIsTaskPickedUp] = useState(false);
+  const [_availableUsers, _setAvailableUsers] = useState<UserProfile[]>([]);
+  const [_selectedUserData, _setSelectedUserData] =
+    useState<UserProfile | null>(null);
+  const [_isAssigning, _setIsAssigning] = useState(false);
+  const [_isTaskPickedUp, _setIsTaskPickedUp] = useState(false);
 
   // Download history refresh trigger
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
+  // New function to fetch complete task details with project information
+  const fetchCompleteTaskDetails = async (): Promise<Task | null> => {
+    try {
+      // Fetch task data
+      const { data: taskData, error: taskError } = await supabase
+        .from("tasks_test")
+        .select("*")
+        .eq("task_id", taskId)
+        .single();
+
+      if (taskError) {
+        console.error("Error fetching task data:", taskError);
+        return null;
+      }
+
+      if (!taskData.project_id) {
+        console.error("Task has no associated project");
+        return null;
+      }
+
+      // Fetch project data
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects_test")
+        .select("*")
+        .eq("project_id", taskData.project_id)
+        .single();
+
+      if (projectError) {
+        console.error("Error fetching project data:", projectError);
+        return null;
+      }
+
+      // Fetch creator information
+      let creatorData: UserProfile = {
+        id: "",
+        name: "Unknown",
+        email: "",
+        role: "",
+      };
+      if (taskData.created_by) {
+        const { data: creator, error: creatorError } = await supabase
+          .from("profiles")
+          .select("id, name, email, role")
+          .eq("id", taskData.created_by)
+          .single();
+
+        if (!creatorError && creator) {
+          creatorData = creator;
+        }
+      }
+
+      // Calculate total estimated hours
+      const totalEstimatedHours =
+        (taskData.estimated_hours_ocr || 0) +
+        (taskData.estimated_hours_qc || 0) +
+        (taskData.estimated_hours_qa || 0);
+
+      // Map priority from processor_type or default
+      const priority = taskData.processor_type?.toLowerCase() || "normal";
+
+      // Combine data into Task interface
+      const completeTask: Task = {
+        // From tasks_test
+        task_id: taskData.task_id,
+        task_name: taskData.task_name,
+        client_instruction: taskData.client_instruction || "",
+        processor_type: taskData.processor_type || "",
+        estimated_hours_ocr: taskData.estimated_hours_ocr || 0,
+        estimated_hours_qc: taskData.estimated_hours_qc || 0,
+        estimated_hours_qa: taskData.estimated_hours_qa || 0,
+        completion_status: taskData.completion_status || false,
+        created_at: taskData.created_at || "",
+        status: taskData.status || "pending",
+        feedback: taskData.feedback || "",
+
+        // From projects_test
+        project_id: projectData.project_id,
+        project_name: projectData.project_name,
+        po_hours: projectData.po_hours || 0,
+        mail_instruction: projectData.mail_instruction || "",
+        list_of_files: projectData.list_of_files || [],
+        reference_file: projectData.reference_file || "",
+        delivery_date: projectData.delivery_date || "",
+        delivery_time: projectData.delivery_time || "",
+
+        // Creator information
+        created_by: creatorData,
+
+        // Frontend display properties
+        title: taskData.task_name,
+        priority: priority,
+        dueDate: projectData.delivery_date || "",
+        deliveryTime: projectData.delivery_time || "",
+        assignedTo: "", // Will be populated separately if needed
+        attachments: projectData.list_of_files || [],
+        estimatedHours: totalEstimatedHours,
+        overall_completion_status: taskData.completion_status || false,
+      };
+
+      return completeTask;
+    } catch (error) {
+      console.error("Error in fetchCompleteTaskDetails:", error);
+      return null;
+    }
+  };
+
   // Fetch real status from database
   const fetchRealStatus = async () => {
     try {
-      setStatusLoading(true);
+      _setStatusLoading(true);
       const { data: taskData, error } = await supabase
         .from("tasks_test")
         .select("status")
@@ -122,7 +318,7 @@ export default function TaskDetailPage() {
 
       if (taskData?.status) {
         setRealStatus(taskData.status);
-        setStatus(
+        _setStatus(
           taskData.status as
             | "pending"
             | "in-progress"
@@ -135,7 +331,7 @@ export default function TaskDetailPage() {
     } catch (error) {
       console.error("Error in fetchRealStatus:", error);
     } finally {
-      setStatusLoading(false);
+      _setStatusLoading(false);
     }
   };
 
@@ -160,7 +356,7 @@ export default function TaskDetailPage() {
       | "upload"
       | "taken_by"
       | "assigned_to",
-    additionalMetadata?: any
+    additionalMetadata?: Record<string, unknown>
   ) => {
     if (!currentUser || !taskId) return;
 
@@ -209,7 +405,7 @@ export default function TaskDetailPage() {
       }
 
       // Update process_logs_test for legacy support
-      const { data: response, error: error } = await supabase
+      const { data: _response, error: error } = await supabase
         .from("process_logs_test")
         .update({
           started_at: new Date(),
@@ -237,7 +433,6 @@ export default function TaskDetailPage() {
   };
 
   const handlePauseResumeTask = async () => {
-    console.log("pressed");
     const previousStatus = realStatus;
     let newStatus:
       | "pending"
@@ -342,11 +537,7 @@ export default function TaskDetailPage() {
       });
     }
 
-    console.log(response);
-    console.log("Completing task:", taskId);
     let overall_completion_status = false;
-    console.log("Current Stage:", currentStage);
-    console.log("Sent By:", sentBy);
     if (
       (currentStage === "Processor" && sentBy === "QA") ||
       (currentStage === "QA" && sentBy === "QC") ||
@@ -359,7 +550,7 @@ export default function TaskDetailPage() {
       setCompletionStatus(true);
     }
     try {
-      // // Update the task in Supabase
+      // Update the task in Supabase
       if (overall_completion_status) {
         const { error } = await supabase
           .from("tasks_test")
@@ -373,13 +564,11 @@ export default function TaskDetailPage() {
           return;
         }
 
-        // check all the tasks mapped to the same project are completed or not
+        // Check all the tasks mapped to the same project are completed or not
         const { data: projectTasks, error: projectTasksError } = await supabase
           .from("tasks_test")
           .select("completion_status")
           .eq("project_id", task.project_id);
-
-        console.log("projectTasks", projectTasks);
 
         if (projectTasksError) {
           console.error("Error fetching project tasks:", projectTasksError);
@@ -389,8 +578,6 @@ export default function TaskDetailPage() {
         const isAllTasksCompleted = projectTasks.every(
           (task) => task.completion_status
         );
-
-        console.log("isAllTasksCompleted", isAllTasksCompleted);
 
         if (isAllTasksCompleted) {
           const { error: projectError } = await supabase
@@ -443,7 +630,6 @@ export default function TaskDetailPage() {
         uploadedFiles.length > 0
       ) {
         setSubmitTo("Send to Processor Team");
-        // console.log("hello");
         setShowSubmitToButton(true);
       } else if (
         (data.sent_by === "QC" &&
@@ -485,8 +671,6 @@ export default function TaskDetailPage() {
   const handleSendTo = async () => {
     let next_current_stage = "";
     let next_sent_by = "";
-
-    // console.log(currentStage, sentBy);
 
     if (SubmitTo === "Send to QC") {
       next_current_stage = "QC";
@@ -543,7 +727,7 @@ export default function TaskDetailPage() {
       updatedStages.push(currentStage);
     }
 
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from("task_iterations")
       .update({
         current_stage: next_current_stage,
@@ -661,10 +845,31 @@ export default function TaskDetailPage() {
       URL.revokeObjectURL(url);
 
       // Log the download to database
+      // console.log("task_id:", taskId);
+      // console.log("fileName:", fileName);
+      // console.log("folder_path:", folder_path);
       if (currentUser) {
         try {
-          // Generate a unique file_id based on file name and path
-          const file_id = `${storage_name}_${folder_path}_${fileName}`;
+          console.log("hello");
+          // Get file_id from files_test table based on task_id, file_name and file_path
+          const { data: fileData, error: fileError } = await supabase
+            .from("files_test")
+            .select("file_id")
+            .eq("task_id", taskId)
+            .eq("file_name", fileName)
+            .eq("file_path", `${folder_path}/${fileName}`)
+            .single();
+
+          // console.log("task_id:", taskId);
+          // console.log("fileName:", fileName);
+          // console.log("folder_path:", folder_path);
+
+          if (fileError) {
+            console.error("Error fetching file_id from files_test:", fileError);
+            return;
+          }
+
+          const file_id = fileData.file_id;
 
           // Check if a record for this file already exists
           const { data: existingRecord, error: checkError } = await supabase
@@ -680,7 +885,7 @@ export default function TaskDetailPage() {
           }
 
           const downloadDetail = {
-            name: currentUser.full_name || "Unknown User",
+            name: currentUser.name || "Unknown User",
             email: currentUser.email || "",
             role: currentUser.role || "user",
             time: new Date().toISOString(),
@@ -713,7 +918,7 @@ export default function TaskDetailPage() {
                 file_id: file_id,
                 file_name: fileName,
                 storage_name: storage_name,
-                folder_path: folder_path,
+                file_path: folder_path,
                 downloaded_details: [downloadDetail],
               });
 
@@ -744,7 +949,7 @@ export default function TaskDetailPage() {
       await logTaskActionHelper("download", {
         file_name: fileName,
         storage_name: storage_name,
-        folder_path: folder_path,
+        file_path: folder_path,
         file_index: index,
         download_type: "task_file",
       });
@@ -779,29 +984,91 @@ export default function TaskDetailPage() {
       URL.revokeObjectURL(url);
 
       // Log the download to database
+      // console.log("task_id:", taskId);
+      // console.log("fileName:", fileName);
+      // console.log("folder_path:", folder_path);
       if (currentUser) {
-        const { error: logError } = await supabase
-          .from("track_downloads")
-          .insert({
-            task_id: taskId,
-            file_name: fileName,
-            storage_name: storage_name,
-            folder_path: folder_path,
-            downloaded_details: [
-              {
-                name: currentUser.name || "Unknown User",
-                email: currentUser.email || "",
-                role: currentUser.role || "user",
-                time: new Date().toISOString(),
-              },
-            ],
-          });
+        try {
+          // Get file_id from files_test table based on task_id, file_name and file_path
+          const { data: fileData, error: fileError } = await supabase
+            .from("files_test")
+            .select("file_id")
+            .eq("task_id", taskId)
+            .eq("file_name", fileName)
+            .eq("file_path", `${folder_path}/${fileName}`) // Adjusted to include fileName in path
+            .single();
 
-        if (logError) {
-          console.error("Error logging download:", logError);
-        } else {
-          // Refresh download history
-          setDownloadHistoryRefresh((prev) => prev + 1);
+          //       console.log("task_id:", taskId);
+          // console.log("fileName:", fileName);
+          // console.log("folder_path:", folder_path);
+
+          if (fileError) {
+            console.error("Error fetching file_id from files_test:", fileError);
+            return;
+          }
+
+          const file_id = fileData.file_id;
+
+          // Check if a record for this file already exists
+          const { data: existingRecord, error: checkError } = await supabase
+            .from("track_downloads")
+            .select("id, downloaded_details")
+            .eq("file_id", file_id)
+            .eq("task_id", taskId)
+            .single();
+
+          if (checkError && checkError.code !== "PGRST116") {
+            console.error("Error checking existing record:", checkError);
+            return;
+          }
+
+          const downloadDetail = {
+            name: currentUser.name || "Unknown User",
+            email: currentUser.email || "",
+            role: currentUser.role || "user",
+            time: new Date().toISOString(),
+          };
+
+          if (existingRecord) {
+            // Update existing record by appending to downloaded_details array
+            const updatedDetails = [
+              ...(existingRecord.downloaded_details || []),
+              downloadDetail,
+            ];
+
+            const { error: updateError } = await supabase
+              .from("track_downloads")
+              .update({ downloaded_details: updatedDetails })
+              .eq("id", existingRecord.id);
+
+            if (updateError) {
+              console.error("Error updating download record:", updateError);
+            } else {
+              // Refresh download history
+              setDownloadHistoryRefresh((prev) => prev + 1);
+            }
+          } else {
+            // Create new record
+            const { error: insertError } = await supabase
+              .from("track_downloads")
+              .insert({
+                task_id: taskId,
+                file_id: file_id,
+                file_name: fileName,
+                storage_name: storage_name,
+                file_path: folder_path,
+                downloaded_details: [downloadDetail],
+              });
+
+            if (insertError) {
+              console.error("Error creating download record:", insertError);
+            } else {
+              // Refresh download history
+              setDownloadHistoryRefresh((prev) => prev + 1);
+            }
+          }
+        } catch (error) {
+          console.error("Error logging download:", error);
         }
       }
     } catch (error) {
@@ -810,6 +1077,7 @@ export default function TaskDetailPage() {
   };
 
   const fetchProcessorFiles = async () => {
+    console.log("Fetching processor files for task:", taskId);
     const { data: current_stage, error: current_stageError } = await supabase
       .from("task_iterations")
       .select("current_stage, sent_by")
@@ -836,7 +1104,7 @@ export default function TaskDetailPage() {
       isQcInLoop = false;
     }
 
-    setIsQcinLoop(isQcInLoop);
+    _setIsQcinLoop(isQcInLoop);
 
     if (
       (current_stage.sent_by === "Processor" &&
@@ -902,7 +1170,7 @@ export default function TaskDetailPage() {
         setVersion(2);
       }
     }
-
+    console.log("Determined storage:", storage_name, "folder:", folder_path);
     if (current_stage.sent_by !== "PM") {
       const { data: processorFiles, error: processorError } =
         await supabase.storage.from(storage_name).list(folder_path);
@@ -917,12 +1185,11 @@ export default function TaskDetailPage() {
         return;
       }
 
-      console.log("processorFiles : ", processorFiles);
-
       // Fetch page counts from files_test table for processor files
       const processorFilesWithPageCount = await Promise.all(
         processorFiles.map(async (file) => {
           try {
+            console.log("Fetching page count for:", file.name);
             const { data: fileInfo, error: fileInfoError } = await supabase
               .from("files_test")
               .select("page_count")
@@ -950,77 +1217,31 @@ export default function TaskDetailPage() {
           }
         })
       );
-
-      setProcessorFiles(processorFilesWithPageCount);
-
-      console.log("Processor Files:", processorFiles);
-    }
-
-    // Fetch task data and set task state
-    const { data: simpleTaskData, error: simpleError } = await supabase
-      .from("tasks_test")
-      .select("*")
-      .eq("task_id", taskId)
-      .single();
-
-    if (simpleError) {
-      console.error("Error fetching simple task data:", simpleError);
-      return;
-    }
-
-    // Fetch creator info separately
-    const { data: creatorData, error: creatorError } = await supabase
-      .from("profiles")
-      .select("id, name, email, role")
-      .eq("id", simpleTaskData.created_by)
-      .single();
-
-    if (creatorError) {
-      console.error("Error fetching creator data:", creatorError);
-      return;
-    }
-
-    // Set task with creator info
-    const taskData = {
-      task_id: simpleTaskData.task_id,
-      project_id: simpleTaskData.project_id,
-      title: simpleTaskData.task_name,
-      client_instruction: simpleTaskData.client_instruction || "",
-      mail_instruction: simpleTaskData.mail_instruction || "",
-      estimated_hours_qc: simpleTaskData.estimated_hours_qc || 0,
-      estimated_hours_qa: simpleTaskData.estimated_hours_qa || 0,
-      estimated_hours_ocr: simpleTaskData.estimated_hours_ocr || 0,
-      priority: simpleTaskData.priority || "low",
-      dueDate: simpleTaskData.delivery_date || "",
-      deliveryTime: simpleTaskData.delivery_time || "",
-      assignedTo: "",
-      createdBy: {
-        id: creatorData.id,
-        name: creatorData.name,
-        email: creatorData.email,
-        role: creatorData.role,
-      },
-      comments: simpleTaskData.comments || [],
-      createdDate: simpleTaskData.created_at,
-      overall_completion_status: simpleTaskData.overall_completion_status,
-      completion_status: simpleTaskData.completion_status,
-      attachments: simpleTaskData.attachments || [],
-      estimatedHours: simpleTaskData.estimated_hours || 0,
-    };
-
-    setTask(taskData);
-
-    // Set real status from database
-    if (simpleTaskData.status) {
-      setStatus(
-        simpleTaskData.status as
-          | "pending"
-          | "in-progress"
-          | "paused"
-          | "completed"
-          | "overdue"
-          | "returned"
+      console.log(
+        "Processor files with page count:",
+        processorFilesWithPageCount
       );
+      setProcessorFiles(processorFilesWithPageCount);
+    }
+
+    // Use the new function to fetch complete task details
+    const completeTask = await fetchCompleteTaskDetails();
+    if (completeTask) {
+      setTask(completeTask);
+
+      // Set real status from database
+      if (completeTask.status) {
+        setRealStatus(completeTask.status);
+        _setStatus(
+          completeTask.status as
+            | "pending"
+            | "in-progress"
+            | "paused"
+            | "completed"
+            | "overdue"
+            | "returned"
+        );
+      }
     }
   };
 
@@ -1035,7 +1256,7 @@ export default function TaskDetailPage() {
       .select("current_stage, sent_by")
       .eq("task_id", taskId)
       .single();
-    console.log("Task Iteration Data:", data);
+
     if (error) {
       console.error("Error fetching task iteration data:", error);
       return;
@@ -1090,7 +1311,7 @@ export default function TaskDetailPage() {
         }
 
         // Upload the file
-        const { data: StoreFiles, error: uploadError } = await supabase.storage
+        const { data: _StoreFiles, error: uploadError } = await supabase.storage
           .from(storage_name)
           .upload(file_path, file, {
             contentType: file.type,
@@ -1151,7 +1372,7 @@ export default function TaskDetailPage() {
 
       setSentBy(data?.sent_by);
       setCurrentStage(data?.current_stage);
-      setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
+      _setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
 
       const sent_by = data?.sent_by;
       const current_stage = data?.current_stage;
@@ -1183,8 +1404,6 @@ export default function TaskDetailPage() {
               );
             }
 
-            console.log(`Fetched page count for ${file.name}:`, fileInfo);
-
             return {
               name: file.name,
               pageCount: fileInfo?.page_count || null,
@@ -1198,11 +1417,10 @@ export default function TaskDetailPage() {
           }
         })
       );
-      console.log("PM Files with page count:", PMFiles);
       setPMFiles(pmFilesWithPageCount);
 
-      var folder_path_correction = "";
-      var storage_name_correction = "";
+      let folder_path_correction = "";
+      let storage_name_correction = "";
 
       if (sent_by !== "PM") {
         if (current_stage === "Processor") {
@@ -1225,7 +1443,6 @@ export default function TaskDetailPage() {
 
         if (correctionError) {
           console.log("Error fetching correction files:", correctionError);
-          // return;
         }
 
         // Fetch page counts from files_test table for correction files
@@ -1264,14 +1481,13 @@ export default function TaskDetailPage() {
         );
 
         setCorrectionFiles(correctionFilesWithPageCount);
-        // }
       }
     } catch (error) {
       console.error("Error in fetchData:", error);
     }
   };
 
-  const fetchAvailableUsers = async () => {
+  const _fetchAvailableUsers = async () => {
     let roleToFetch = "";
     if (currentStage === "Processor") {
       roleToFetch = "processor";
@@ -1281,37 +1497,30 @@ export default function TaskDetailPage() {
       roleToFetch = "qaTeam";
     }
 
-    console.log("roleToFetch : ", roleToFetch);
-
     try {
-      // This would need a new API endpoint for fetching users by role
-      // For now, we'll keep the direct call but mark it for future API migration
       const { data: users, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("role", roleToFetch);
 
       if (error) {
-        console.log("error : ", error);
         console.error("Error fetching users:", error);
         return;
       }
 
-      console.log("users : ", users);
-
-      setAvailableUsers(users || []);
+      _setAvailableUsers(users || []);
     } catch (error) {
       console.error("Error in fetchAvailableUsers:", error);
     }
   };
 
-  const handleAssignTask = async (selectedUserData: any) => {
+  const handleAssignTask = async (selectedUserData: UserProfile) => {
     if (!selectedUserData) {
       toast.error("Please select a user to assign the task");
       return;
     }
 
-    setIsAssigning(true);
+    _setIsAssigning(true);
     try {
       // Log the assignment action
       await logTaskActionHelper("assigned_to", {
@@ -1330,7 +1539,6 @@ export default function TaskDetailPage() {
         .single();
 
       if (fetchError && fetchError.code !== "PGRST116") {
-        // PGRST116 is "not found" error
         console.error("Error checking existing log:", fetchError);
         throw fetchError;
       }
@@ -1339,36 +1547,26 @@ export default function TaskDetailPage() {
 
       // Create new assignment entry
       const newAssignment = {
-        name: selectedUserData.name,
-        email: selectedUserData.email,
-        role: selectedUserData.role,
+        user_name: selectedUserData.name,
+        user_email: selectedUserData.email,
+        user_role: selectedUserData.role,
         user_id: selectedUserData.id,
         assigned_at: now,
       };
 
-      console.log("newAssignment : ", newAssignment);
-      console.log("existingLog : ", existingLog);
-
       // Handle existing or new assignedTo array
-      let assignedToArray: any[] = [];
-
-      // const logData = {
-      //   task_id: taskId,
-      //   current_stage: currentStage,
-      //   sent_by: sentBy,
-      //   assigned_to: assignedToArray,
-      //   created_at: now,
-      // };
+      let assignedToArray: (typeof newAssignment)[] = [];
 
       if (existingLog?.assigned_to) {
         // Check if user is already assigned
         const isAlreadyAssigned = existingLog.assigned_to.some(
-          (assignment: any) => assignment.user_id === selectedUserData.id
+          (assignment: { user_id: string }) =>
+            assignment.user_id === selectedUserData.id
         );
 
         if (isAlreadyAssigned) {
           toast.error("This user is already assigned to this task");
-          setIsAssigning(false);
+          _setIsAssigning(false);
           return;
         }
 
@@ -1379,11 +1577,6 @@ export default function TaskDetailPage() {
         assignedToArray = [newAssignment];
       }
 
-      const logData = {
-        task_id: taskId,
-        assigned_to: assignedToArray,
-      };
-
       await api.assignTask(taskId, assignedToArray);
       toast.success("Task assigned successfully!");
       await fetchData(); // Refresh the data
@@ -1391,51 +1584,25 @@ export default function TaskDetailPage() {
       console.error("Error assigning task:", error);
       toast.error("Failed to assign task. Please try again.");
     } finally {
-      setIsAssigning(false);
-      setSelectedUserData({}); // Reset selection
+      _setIsAssigning(false);
+      _setSelectedUserData(null); // Reset selection
     }
   };
 
   // Fetch task details from API
-  const fetchTaskDetails = async () => {
+  const _fetchTaskDetails = async () => {
     try {
       const taskDetails = await api.getTaskDetails(taskId);
       if (taskDetails.task) {
-        setTask({
-          task_id: taskDetails.task.task_id || taskId,
-          title: taskDetails.task.task_name || taskDetails.task.title || "",
-          client_instruction: taskDetails.task.client_instruction || "",
-          mail_instruction: taskDetails.task.mail_instruction || "",
-          estimated_hours_qc: taskDetails.task.estimated_hours_qc || 0,
-          estimated_hours_qa: taskDetails.task.estimated_hours_qa || 0,
-          estimated_hours_ocr: taskDetails.task.estimated_hours_ocr || 0,
-          priority: taskDetails.task.priority || "low",
-          dueDate:
-            taskDetails.task.delivery_date || taskDetails.task.dueDate || "",
-          deliveryTime:
-            taskDetails.task.delivery_time ||
-            taskDetails.task.deliveryTime ||
-            "",
-          assignedTo:
-            taskDetails.task.assigned_to || taskDetails.task.assignedTo || "",
-          createdBy:
-            taskDetails.task.created_by || taskDetails.task.createdBy || "",
-          attachments: taskDetails.task.attachments || [],
-          createdDate:
-            taskDetails.task.created_at || taskDetails.task.createdDate || "",
-          estimatedHours:
-            taskDetails.task.estimated_hours ||
-            taskDetails.task.estimatedHours ||
-            0,
-          project_id: taskDetails.task.project_id || "",
-          overall_completion_status:
-            taskDetails.task.overall_completion_status || false,
-          completion_status: taskDetails.task.completion_status || false,
-        });
+        // Use the new fetchCompleteTaskDetails function instead
+        const completeTask = await fetchCompleteTaskDetails();
+        if (completeTask) {
+          setTask(completeTask);
+        }
 
         // Also set available users if provided
         if (taskDetails.availableUsers) {
-          setAvailableUsers(taskDetails.availableUsers);
+          _setAvailableUsers(taskDetails.availableUsers);
         }
       }
     } catch (error) {
@@ -1472,7 +1639,7 @@ export default function TaskDetailPage() {
           fetchCurrentUser(),
           fetchProcessorFiles(),
           fetchData(),
-          fetchRealStatus(), // Add fetchRealStatus to initial data loading
+          fetchRealStatus(),
         ]);
       } catch (error) {
         console.error("Error initializing data:", error);
@@ -1524,7 +1691,7 @@ export default function TaskDetailPage() {
 
         {/* Footer with buttons */}
         <FooterButtons
-          currentUser={currentUser}
+          currentUser={currentUser || { id: "", name: "", email: "", role: "" }}
           currentStage={currentStage}
           sentBy={sentBy}
           taskId={taskId}
@@ -1532,7 +1699,6 @@ export default function TaskDetailPage() {
           handlePauseResumeTask={handlePauseResumeTask}
           handleSendTo={handleSendTo}
           showSubmitToButton={showSubmitToButton}
-          setShowHandoverDialog={setShowHandoverDialog}
           setShowCompleteDialog={setShowCompleteDialog}
           status={realStatus}
           SubmitTo={SubmitTo}
@@ -1580,6 +1746,7 @@ export default function TaskDetailPage() {
           <TaskAttachments
             PMFiles={PMFiles}
             processorFiles={processorFiles}
+            fetchProcessorFiles={fetchProcessorFiles}
             correctionFiles={correctionFiles}
             version={version}
             taskId={taskId}

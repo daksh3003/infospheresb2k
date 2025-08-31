@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -42,7 +42,7 @@ const getTaskType = (processType: string) => {
   return typeMap[processType] || "other";
 };
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // First get all projects
     const { data: projectsData, error: projectsError } = await supabase
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Create a map of project_id to current_stage
-    const stageMap = iterationsData.reduce((acc: any, curr) => {
+    const stageMap = iterationsData.reduce((acc: Record<string, string>, curr) => {
       acc[curr.task_id] = curr.current_stage;
       return acc;
     }, {});
@@ -132,10 +132,11 @@ export async function GET(request: NextRequest) {
       projectNames: {},
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('PM Dashboard error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

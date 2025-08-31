@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         file_id,
         file_name,
         storage_name,
-        folder_path,
+        file_path,
         downloaded_details
       `
       )
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       ...record,
       downloaded_details:
         record.downloaded_details?.sort(
-          (a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime()
+          (a: { time: string }, b: { time: string }) => new Date(b.time).getTime() - new Date(a.time).getTime()
         ) || [],
     }));
 
@@ -64,10 +64,10 @@ export async function GET(request: NextRequest) {
       downloadHistory: filesSortedByLatestDownload,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Download history error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
             file_id: fileId,
             file_name: fileName,
             storage_name: storageName,
-            folder_path: folderPath,
+            file_path: folderPath,
             downloaded_details: [downloadDetails],
           },
         ]);
@@ -134,10 +134,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Download tracked successfully' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Download tracking error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

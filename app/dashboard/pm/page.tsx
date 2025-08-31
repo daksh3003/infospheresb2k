@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +18,6 @@ import {
   Users,
   ClipboardCheck,
   ShieldCheck,
-  Loader2,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -82,11 +81,12 @@ export default function DashboardPage() {
     };
   }>({});
 
-  const router = useRouter();
+  const _router = useRouter();
 
   useEffect(() => {
     setMounted(true);
     fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProjectNames = async (projectIds: string[]) => {
@@ -129,7 +129,7 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setIsLoading(true);
 
     try {
@@ -145,29 +145,54 @@ export default function DashboardPage() {
       const iterationsData = await iterationsResponse.json();
 
       // Create a map of project_id to current_stage
-      const stageMap = iterationsData.reduce((acc: any, curr: any) => {
-        acc[curr.task_id] = curr.current_stage;
-        return acc;
-      }, {});
+      const stageMap = iterationsData.reduce(
+        (
+          acc: Record<string, string>,
+          curr: { task_id: string; current_stage: string }
+        ) => {
+          acc[curr.task_id] = curr.current_stage;
+          return acc;
+        },
+        {}
+      );
 
       console.log("stageMap", stageMap);
 
       if (projectsData) {
-        const processedTasks = projectsData.map((task: any) => {
-          return {
-            ...task,
-            status: calculateStatus(task.delivery_date, task.completion_status),
-            priority: calculatePriority(task.delivery_date, task.po_hours),
-            type: getTaskType(task.process_type),
-            current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
-          };
-        });
+        const processedTasks = projectsData.map(
+          (task: {
+            task_id: string;
+            delivery_date: string;
+            completion_status: boolean;
+            po_hours: number;
+            process_type: string;
+            project_id: string;
+            task_name?: string;
+            client_instruction?: string;
+            created_at?: string;
+          }) => {
+            return {
+              ...task,
+              status: calculateStatus(
+                task.delivery_date,
+                task.completion_status
+              ),
+              priority: calculatePriority(task.delivery_date, task.po_hours),
+              type: getTaskType(task.process_type),
+              current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
+            };
+          }
+        );
         console.log("processedTasks : ", processedTasks);
         setTasks(processedTasks);
 
         // Get unique project IDs and fetch their names
         const uniqueProjectIds = [
-          ...new Set(processedTasks.map((task: any) => task.project_id)),
+          ...new Set(
+            processedTasks.map(
+              (task: { project_id: string }) => task.project_id
+            )
+          ),
         ];
         await fetchProjectNames(uniqueProjectIds as string[]);
       }
@@ -176,7 +201,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Helper functions (same as before)
   const calculateStatus = (deliveryDate: string, isCompleted: boolean) => {
@@ -194,7 +219,7 @@ export default function DashboardPage() {
     return diffDays <= 2 ? "in-progress" : "pending";
   };
 
-  const calculatePriority = (deliveryDate: string, poHours: number) => {
+  const calculatePriority = (deliveryDate: string, _poHours: number) => {
     if (!deliveryDate) return "medium";
 
     const today = new Date();
@@ -247,10 +272,10 @@ export default function DashboardPage() {
 
   // console.log("filteredTasks", filteredTasks);
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  const _openModal = () => setIsModalOpen(true);
+  const _closeModal = () => setIsModalOpen(false);
 
-  const handleTaskAdded = () => {
+  const _handleTaskAdded = () => {
     fetchTasks();
   };
 
@@ -295,7 +320,7 @@ export default function DashboardPage() {
   );
 
   // Function to render grouped tasks
-  const renderGroupedTasks = (tasks: ProjectTask[]) => {
+  const renderGroupedTasks = (_tasks: ProjectTask[]) => {
     return Object.values(projectGroups).map((group, index) => (
       <div
         key={index}

@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try { 
     const { taskId } = await params;
@@ -27,7 +27,7 @@ export async function GET(
 
     const stagesArray = stages.stages;
     const len = stagesArray.length;
-    let timelineItems: any[] = [];
+    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number }[]; completed: boolean; date: string }[] = [];
     let cnt_of_processor = 1;
 
     for (let i = 0; i < len; i++) {
@@ -86,7 +86,7 @@ export async function GET(
       const timelineItem = {
         id: taskId,
         title: current_stage,
-        content: uploadedFiles.map((file: any, index: number) => ({
+        content: uploadedFiles.map((file: { name: string }, index: number) => ({
           name: file.name,
           storage_name,
           folder_path,

@@ -9,7 +9,7 @@ const supabase = createClient(
 // GET - Fetch user profile by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params: _params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

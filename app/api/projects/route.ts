@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           ...projectData,
-          list_of_files: selectedFiles.map((f: any) => f.name),
+          list_of_files: selectedFiles.map((f: { name: string }) => f.name),
         },
       ])
       .select("project_id")
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       const taskId = taskResult.task_id;
 
       // Create task iteration
-      const { data: taskIterationResult, error: taskIterationError } =
+      const { data: _taskIterationResult, error: taskIterationError } =
         await supabase.from("task_iterations").insert([
           {
             task_id: taskId,
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create process logs
-      const { data: process_logs, error: process_logsError } = await supabase
+      const { data: _process_logs, error: process_logsError } = await supabase
         .from("process_logs_test")
         .insert([
           {
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
               file_name: group.filesData[0].file_name,
               storage_name: "task-files",
               assigned_to: group.filesData[0].assigned_to,
-              file_path: `${taskId}`,
+              file_path: `${taskId}/${group.filesData[0].file_name}`,
               page_count: group.filesData[0].page_count,
             },
           ]);
@@ -168,10 +168,11 @@ export async function POST(request: NextRequest) {
       projectId,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Project creation error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

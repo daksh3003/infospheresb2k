@@ -17,7 +17,12 @@ export const Comments = ({ taskId }: { taskId: string }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | null>(null);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
@@ -27,12 +32,28 @@ export const Comments = ({ taskId }: { taskId: string }) => {
       await fetchComments(user);
     };
     initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
-  const getCurrentUser = async () => {
+  const getCurrentUser = async (): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | null> => {
     try {
       // First try to get from authManager
-      let user = await authManager.getCurrentUser();
+      let user: {
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+      } | null = (await authManager.getCurrentUser()) as {
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+      } | null;
 
       // If that doesn't work, try to get directly from Supabase auth
       if (!user) {
@@ -49,18 +70,14 @@ export const Comments = ({ taskId }: { taskId: string }) => {
             .single();
 
           user = {
-            ...authUser,
-            role: profileData?.role || authUser.user_metadata?.role || "user",
-          } as any; // Type assertion to handle the dynamic properties
-
-          // Add name and email as dynamic properties
-          if (user) {
-            (user as any).name =
+            id: authUser.id,
+            name:
               profileData?.name ||
               authUser.user_metadata?.name ||
-              "Unknown User";
-            (user as any).email = authUser.email || profileData?.email || "";
-          }
+              "Unknown User",
+            email: authUser.email || profileData?.email || "",
+            role: profileData?.role || authUser.user_metadata?.role || "user",
+          };
         }
       }
 
@@ -73,7 +90,14 @@ export const Comments = ({ taskId }: { taskId: string }) => {
     }
   };
 
-  const fetchComments = async (user?: any) => {
+  const fetchComments = async (
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+    } | null
+  ) => {
     try {
       console.log("fetchComments called with user:", user);
       const response = await fetch(`/api/comments?task_id=${taskId}`);
@@ -88,20 +112,40 @@ export const Comments = ({ taskId }: { taskId: string }) => {
       const allComments = result.comments || [];
 
       // Format the comments based on available data
-      const formattedComments = allComments.map((item: any, index: number) => ({
-        id: item.comment_id || item.id || `temp-${index}`,
-        comment:
-          item.comment || item.text || item.message || "No comment text found",
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        user_id: item.user_id,
-        task_id: taskId,
-        user_name: "Loading...",
-        user_email: "",
-      }));
+      const formattedComments = allComments.map(
+        (
+          item: {
+            comment_id?: string;
+            id?: string;
+            comment?: string;
+            text?: string;
+            message?: string;
+            created_at: string;
+            updated_at: string;
+            user_id: string;
+          },
+          index: number
+        ) => ({
+          id: item.comment_id || item.id || `temp-${index}`,
+          comment:
+            item.comment ||
+            item.text ||
+            item.message ||
+            "No comment text found",
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          user_id: item.user_id,
+          task_id: taskId,
+          user_name: "Loading...",
+          user_email: "",
+        })
+      );
 
       // Fetch user information for each comment, passing current user
-      await fetchUserInformation(formattedComments, user || currentUser);
+      const validUser = user || currentUser;
+      if (validUser) {
+        await fetchUserInformation(formattedComments, validUser);
+      }
 
       setComments(formattedComments);
     } catch (error) {
@@ -109,7 +153,19 @@ export const Comments = ({ taskId }: { taskId: string }) => {
     }
   };
 
-  const fetchUserInformation = async (comments: any[], user: any) => {
+  const fetchUserInformation = async (
+    comments: {
+      user_id: string;
+      id: string;
+      comment: string;
+      created_at: string;
+      updated_at: string;
+      task_id: string;
+      user_name: string;
+      user_email: string;
+    }[],
+    user: { id: string; name: string; email: string; role: string }
+  ) => {
     try {
       // Get unique user IDs from comments
       const userIds = [
@@ -151,14 +207,14 @@ export const Comments = ({ taskId }: { taskId: string }) => {
         console.log("Current user:", user);
         if (comment.user_id === user?.id) {
           comment.user_name = user?.name || "You";
-          comment.user_email = user?.email || "";
+          // comment.user_email = user?.email || "";
         } else {
           const userData = usersData?.find(
             (userItem) => userItem.id === comment.user_id
           );
           if (userData) {
             comment.user_name = userData.name || "Unknown User";
-            comment.user_email = userData.email || "";
+            // comment.user_email = userData.email || "";
           } else {
             comment.user_name = "Team Member";
           }
