@@ -6,6 +6,7 @@ interface Comment {
   id: string;
   comment: string;
   created_at: string;
+  updated_at?: string;
   user_id: string;
   task_id: string;
   user_name?: string;
@@ -92,6 +93,7 @@ export const Comments = ({ taskId }: { taskId: string }) => {
         comment:
           item.comment || item.text || item.message || "No comment text found",
         created_at: item.created_at,
+        updated_at: item.updated_at,
         user_id: item.user_id,
         task_id: taskId,
         user_name: "Loading...",
@@ -254,6 +256,13 @@ export const Comments = ({ taskId }: { taskId: string }) => {
     });
   };
 
+  const isCommentEdited = (comment: Comment) => {
+    if (!comment.updated_at || !comment.created_at) return false;
+    const created = new Date(comment.created_at);
+    const updated = new Date(comment.updated_at);
+    return updated.getTime() - created.getTime() > 1000; // More than 1 second difference
+  };
+
   const handleEditComment = (commentId: string, currentText: string) => {
     setEditingComment(commentId);
     setEditText(currentText);
@@ -390,9 +399,16 @@ export const Comments = ({ taskId }: { taskId: string }) => {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{comment.user_name}</span>
-                        <span className="text-xs text-gray-500">
-                          {formatTimestamp(comment.created_at)}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500">
+                            {formatTimestamp(comment.created_at)}
+                          </span>
+                          {isCommentEdited(comment) && (
+                            <span className="text-xs text-gray-400 italic">
+                              edited {formatTimestamp(comment.updated_at!)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {/* Show edit/delete buttons only for current user's comments */}
                       {currentUser && comment.user_id === currentUser.id && (
