@@ -133,7 +133,7 @@ export default function QCDashboard() {
           (item: {
             id: number;
             current_stage: string;
-            status_flag: string | null;
+            status: string | null;
             task_id: string;
             iteration_number: number | null;
             tasks_test: {
@@ -153,7 +153,7 @@ export default function QCDashboard() {
             taskIterationId: item.id,
             iterationNumber: item.iteration_number || 1,
             currentStage: item.current_stage,
-            statusFlag: item.status_flag || null,
+            status: item.status || null,
             iterationNotes: null,
             currentFileVersionId: null,
             currentFileName: null,
@@ -161,12 +161,12 @@ export default function QCDashboard() {
             calculatedPriority: "medium",
             displayId: item.id,
             displayTitle: item.tasks_test?.task_name || "No Project Name",
-            displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+            displayDescription: `Status: ${item.status || "N/A"}`,
             displayDueDate: null,
             displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
             title: item.tasks_test?.task_name || "No Project Name",
-            description: `Status Flag: ${item.status_flag || "N/A"}`,
-            status: "pending",
+            description: `Status: ${item.status || "N/A"}`,
+            // status: "pending",
             priority: "medium",
             dueDate: "",
             assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,

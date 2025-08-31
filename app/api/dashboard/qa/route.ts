@@ -14,7 +14,7 @@ export async function GET() {
         `
         id, 
         current_stage, 
-        status_flag, 
+        status, 
         task_id, 
         iteration_number, 
         tasks_test ( task_name, task_id, project_id )
@@ -28,10 +28,10 @@ export async function GET() {
     }
 
     if (data && data.length > 0) {
-      const processedTasks = data.map((item: { id: number; current_stage: string; status_flag: string | null; task_id: string; iteration_number: number | null; tasks_test: { task_name: string; task_id: string; project_id: string }[] | null }) => ({
+      const processedTasks = data.map((item: { id: number; current_stage: string; status: string | null; task_id: string; iteration_number: number | null; tasks_test: { task_name: string; task_id: string; project_id: string }[] | null }) => ({
         id: item.id,
         title: item.tasks_test?.[0]?.task_name || "No Project Name",
-        description: `Status Flag: ${item.status_flag || "N/A"}`,
+        description: `Status: ${item.status || "N/A"}`,
         status: "pending",
         priority: "medium",
         dueDate: "",
@@ -39,7 +39,7 @@ export async function GET() {
         projectId: item.tasks_test?.[0]?.project_id || item.task_id || "unknown",
         projectName: item.tasks_test?.[0]?.task_name || "No Project Name",
         currentStage: item.current_stage,
-        statusFlag: item.status_flag || null,
+        // status: item.status || null,
         iterationNumber: item.iteration_number || 1,
       }));
 

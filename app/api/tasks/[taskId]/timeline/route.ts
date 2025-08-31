@@ -13,6 +13,8 @@ export async function GET(
   try { 
     const { taskId } = await params;
 
+    console.log(taskId);
+
     // Get stages from task_iterations
     const { data: stages, error: timelineError } = await supabase
       .from("task_iterations")

@@ -13,7 +13,7 @@ export async function GET() {
           `
           id, 
           current_stage, 
-          status_flag, 
+          status, 
           task_id, 
           iteration_number, 
           tasks_test ( task_name, task_id, project_id )

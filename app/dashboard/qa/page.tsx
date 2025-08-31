@@ -104,7 +104,7 @@ export default function QADashboard() {
           (item: {
             id: number;
             current_stage: string;
-            status_flag: string | null;
+            status: string | null;
             task_id: string;
             iteration_number: number | null;
             tasks_test: {
@@ -115,7 +115,7 @@ export default function QADashboard() {
           }) => ({
             id: item.id,
             title: item.tasks_test?.task_name || "No Project Name",
-            description: `Status Flag: ${item.status_flag || "N/A"}`,
+            description: `Status: ${item.status || "N/A"}`,
             status: "pending",
             priority: "medium",
             dueDate: "",
@@ -123,7 +123,7 @@ export default function QADashboard() {
             projectId: item.tasks_test?.project_id || item.task_id || "unknown",
             projectName: item.tasks_test?.task_name || "No Project Name",
             currentStage: item.current_stage,
-            statusFlag: item.status_flag || null,
+            // status: item.status || null,
             iterationNumber: item.iteration_number || 1,
           })
         );

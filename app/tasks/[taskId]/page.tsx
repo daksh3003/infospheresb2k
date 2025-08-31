@@ -806,31 +806,50 @@ export default function TaskDetailPage() {
         download_type: "uploaded_file",
       });
 
-      let storage_name = "";
-      let folder_path = "";
+      // let storage_name = "";
+      // let folder_path = "";
 
-      if (currentStage === "Processor") {
-        if (sentBy === "PM") {
-          storage_name = "task-files";
-          folder_path = taskId;
-        } else if (sentBy === "QC") {
-          storage_name = "qc-files";
-          folder_path = taskId;
-        } else if (sentBy === "QA") {
-          storage_name = "qa-files";
-          folder_path = taskId;
-        }
-      } else if (currentStage === "QC") {
-        storage_name = "qc-files";
-        folder_path = taskId;
-      } else if (currentStage === "QA") {
-        storage_name = "qa-files";
-        folder_path = taskId;
+      // if (currentStage === "Processor") {
+      //   if (sentBy === "PM") {
+      //     storage_name = "task-files";
+      //     folder_path = taskId;
+      //   } else if (sentBy === "QC") {
+      //     storage_name = "qc-files";
+      //     folder_path = taskId;
+      //   } else if (sentBy === "QA") {
+      //     storage_name = "qa-files";
+      //     folder_path = taskId;
+      //   }
+      // } else if (currentStage === "QC") {
+      //   storage_name = "qc-files";
+      //   folder_path = taskId;
+      // } else if (currentStage === "QA") {
+      //   storage_name = "qa-files";
+      //   folder_path = taskId;
+      // }
+
+      const { data: filesData, error: filesDataError } = await supabase
+        .from("files_test")
+        .select("file_path, storage_name")
+        .eq("task_id", taskId)
+        .eq("file_name", fileName)
+        .single();
+
+      if (filesDataError) {
+        console.error("Error fetching file data:", filesDataError);
+        return;
       }
 
+      console.log("Downloading file:", {
+        fileName,
+        storage_name: filesData.storage_name,
+        folder_path: filesData.file_path,
+        index,
+      });
+
       const { data, error } = await supabase.storage
-        .from(storage_name)
-        .download(`${folder_path}/${fileName}`);
+        .from(filesData.storage_name)
+        .download(`${filesData.file_path}`);
 
       if (error) throw new Error("Download failed: " + error.message);
       if (!data) throw new Error("No file data found");
@@ -850,14 +869,19 @@ export default function TaskDetailPage() {
       // console.log("folder_path:", folder_path);
       if (currentUser) {
         try {
-          console.log("hello");
-          // Get file_id from files_test table based on task_id, file_name and file_path
+          // console.log("hello");
+          // // Get file_id from files_test table based on task_id, file_name and file_path
+          // console.log("Fetching file_id for:", {
+          //   taskId,
+          //   fileName,
+          //   folder_path: `${folder_path}/${fileName}`,
+          // });
           const { data: fileData, error: fileError } = await supabase
             .from("files_test")
             .select("file_id")
             .eq("task_id", taskId)
             .eq("file_name", fileName)
-            .eq("file_path", `${folder_path}/${fileName}`)
+            .eq("file_path", `${filesData.file_path}`)
             .single();
 
           // console.log("task_id:", taskId);
@@ -1372,7 +1396,7 @@ export default function TaskDetailPage() {
 
       setSentBy(data?.sent_by);
       setCurrentStage(data?.current_stage);
-      _setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
+      // setIsTaskPickedUp(data?.assigned_to_processor_user_id || false);
 
       const sent_by = data?.sent_by;
       const current_stage = data?.current_stage;
@@ -1404,6 +1428,8 @@ export default function TaskDetailPage() {
               );
             }
 
+            console.log(`Fetched page count for ${file.name}:`, fileInfo);
+
             return {
               name: file.name,
               pageCount: fileInfo?.page_count || null,
@@ -1417,6 +1443,7 @@ export default function TaskDetailPage() {
           }
         })
       );
+      console.log("PM Files with page count:", PMFiles);
       setPMFiles(pmFilesWithPageCount);
 
       let folder_path_correction = "";
@@ -1443,6 +1470,7 @@ export default function TaskDetailPage() {
 
         if (correctionError) {
           console.log("Error fetching correction files:", correctionError);
+          // return;
         }
 
         // Fetch page counts from files_test table for correction files
@@ -1481,10 +1509,71 @@ export default function TaskDetailPage() {
         );
 
         setCorrectionFiles(correctionFilesWithPageCount);
+        // }
       }
+
+      let folder_path = "";
+      let storage_name = "";
+
+
+      if (current_stage === "Processor") {
+        folder_path = `${sent_by}_${taskId}`;
+        storage_name = "processor-files";
+      } else if (current_stage === "QC") {
+        folder_path = taskId;
+        storage_name = "qc-files";
+      } else if (current_stage === "QA") {
+        folder_path = taskId;
+        storage_name = "qa-files";
+      }
+      console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
+      console.log("current_stage : ", current_stage);
+
+      const { data: uploadedFiles, error: uploadedError } =
+        await supabase.storage.from(storage_name).list(folder_path);
+      if (uploadedError) {
+        console.log("Error fetching uploaded files:", uploadedError);
+        return;
+      }
+      console.log(uploadedFiles);
+
+      // Fetch page counts from files_test table for uploaded files
+      const uploadedFilesWithPageCount = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          try {
+            const { data: fileInfo, error: fileInfoError } = await supabase
+              .from("files_test")
+              .select("page_count")
+              .eq("task_id", taskId)
+              .eq("file_name", file.name)
+              .single();
+
+            if (fileInfoError && fileInfoError.code !== "PGRST116") {
+              console.warn(
+                `Error fetching page count for ${file.name}:`,
+                fileInfoError
+              );
+            }
+
+            return {
+              name: file.name,
+              pageCount: fileInfo?.page_count || null,
+            };
+          } catch (error) {
+            console.warn(`Failed to fetch page count for ${file.name}:`, error);
+            return {
+              name: file.name,
+              pageCount: null,
+            };
+          }
+        })
+      );
+
+      _setUploadedFiles(uploadedFilesWithPageCount);
     } catch (error) {
       console.error("Error in fetchData:", error);
     }
+
   };
 
   const _fetchAvailableUsers = async () => {

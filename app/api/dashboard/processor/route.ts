@@ -14,7 +14,7 @@ export async function GET() {
         `
         id, 
         current_stage, 
-        status_flag, 
+        status, 
         task_id, 
         iteration_number, 
         tasks_test ( task_name, task_id, project_id )
@@ -33,7 +33,7 @@ export async function GET() {
       const processedTasks = data.map((item: {
         id: number;
         current_stage: string;
-        status_flag: string | null;
+        status: string | null;
         task_id: string;
         iteration_number: number | null;
         tasks_test: {
@@ -54,7 +54,7 @@ export async function GET() {
         taskIterationId: item.id,
         iterationNumber: item.iteration_number || 1,
         currentStage: item.current_stage,
-        statusFlag: item.status_flag || null,
+        status: item.status || null,
         iterationNotes: null,
         currentFileVersionId: null,
         currentFileName: null,
@@ -62,7 +62,7 @@ export async function GET() {
         calculatedPriority: "medium",
         displayId: item.id,
         displayTitle: item.tasks_test?.[0]?.task_name || "No Project Name",
-        displayDescription: `Status Flag: ${item.status_flag || "N/A"}`,
+        displayDescription: `Status: ${item.status || "N/A"}`,
         displayDueDate: null,
         displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
       }));
