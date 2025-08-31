@@ -282,7 +282,7 @@ export default function TaskDetailPage() {
 
       // Refresh the real status from database
       await fetchRealStatus();
-      
+
       // Show success toast
       toast(`Task ${actionType}d successfully!`, {
         type: "success",
@@ -1007,7 +1007,7 @@ export default function TaskDetailPage() {
       attachments: simpleTaskData.attachments || [],
       estimatedHours: simpleTaskData.estimated_hours || 0,
     };
-    
+
     setTask(taskData);
 
     // Set real status from database
@@ -1410,15 +1410,26 @@ export default function TaskDetailPage() {
           estimated_hours_qa: taskDetails.task.estimated_hours_qa || 0,
           estimated_hours_ocr: taskDetails.task.estimated_hours_ocr || 0,
           priority: taskDetails.task.priority || "low",
-          dueDate: taskDetails.task.delivery_date || taskDetails.task.dueDate || "",
-          deliveryTime: taskDetails.task.delivery_time || taskDetails.task.deliveryTime || "",
-          assignedTo: taskDetails.task.assigned_to || taskDetails.task.assignedTo || "",
-          createdBy: taskDetails.task.created_by || taskDetails.task.createdBy || "",
+          dueDate:
+            taskDetails.task.delivery_date || taskDetails.task.dueDate || "",
+          deliveryTime:
+            taskDetails.task.delivery_time ||
+            taskDetails.task.deliveryTime ||
+            "",
+          assignedTo:
+            taskDetails.task.assigned_to || taskDetails.task.assignedTo || "",
+          createdBy:
+            taskDetails.task.created_by || taskDetails.task.createdBy || "",
           attachments: taskDetails.task.attachments || [],
-          createdDate: taskDetails.task.created_at || taskDetails.task.createdDate || "",
-          estimatedHours: taskDetails.task.estimated_hours || taskDetails.task.estimatedHours || 0,
+          createdDate:
+            taskDetails.task.created_at || taskDetails.task.createdDate || "",
+          estimatedHours:
+            taskDetails.task.estimated_hours ||
+            taskDetails.task.estimatedHours ||
+            0,
           project_id: taskDetails.task.project_id || "",
-          overall_completion_status: taskDetails.task.overall_completion_status || false,
+          overall_completion_status:
+            taskDetails.task.overall_completion_status || false,
           completion_status: taskDetails.task.completion_status || false,
         });
 
@@ -1592,11 +1603,7 @@ export default function TaskDetailPage() {
         </div>
       )}
 
-      {activeTab === "comments" && (
-        <Comments
-          taskId={taskId}
-        />
-      )}
+      {activeTab === "comments" && <Comments taskId={taskId} />}
 
       {/* Handover Dialog */}
       <Dialog

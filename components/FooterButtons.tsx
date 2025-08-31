@@ -291,7 +291,9 @@ export const FooterButtons = ({
   // Sync realStatus with status prop when it changes
   useEffect(() => {
     if (status && status !== realStatus) {
-      console.log(`FooterButtons: Status updated from ${realStatus} to ${status}`);
+      console.log(
+        `FooterButtons: Status updated from ${realStatus} to ${status}`
+      );
       setRealStatus(status);
     }
   }, [status]);

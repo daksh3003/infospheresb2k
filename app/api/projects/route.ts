@@ -24,12 +24,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Creating project with data:', {
-      // projectData,
-      fileGroups: fileGroups[1].filesData,
-      // selectedFiles,
-      // currentUser
-    });
+    // console.log('Creating project with data:', {
+    //   // projectData,
+    //   fileGroups: fileGroups[1].filesData,
+    //   // selectedFiles,
+    //   // currentUser
+    // });
 
     // 1. Create project in projects_test table
     const { data: projectResult, error: projectError } = await supabase

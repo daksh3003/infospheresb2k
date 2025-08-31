@@ -86,7 +86,9 @@ export function TaskCard({
   // Sync realStatus with propStatus when it changes
   useEffect(() => {
     if (propStatus && propStatus !== realStatus) {
-      console.log(`TaskCard: Status updated from ${realStatus} to ${propStatus}`);
+      console.log(
+        `TaskCard: Status updated from ${realStatus} to ${propStatus}`
+      );
       setRealStatus(propStatus);
     }
   }, [propStatus]);

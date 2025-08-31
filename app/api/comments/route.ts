@@ -11,31 +11,43 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('task_id');
 
-    // First, let's discover the actual table structure
-    const { data: sampleData, error: sampleError } = await supabase
-      .from("comments")
-      .select("*")
-      .limit(10);
-
-    if (sampleError) {
-      console.error("Database error:", sampleError);
+    if (!taskId) {
       return NextResponse.json(
-        { error: sampleError.message, code: sampleError.code },
+        { error: 'task_id parameter is required' },
         { status: 400 }
       );
     }
 
-    const columns = sampleData && sampleData.length > 0 ? Object.keys(sampleData[0]) : [];
-    console.log("Comments table actual columns:", columns);
+    console.log("Fetching comments for task:", taskId);
 
-    // Return the table structure info and all comments for now
+    // Fetch comments for the specific task, ordered by creation date
+    const { data: comments, error } = await supabase
+      .from("comments")
+      .select(`
+        comment_id,
+        comment,
+        task_id,
+        user_id,
+        created_at,
+        updated_at,
+        parent_comment_id
+      `)
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("Database error:", error);
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Found ${comments?.length || 0} comments for task ${taskId}`);
+
     return NextResponse.json({ 
-      comments: sampleData || [],
-      tableInfo: {
-        availableColumns: columns,
-        sampleCount: sampleData?.length || 0,
-        requestedTaskId: taskId
-      }
+      comments: comments || [],
+      taskId: taskId
     });
   } catch (error: any) {
     console.error('API error:', error);
@@ -48,81 +60,79 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { comment, user_id, task_id } = await request.json();
+    const { comment, user_id, task_id, parent_comment_id } = await request.json();
 
-    if (!comment) {
+    // Validate required fields
+    if (!comment || !comment.trim()) {
       return NextResponse.json(
-        { error: 'comment is required' },
+        { error: 'Comment text is required' },
         { status: 400 }
       );
     }
 
-    console.log("Attempting to save comment with data:", { comment: comment.trim(), user_id, task_id });
+    if (!task_id) {
+      return NextResponse.json(
+        { error: 'task_id is required' },
+        { status: 400 }
+      );
+    }
 
-    // First, let's check what columns exist by trying different combinations
-    let data, error;
+    if (!user_id) {
+      return NextResponse.json(
+        { error: 'user_id is required' },
+        { status: 400 }
+      );
+    }
 
-    // Try with all fields
-    ({ data, error } = await supabase
+    console.log("Attempting to save comment:", { 
+      comment: comment.trim(), 
+      user_id, 
+      task_id, 
+      parent_comment_id 
+    });
+
+    // Insert new comment
+    const { data, error } = await supabase
       .from("comments")
       .insert({
         comment: comment.trim(),
-        user_id: user_id || "anonymous",
+        user_id: user_id,
         task_id: task_id,
+        parent_comment_id: parent_comment_id || null,
       })
-      .select("*")
-      .single());
-
-    if (error && error.code === 'PGRST204') {
-      console.log("Trying with different column names...");
-      
-      // Try with different column names
-      ({ data, error } = await supabase
-        .from("comments")
-        .insert({
-          text: comment.trim(),
-          userId: user_id || "anonymous",
-          taskId: task_id,
-        })
-        .select("*")
-        .single());
-    }
-
-    if (error && error.code === 'PGRST204') {
-      // Try with just comment and user_id
-      ({ data, error } = await supabase
-        .from("comments")
-        .insert({
-          comment: comment.trim(),
-          user_id: user_id || "anonymous",
-        })
-        .select("*")
-        .single());
-    }
-
-    if (error && error.code === 'PGRST204') {
-      // Try with just comment field
-      ({ data, error } = await supabase
-        .from("comments")
-        .insert({
-          comment: comment.trim(),
-        })
-        .select("*")
-        .single());
-    }
+      .select(`
+        comment_id,
+        comment,
+        task_id,
+        user_id,
+        created_at,
+        updated_at,
+        parent_comment_id
+      `)
+      .single();
 
     if (error) {
       console.error("Database error:", error);
       
-      // Handle RLS policy violation - suggest disabling RLS temporarily
+      // Handle specific error cases
       if (error.message?.includes('row-level security')) {
         return NextResponse.json(
           { 
             error: "Database security policy prevents this operation. Please contact administrator to configure Row Level Security policies for the comments table.",
             code: error.code,
-            details: "Row Level Security (RLS) is enabled but no policies allow this operation"
+            suggestion: "Disable RLS temporarily or create proper policies"
           },
           { status: 403 }
+        );
+      }
+
+      if (error.message?.includes('foreign key')) {
+        return NextResponse.json(
+          { 
+            error: "Invalid task_id or user_id provided",
+            code: error.code
+          },
+          { status: 400 }
         );
       }
       
@@ -134,6 +144,168 @@ export async function POST(request: NextRequest) {
 
     console.log("Comment saved successfully:", data);
     return NextResponse.json({ comment: data });
+  } catch (error: any) {
+    console.error('API error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { comment_id, comment, user_id } = await request.json();
+
+    // Validate required fields
+    if (!comment_id) {
+      return NextResponse.json(
+        { error: 'comment_id is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!comment || !comment.trim()) {
+      return NextResponse.json(
+        { error: 'Comment text is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!user_id) {
+      return NextResponse.json(
+        { error: 'user_id is required' },
+        { status: 400 }
+      );
+    }
+
+    console.log("Attempting to update comment:", { 
+      comment_id, 
+      comment: comment.trim(), 
+      user_id 
+    });
+
+    // First, verify that the user owns this comment
+    const { data: existingComment, error: fetchError } = await supabase
+      .from("comments")
+      .select("user_id")
+      .eq('comment_id', comment_id)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching comment:", fetchError);
+      return NextResponse.json(
+        { error: 'Comment not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingComment.user_id !== user_id) {
+      return NextResponse.json(
+        { error: 'You can only edit your own comments' },
+        { status: 403 }
+      );
+    }
+
+    // Update the comment
+    const { data, error } = await supabase
+      .from("comments")
+      .update({
+        comment: comment.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('comment_id', comment_id)
+      .eq('user_id', user_id)
+      .select(`
+        comment_id,
+        comment,
+        task_id,
+        user_id,
+        created_at,
+        updated_at,
+        parent_comment_id
+      `)
+      .single();
+
+    if (error) {
+      console.error("Database error:", error);
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 400 }
+      );
+    }
+
+    console.log("Comment updated successfully:", data);
+    return NextResponse.json({ comment: data });
+  } catch (error: any) {
+    console.error('API error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { comment_id, user_id } = await request.json();
+
+    // Validate required fields
+    if (!comment_id) {
+      return NextResponse.json(
+        { error: 'comment_id is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!user_id) {
+      return NextResponse.json(
+        { error: 'user_id is required' },
+        { status: 400 }
+      );
+    }
+
+    console.log("Attempting to delete comment:", { comment_id, user_id });
+
+    // First, verify that the user owns this comment
+    const { data: existingComment, error: fetchError } = await supabase
+      .from("comments")
+      .select("user_id")
+      .eq('comment_id', comment_id)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching comment:", fetchError);
+      return NextResponse.json(
+        { error: 'Comment not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingComment.user_id !== user_id) {
+      return NextResponse.json(
+        { error: 'You can only delete your own comments' },
+        { status: 403 }
+      );
+    }
+
+    // Delete the comment
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq('comment_id', comment_id)
+      .eq('user_id', user_id);
+
+    if (error) {
+      console.error("Database error:", error);
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 400 }
+      );
+    }
+
+    console.log("Comment deleted successfully");
+    return NextResponse.json({ message: 'Comment deleted successfully' });
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json(

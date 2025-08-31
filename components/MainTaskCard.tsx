@@ -59,7 +59,7 @@ export const MainTaskCard = ({
       });
 
       let taskActionsUsers: any[] = [];
-      
+
       if (actionsResult.success && actionsResult.data) {
         // Process task actions to get assigned users
         taskActionsUsers = actionsResult.data.map((action: any) => ({
@@ -70,7 +70,7 @@ export const MainTaskCard = ({
           action_type: action.action_type,
           assigned_at: action.created_at,
           stage: action.metadata?.stage || action.metadata?.current_stage,
-          source: 'task_actions'
+          source: "task_actions",
         }));
       }
 
@@ -95,14 +95,14 @@ export const MainTaskCard = ({
               action_type: "taken_by",
               assigned_at: file.created_at,
               stage: "",
-              source: 'files_test'
+              source: "files_test",
             });
           }
 
           // Process assigned_to array
           if (file.assigned_to && Array.isArray(file.assigned_to)) {
             file.assigned_to.forEach((assignment: any) => {
-              if (assignment && typeof assignment === 'object') {
+              if (assignment && typeof assignment === "object") {
                 filesUsers.push({
                   user_id: assignment.user_id || assignment.id,
                   name: assignment.name || assignment.user_id || assignment.id,
@@ -111,7 +111,7 @@ export const MainTaskCard = ({
                   action_type: "assigned_to",
                   assigned_at: assignment.assigned_at || file.created_at,
                   stage: "",
-                  source: 'files_test'
+                  source: "files_test",
                 });
               }
             });
@@ -164,7 +164,10 @@ export const MainTaskCard = ({
                 };
               }
             } catch (error) {
-              console.warn(`Failed to fetch profile for user ${user.user_id}:`, error);
+              console.warn(
+                `Failed to fetch profile for user ${user.user_id}:`,
+                error
+              );
             }
           }
           return user;
@@ -189,7 +192,7 @@ export const MainTaskCard = ({
     //   console.log(
     //     `MainTaskCard: Status updated from ${realStatus} to ${status}`
     //   );
-      setRealStatus(status);
+    setRealStatus(status);
     // }
   }, [status]);
 
@@ -358,21 +361,20 @@ export const MainTaskCard = ({
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-900">
-                    {task.dueDate 
+                    {task.dueDate
                       ? (() => {
                           try {
                             const date = new Date(task.dueDate);
-                            return date.toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
+                            return date.toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
                             });
                           } catch (error) {
                             return task.dueDate;
                           }
                         })()
-                      : "Not set"
-                    }
+                      : "Not set"}
                   </span>
                 </div>
               </div>
@@ -388,16 +390,16 @@ export const MainTaskCard = ({
                       ? (() => {
                           let timeStr;
                           // Handle different time formats
-                          if (task.deliveryTime.includes('T')) {
+                          if (task.deliveryTime.includes("T")) {
                             // Full datetime format (2023-01-01T14:30:00)
                             timeStr = task.deliveryTime.substring(11, 16);
-                          } else if (task.deliveryTime.includes(':')) {
+                          } else if (task.deliveryTime.includes(":")) {
                             // Time only format (14:30:00 or 14:30)
                             timeStr = task.deliveryTime.substring(0, 5);
                           } else {
                             return task.deliveryTime;
                           }
-                          
+
                           const [hours, minutes] = timeStr.split(":");
                           const hour = parseInt(hours);
                           const ampm = hour >= 12 ? "PM" : "AM";
