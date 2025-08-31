@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import LoadingScreen from "@/components/ui/loading-screen";
 
-export default function VerifyEmail() {
+function VerifyEmailContent() {
   const [mounted, setMounted] = useState(false);
 
   const searchParams = useSearchParams();
@@ -112,5 +112,13 @@ export default function VerifyEmail() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmail() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Loading..." />}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

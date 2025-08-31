@@ -1,4 +1,4 @@
-import React, { use, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Paperclip, DownloadCloud } from "lucide-react";
 
 export const TaskAttachments = ({

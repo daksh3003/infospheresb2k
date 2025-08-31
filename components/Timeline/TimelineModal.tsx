@@ -185,9 +185,9 @@ export default function TimelineModal({
                         ) : (
                           <p className="text-sm text-gray-500"></p>
                         )}
-                        {item.date && (
+                        {/* {item.date && (
                           <span className="timeline-date">{item.date}</span>
-                        )}
+                        )} */}
                       </div>
                       {expandedCards[index] ? (
                         <ChevronUp size={16} />

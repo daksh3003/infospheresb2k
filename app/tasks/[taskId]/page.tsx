@@ -18,37 +18,37 @@ import LoadingScreen from "@/components/ui/loading-screen";
 import { DownloadHistory } from "@/components/DownloadHistory";
 
 // Updated interfaces based on actual database schema
-interface TaskFromDB {
-  task_id: string;
-  task_name: string;
-  client_instruction: string | null;
-  processor_type: string | null;
-  estimated_hours_ocr: number | null;
-  estimated_hours_qc: number | null;
-  estimated_hours_qa: number | null;
-  completion_status: boolean | null;
-  project_id: string | null;
-  created_at: string | null;
-  created_by: string | null;
-  status: string | null;
-  updated_at: string | null;
-  feedback: string | null;
-}
+// interface TaskFromDB {
+//   task_id: string;
+//   task_name: string;
+//   client_instruction: string | null;
+//   processor_type: string | null;
+//   estimated_hours_ocr: number | null;
+//   estimated_hours_qc: number | null;
+//   estimated_hours_qa: number | null;
+//   completion_status: boolean | null;
+//   project_id: string | null;
+//   created_at: string | null;
+//   created_by: string | null;
+//   status: string | null;
+//   updated_at: string | null;
+//   feedback: string | null;
+// }
 
-interface ProjectFromDB {
-  project_id: string;
-  project_name: string;
-  po_hours: number | null;
-  mail_instruction: string | null;
-  list_of_files: string[] | null;
-  reference_file: string | null;
-  delivery_date: string | null;
-  delivery_time: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  completion_status: boolean | null;
-  created_by: string | null;
-}
+// interface ProjectFromDB {
+//   project_id: string;
+//   project_name: string;
+//   po_hours: number | null;
+//   mail_instruction: string | null;
+//   list_of_files: string[] | null;
+//   reference_file: string | null;
+//   delivery_date: string | null;
+//   delivery_time: string | null;
+//   created_at: string | null;
+//   updated_at: string | null;
+//   completion_status: boolean | null;
+//   created_by: string | null;
+// }
 
 interface UserProfile {
   id: string;
