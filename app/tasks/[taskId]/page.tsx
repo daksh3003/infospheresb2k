@@ -1329,7 +1329,7 @@ export default function TaskDetailPage() {
             task_id: taskId,
             file_name: `${date}_${file.name}`,
             page_count: (file as FileWithPageCount).pageCount,
-            taken_by: currentUser?.id || null,
+            // taken_by: currentUser?.id || null,
             assigned_to: [], // Empty array for initial upload
             storage_name: storage_name,
             file_path: file_path,
