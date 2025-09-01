@@ -167,7 +167,6 @@ task_iterations
 ├── task_id (FK)
 ├── iteration_number
 ├── current_stage
-├── status_flag
 ├── iteration_notes
 ├── sent_by
 ├── assigned_to_processor_user_id
@@ -271,7 +270,6 @@ app/
 - **Caching**: Supabase query caching
 - **CDN**: Global asset distribution
 
-
 ## Getting Started
 
 ### Prerequisites
@@ -307,4 +305,3 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 This architecture provides a robust, scalable foundation for the InfoSpheres task management system, with clear separation of concerns, security best practices, and modern development patterns.
-

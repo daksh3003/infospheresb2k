@@ -62,18 +62,38 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // Check current auth status on mount
     authManager.checkAuthStatus();
 
+    // Function to fetch user role from API
+    const fetchUserRole = async (userId: string) => {
+      try {
+        const response = await fetch(`/api/auth/user/role?userId=${userId}`);
+        
+        if (!response.ok) {
+          console.error('Failed to fetch user role:', response.statusText);
+          return null;
+        }
+
+        const data = await response.json();
+        return data.role || null;
+      } catch (error) {
+        console.error('Error in fetchUserRole:', error);
+        return null;
+      }
+    };
+
     // Listen for auth state changes
-    const unsubscribe = authManager.onAuthStateChange((user) => {
+    const unsubscribe = authManager.onAuthStateChange(async (user) => {
       setCurrentUser(user);
-      setCurrentUserRole(user?.role || null);
+      
+      if (user?.id) {
+        // Fetch role from API
+        const role = await fetchUserRole(user.id);
+        console.log("user role from API", role);
+        setCurrentUserRole(role);
+      } else {
+        setCurrentUserRole(null);
+      }
 
       console.log("user", user);
-
-      // If user is not authenticated, redirect to login
-
-      // if (!user) {
-      //   router.push("/auth/login");
-      // }
     });
 
     return unsubscribe;

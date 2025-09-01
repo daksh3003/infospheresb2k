@@ -168,7 +168,6 @@ erDiagram
         uuid task_id FK
         integer iteration_number
         string current_stage
-        string status_flag
         text iteration_notes
         uuid sent_by FK
         uuid assigned_to_processor_user_id FK
@@ -365,4 +364,3 @@ graph LR
 ```
 
 These diagrams provide a comprehensive visual representation of the InfoSpheres system architecture, showing the relationships between different components, data flow, user roles, and system design patterns.
-
