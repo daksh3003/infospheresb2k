@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { authManager, type AuthUser } from "@/utils/auth";
+import { toast } from "react-toastify";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -68,14 +69,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         const response = await fetch(`/api/auth/user/role?userId=${userId}`);
         
         if (!response.ok) {
-          console.error('Failed to fetch user role:', response.statusText);
+          // console.error('Failed to fetch user role:', response.statusText);
+          // toast.error("Invalid login credentials. Please try again.");
+          toast("Invalid login credentials", {
+            type: "error",
+            position: "top-right",
+          });
           return null;
         }
 
         const data = await response.json();
         return data.role || null;
       } catch (error) {
-        console.error('Error in fetchUserRole:', error);
+        console.error("Error in fetchUserRole:", error);
         return null;
       }
     };
@@ -83,7 +89,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // Listen for auth state changes
     const unsubscribe = authManager.onAuthStateChange(async (user) => {
       setCurrentUser(user);
-      
+
       if (user?.id) {
         // Fetch role from API
         const role = await fetchUserRole(user.id);

@@ -37,9 +37,9 @@ interface TaskModalProps {
 
 interface ProjectFormData {
   project_name: string;
-  po_hours: string;
+  po_hours: number;
   mail_instruction: string;
-  list_of_files: string;
+  list_of_files: number;
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
@@ -51,9 +51,9 @@ interface TaskFormData {
   task_name: string;
   client_instruction: string;
   processor_type: string[];
-  estimated_hours_ocr: string;
-  estimated_hours_qc: string;
-  estimated_hours_qa: string;
+  estimated_hours_ocr: number;
+  estimated_hours_qc: number;
+  estimated_hours_qa: number;
   completion_status: boolean;
   project_id: string;
   created_by: string;
@@ -113,9 +113,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
   // Project form data
   const [projectData, setProjectData] = useState<ProjectFormData>({
     project_name: "",
-    po_hours: "",
+    po_hours: 0,
     mail_instruction: "",
-    list_of_files: "",
+    list_of_files: 0,
     reference_file: "",
     delivery_date: "",
     delivery_time: "",
@@ -272,9 +272,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
           task_name: "",
           client_instruction: "",
           processor_type: [],
-          estimated_hours_ocr: "",
-          estimated_hours_qc: "",
-          estimated_hours_qa: "",
+          estimated_hours_ocr: 0,
+          estimated_hours_qc: 0,
+          estimated_hours_qa: 0,
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
@@ -296,9 +296,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
           task_name: "",
           client_instruction: "",
           processor_type: [],
-          estimated_hours_ocr: "",
-          estimated_hours_qc: "",
-          estimated_hours_qa: "",
+          estimated_hours_ocr: 0,
+          estimated_hours_qc: 0,
+          estimated_hours_qa: 0,
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
@@ -317,9 +317,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
           task_name: "",
           client_instruction: "",
           processor_type: [],
-          estimated_hours_ocr: "",
-          estimated_hours_qc: "",
-          estimated_hours_qa: "",
+          estimated_hours_ocr: 0,
+          estimated_hours_qc: 0,
+          estimated_hours_qa: 0,
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",

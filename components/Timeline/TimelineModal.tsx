@@ -63,6 +63,7 @@ export default function TimelineModal({
     {
       id: string;
       title: string;
+      date: string;
       content: {
         name: string;
         storage_name: string;
@@ -76,6 +77,7 @@ export default function TimelineModal({
   const fetchTimelineItems = async () => {
     try {
       const result = await api.getTaskTimeline(taskId);
+      console.log("Fetched timeline items:", result);
       setTimelineItems(result.timelineItems || []);
     } catch (error) {
       console.log("Error fetching timeline items:", error);
@@ -185,9 +187,9 @@ export default function TimelineModal({
                         ) : (
                           <p className="text-sm text-gray-500"></p>
                         )}
-                        {/* {item.date && (
+                        {item.date && (
                           <span className="timeline-date">{item.date}</span>
-                        )} */}
+                        )}
                       </div>
                       {expandedCards[index] ? (
                         <ChevronUp size={16} />

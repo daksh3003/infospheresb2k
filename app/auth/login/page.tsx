@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "../../../utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { toast } from "react-toastify";
 
 export default function Login() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,7 +31,6 @@ export default function Login() {
     if (loading) return;
 
     setLoading(true);
-    setError(null);
 
     try {
       const result = await api.login(formData.email, formData.password);
@@ -74,12 +74,10 @@ export default function Login() {
       // Direct redirect without prefetch for faster response
       router.push(redirectPath);
     } catch (error: unknown) {
-      console.error("Error logging in:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Login failed. Please try again.";
-      setError(errorMessage);
+      toast("Invalid login credentials", {
+        type: "error",
+        position: "top-right",
+      });
     } finally {
       setLoading(false);
     }
@@ -186,10 +184,6 @@ export default function Login() {
                         className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
-
-                    {error && (
-                      <div className="text-red-600 text-sm">{error}</div>
-                    )}
 
                     <div>
                       <button

@@ -301,6 +301,91 @@ export default function TaskDetailPage() {
     }
   };
 
+  // Function to check and show submit button based on task status
+  const checkAndShowSubmitButton = async () => {
+    console.log("Called checkAndShowSubmitButton");
+    try {
+      // Check if task is completed
+      const { data: taskData, error: taskError } = await supabase
+        .from("tasks_test")
+        .select("status")
+        .eq("task_id", taskId)
+        .single();
+
+      if (taskError) {
+        console.error("Error fetching task status:", taskError);
+        return;
+      }
+
+      // Only show submit button logic if task is completed
+      if (taskData.status === "completed") {
+        const { data, error: iterationError } = await supabase
+          .from("task_iterations")
+          .select("sent_by, current_stage")
+          .eq("task_id", taskId)
+          .single();
+
+        if (iterationError) {
+          console.error("Error fetching task iteration:", iterationError);
+          return;
+        }
+
+        console.log("Task Iteration Data:", data);
+
+        // Show submit button logic based on workflow
+        if (data.sent_by === "PM") {
+          setSubmitTo("Send to QC");
+          setShowSubmitToButton(true);
+        } else if (
+          (data.sent_by === "Processor" &&
+            data.current_stage === "QC" &&
+            uploadedFiles?.length === 0) ||
+          (data.sent_by === "QC" && data.current_stage === "Processor")
+        ) {
+          setSubmitTo("Send to QA");
+          setShowSubmitToButton(true);
+        } else if (
+          data.sent_by === "Processor" &&
+          data.current_stage === "QC" &&
+          uploadedFiles &&
+          uploadedFiles.length > 0
+        ) {
+          setSubmitTo("Send to Processor Team");
+          setShowSubmitToButton(true);
+        } else if (
+          (data.sent_by === "QC" &&
+            data.current_stage === "QA" &&
+            uploadedFiles?.length === 0) ||
+          (data.current_stage === "Processor" && data.sent_by === "QA") ||
+          (data.sent_by === "Processor" &&
+            data.current_stage === "QA" &&
+            uploadedFiles &&
+            uploadedFiles.length === 0)
+        ) {
+          setSubmitTo("Send to Delivery");
+          setShowSubmitToButton(true);
+        } else if (
+          (data.sent_by === "QC" &&
+            data.current_stage === "QA" &&
+            uploadedFiles &&
+            uploadedFiles.length > 0) ||
+          (data.sent_by === "Processor" &&
+            data.current_stage === "QA" &&
+            uploadedFiles &&
+            uploadedFiles.length > 0)
+        ) {
+          setSubmitTo("Send to Processor Team");
+          setShowSubmitToButton(true);
+        } else {
+          console.log("Show Submit To Button:", showSubmitToButton);
+          setShowSubmitToButton(false);
+        }
+      }
+    } catch (error) {
+      console.error("Error in checkAndShowSubmitButton:", error);
+    }
+  };
+
   // Fetch real status from database
   const fetchRealStatus = async () => {
     try {
@@ -493,51 +578,84 @@ export default function TaskDetailPage() {
   };
 
   const handleCompleteTask = async () => {
-    // Log the complete action
-    await logTaskActionHelper("complete", {
-      previous_status: realStatus,
-      completion_status: completionStatus,
-      files_uploaded: uploadedFiles?.length || 0,
-    });
-
-    // Update the task status in tasks_test table
-    const { error: statusError } = await supabase
+    // Check current task status first
+    const { data: currentTaskData, error: taskStatusError } = await supabase
       .from("tasks_test")
-      .update({ status: "completed" })
-      .eq("task_id", taskId);
+      .select("status")
+      .eq("task_id", taskId)
+      .single();
 
-    if (statusError) {
-      console.error("Error updating task status:", statusError);
-      toast("Failed to update task status", {
+    if (taskStatusError) {
+      console.error("Error fetching current task status:", taskStatusError);
+      toast("Failed to fetch task status", {
         type: "error",
         position: "top-right",
       });
       return;
     }
 
-    const { data: response, error: error } = await supabase
-      .from("process_logs_test")
-      .update({
-        ended_at: new Date(),
-      })
-      .eq("task_id", taskId);
+    const isTaskAlreadyCompleted = currentTaskData.status === "completed";
 
-    if (error) {
-      toast("Failed to complete task", {
-        type: "error",
-        position: "top-right",
+    // Only update status and log if task is not already completed
+    if (!isTaskAlreadyCompleted) {
+      // Log the complete action
+      await logTaskActionHelper("complete", {
+        previous_status: realStatus,
+        completion_status: completionStatus,
+        files_uploaded: uploadedFiles?.length || 0,
       });
-      return;
-    }
 
-    if (response) {
-      toast("Task completed", {
-        type: "success",
-        position: "top-right",
-      });
+      // Update the task status in tasks_test table
+      const { error: statusError } = await supabase
+        .from("tasks_test")
+        .update({ status: "completed" })
+        .eq("task_id", taskId);
+
+      if (statusError) {
+        console.error("Error updating task status:", statusError);
+        toast("Failed to update task status", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      const { data: response, error: error } = await supabase
+        .from("process_logs_test")
+        .update({
+          ended_at: new Date(),
+        })
+        .eq("task_id", taskId);
+
+      if (error) {
+        toast("Failed to complete task", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      if (response) {
+        toast("Task completed", {
+          type: "success",
+          position: "top-right",
+        });
+      }
+
+      // Only check for files to be uploaded if task wasn't already completed
+      if (filesToBeUploaded && filesToBeUploaded.length > 0) {
+        toast("Failed to complete task. Files are added but not uploaded", {
+          type: "warning",
+          position: "top-right",
+        });
+        return;
+      }
     }
 
     let overall_completion_status = false;
+    console.log("Current Stage:", currentStage);
+    console.log("Sent By:", sentBy);
+    console.log("Completion Status:", completionStatus);
     if (
       (currentStage === "Processor" && sentBy === "QA") ||
       (currentStage === "QA" && sentBy === "QC") ||
@@ -549,6 +667,7 @@ export default function TaskDetailPage() {
     if (overall_completion_status) {
       setCompletionStatus(true);
     }
+
     try {
       // Update the task in Supabase
       if (overall_completion_status) {
@@ -592,72 +711,8 @@ export default function TaskDetailPage() {
         }
       }
 
-      const { data, error: iterationError } = await supabase
-        .from("task_iterations")
-        .select("sent_by")
-        .eq("task_id", taskId)
-        .single();
-
-      if (iterationError) {
-        console.error("Error fetching task iteration:", iterationError);
-        return;
-      }
-
-      if (filesToBeUploaded && filesToBeUploaded.length > 0) {
-        toast("Failed to complete task. Files are added but not uploaded", {
-          type: "warning",
-          position: "top-right",
-        });
-
-        return;
-      }
-
-      if (data.sent_by === "PM") {
-        setSubmitTo("Send to QC");
-        setShowSubmitToButton(true);
-      } else if (
-        (data.sent_by === "Processor" &&
-          currentStage === "QC" &&
-          uploadedFiles?.length === 0) ||
-        (data.sent_by === "QC" && currentStage === "Processor")
-      ) {
-        setSubmitTo("Send to QA");
-        setShowSubmitToButton(true);
-      } else if (
-        data.sent_by === "Processor" &&
-        currentStage === "QC" &&
-        uploadedFiles &&
-        uploadedFiles.length > 0
-      ) {
-        setSubmitTo("Send to Processor Team");
-        setShowSubmitToButton(true);
-      } else if (
-        (data.sent_by === "QC" &&
-          currentStage === "QA" &&
-          uploadedFiles?.length === 0) ||
-        (currentStage === "Processor" && data.sent_by === "QA") ||
-        (data.sent_by === "Processor" &&
-          currentStage === "QA" &&
-          uploadedFiles &&
-          uploadedFiles.length === 0)
-      ) {
-        setSubmitTo("Send to Delivery");
-        setShowSubmitToButton(true);
-      } else if (
-        (data.sent_by === "QC" &&
-          currentStage === "QA" &&
-          uploadedFiles &&
-          uploadedFiles.length > 0) ||
-        (data.sent_by === "Processor" &&
-          currentStage === "QA" &&
-          uploadedFiles &&
-          uploadedFiles.length > 0)
-      ) {
-        setSubmitTo("Send to Processor Team");
-        setShowSubmitToButton(true);
-      } else {
-        setShowSubmitToButton(false);
-      }
+      // Check and show submit button after completing task
+      await checkAndShowSubmitButton();
 
       // Refresh status from database and update local state
       await fetchRealStatus();
@@ -1515,7 +1570,6 @@ export default function TaskDetailPage() {
       let folder_path = "";
       let storage_name = "";
 
-
       if (current_stage === "Processor") {
         folder_path = `${sent_by}_${taskId}`;
         storage_name = "processor-files";
@@ -1573,7 +1627,6 @@ export default function TaskDetailPage() {
     } catch (error) {
       console.error("Error in fetchData:", error);
     }
-
   };
 
   const _fetchAvailableUsers = async () => {
@@ -1730,6 +1783,9 @@ export default function TaskDetailPage() {
           fetchData(),
           fetchRealStatus(),
         ]);
+
+        // After all data is loaded, check if submit button should be shown
+        await checkAndShowSubmitButton();
       } catch (error) {
         console.error("Error initializing data:", error);
       } finally {
@@ -1747,17 +1803,110 @@ export default function TaskDetailPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
+      {/* Workflow Stage Progress */}
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Task Stage Progress
+          </h2>
+          <div className="text-sm text-gray-500">Task ID: {task.task_id}</div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          {/* Workflow Steps */}
+          <div className="flex items-center space-x-4">
+            {["PM", "Processor", "QC", "QA", "Delivery"].map((stage, index) => {
+              // const isActive = currentStage === stage;
+              const isPast =
+                ["PM", "Processor", "QC", "QA", "Delivery"].indexOf(
+                  currentStage
+                ) > index;
+              const isCurrent = currentStage === stage;
+
+              return (
+                <div key={stage} className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                      isCurrent
+                        ? "bg-blue-500 border-blue-500 text-white shadow-lg"
+                        : isPast
+                        ? "bg-green-500 border-green-500 text-white"
+                        : "bg-gray-100 border-gray-300 text-gray-500"
+                    }`}
+                  >
+                    {isPast ? (
+                      <svg
+                        className="w-5 h-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    ) : (
+                      <span className="text-xs font-bold">{index + 1}</span>
+                    )}
+                  </div>
+                  <div className="ml-2">
+                    <div
+                      className={`text-sm font-medium ${
+                        isCurrent
+                          ? "text-blue-600"
+                          : isPast
+                          ? "text-green-600"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {stage}
+                    </div>
+                    {isCurrent && sentBy && (
+                      <div className="text-xs text-gray-500">from {sentBy}</div>
+                    )}
+                  </div>
+                  {index < 4 && (
+                    <div
+                      className={`w-8 h-0.5 mx-2 ${
+                        isPast ? "bg-green-300" : "bg-gray-300"
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Status Badge */}
+          <div className="flex items-center space-x-3">
+            <div
+              className={`px-3 py-2 rounded-full text-sm font-medium ${
+                realStatus === "completed"
+                  ? "bg-green-100 text-green-800"
+                  : realStatus === "in-progress"
+                  ? "bg-blue-100 text-blue-800"
+                  : realStatus === "paused"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {realStatus?.toUpperCase() || "PENDING"}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Back button and task ID */}
       <div className="flex items-center justify-between mb-6">
         <TaskDetailBackButton />
-        <div className="text-sm text-gray-500">Task ID: {task.task_id}</div>
         {task.overall_completion_status ? (
           <h3 className="text-sm font-medium text-green-500 mb-1">
-            Overall Task Status: Completed
+            Overall Project Status: Completed
           </h3>
         ) : (
           <h3 className="text-sm font-medium text-red-500 mb-1">
-            Overall Task Status: Pending
+            Overall Project Status: Pending
           </h3>
         )}
         <div className="flex justify-end">

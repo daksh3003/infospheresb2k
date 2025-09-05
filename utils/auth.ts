@@ -45,12 +45,14 @@ export class AuthManager {
           .select("role")
           .eq("id", user.id)
           .single();
-        
-        role = profileData?.role;
-      }
 
-      this.currentUser = { ...user, role };
-      
+          
+          role = profileData?.role;
+        }
+        
+        this.currentUser = { ...user, role };
+        
+        console.log("Fetched profile data for role:", user);
       // Store role in localStorage for quick access
       if (role) {
         localStorage.setItem('userRole', role);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Clock } from "react-feather";
 import { Modal } from "./Modal";
 import "./Timeline.css";
@@ -33,6 +33,10 @@ export const Timeline: React.FC<TimelineProps> = ({
       [id]: !prev[id],
     }));
   };
+
+  useEffect(() => {
+    console.log("Items :", items);
+  }, [items]);
 
   const TimelineContent = () => (
     <div className="timeline">
