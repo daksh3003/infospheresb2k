@@ -27,6 +27,7 @@ type TaskPriority = "low" | "medium" | "high" | "critical";
 
 interface TaskCardProps {
   id: string;
+  taskId: string;
   title: string;
   description: string;
   dueDate: string;
@@ -41,6 +42,7 @@ interface TaskCardProps {
 
 export function TaskCard({
   id,
+  taskId,
   title,
   description,
   dueDate,
@@ -61,7 +63,7 @@ export function TaskCard({
     const fetchRealStatus = async () => {
       try {
         setStatusLoading(true);
-        const response = await fetch(`/api/tasks/${id}/status`);
+        const response = await fetch(`/api/tasks/${taskId}/status`);
 
         if (response.ok) {
           const result = await response.json();
@@ -78,10 +80,10 @@ export function TaskCard({
       }
     };
 
-    if (id) {
+    if (taskId) {
       fetchRealStatus();
     }
-  }, [id, propStatus]);
+  }, [taskId, propStatus]);
 
   // Sync realStatus with propStatus when it changes
   useEffect(() => {
@@ -136,10 +138,10 @@ export function TaskCard({
 
       // If we're in a specific dashboard (pm, qc, qa)
       if (pathParts[2]) {
-        router.push(`/tasks/${id}?source=${pathParts[2]}`);
+        router.push(`/tasks/${taskId}?source=${pathParts[2]}`);
       } else {
         // If we're in the main dashboard , hardcode the source to global.
-        router.push(`/tasks/${id}?source=global`);
+        router.push(`/tasks/${taskId}?source=global`);
       }
     }
   };
@@ -147,7 +149,7 @@ export function TaskCard({
   const handleSendToQCClick = () => {
     if (onSendToQC && !isLoadingAction) {
       // Check isLoadingAction here
-      onSendToQC(id);
+      onSendToQC(taskId);
     }
   };
 

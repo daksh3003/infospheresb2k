@@ -17,6 +17,7 @@ import { Search } from "lucide-react";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface QCDashboardTask {
+  taskId: string;
   title: string;
   description: string;
   status: "pending" | "in-progress" | "completed" | "overdue" | "returned";
@@ -142,6 +143,7 @@ export default function QCDashboard() {
               project_id: string;
             } | null;
           }) => ({
+            taskId: item.task_id,
             projectId: item.tasks_test?.project_id || item.task_id || "unknown",
             projectName: item.tasks_test?.task_name || "No Project Name",
             projectTaskId: item.tasks_test?.task_id || null,
@@ -193,6 +195,7 @@ export default function QCDashboard() {
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
+      task.taskId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
@@ -301,6 +304,7 @@ export default function QCDashboard() {
                 <TaskCard
                   key={index}
                   id={task.projectTaskId || task.displayId}
+                  taskId={task.taskId}
                   title={task.title}
                   description={task.description}
                   dueDate={projectNames[task.projectId]?.delivery_date || ""}

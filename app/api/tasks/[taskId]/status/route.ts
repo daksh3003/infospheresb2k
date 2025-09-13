@@ -20,6 +20,8 @@ export async function GET(
       )
     }
 
+    console.log('Task ID:', taskId)
+
     // Fetch the current status from tasks_test table
     const { data: task, error } = await supabase
       .from('tasks_test')

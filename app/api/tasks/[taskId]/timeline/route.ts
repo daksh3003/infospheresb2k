@@ -31,6 +31,7 @@ export async function GET(
     const len = stagesArray.length;
     const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number }[]; completed: boolean; date: string }[] = [];
     let cnt_of_processor = 1;
+    let latest_processor_folder_path = "";
 
     for (let i = 0; i < len; i++) {
       let folder_path = "";
@@ -55,6 +56,7 @@ export async function GET(
           storage_name = "processor-files";
           current_stage = "Processor (" + cnt_of_processor + ")";
         }
+        latest_processor_folder_path = folder_path;
         cnt_of_processor++;
       } else if (stagesArray[i] === "QC") {
         folder_path = taskId;
@@ -65,13 +67,14 @@ export async function GET(
         storage_name = "qa-files";
         current_stage = "QA";
       } else if (stagesArray[i] === "Delivery") {
-        if (cnt_of_processor == 2) {
-          folder_path = `PM_${taskId}`;
-        } else if (cnt_of_processor == 3) {
-          folder_path = `QC_${taskId}`;
-        } else if (cnt_of_processor == 4) {
-          folder_path = `QA_${taskId}`;
-        }
+        // if (cnt_of_processor == 2) {
+        //   folder_path = `PM_${taskId}`;
+        // } else if (cnt_of_processor == 3) {
+        //   folder_path = `QC_${taskId}`;
+        // } else if (cnt_of_processor == 4) {
+        //   folder_path = `QA_${taskId}`;
+        // }
+        folder_path = latest_processor_folder_path;
         storage_name = "processor-files";
         current_stage = "Delivery";
       }

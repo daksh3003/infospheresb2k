@@ -401,6 +401,7 @@ export default function DashboardPage() {
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {group.tasks.map((task, index) => (
                 <TaskCard
+                  taskId={task.task_id}
                   key={index}
                   id={task.task_id}
                   title={task.task_name || "Untitled Task"}

@@ -17,6 +17,7 @@ import { Search } from "lucide-react";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 interface PMDashboardTask {
+  taskId: string;
   // From projects table
   projectId: string;
   projectName: string;
@@ -161,6 +162,7 @@ export default function ProcessorDashboard() {
             displayDescription: `Status: ${item.status || "N/A"}`,
             displayDueDate: null,
             displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
+            taskId: item.task_id,
           })
         );
         setTasks(processedTasks);
@@ -184,6 +186,7 @@ export default function ProcessorDashboard() {
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
+      task.taskId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.displayTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.displayDescription
         ?.toLowerCase()
@@ -304,6 +307,7 @@ export default function ProcessorDashboard() {
               filteredTasks.map((task, index) => (
                 <TaskCard
                   key={index}
+                  taskId={task.taskId}
                   id={task.projectTaskId || task.displayId}
                   title={task.displayTitle}
                   description={task.displayDescription || "No description"}

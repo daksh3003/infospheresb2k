@@ -1159,7 +1159,7 @@ export default function TaskDetailPage() {
     console.log("Fetching processor files for task:", taskId);
     const { data: current_stage, error: current_stageError } = await supabase
       .from("task_iterations")
-      .select("current_stage, sent_by")
+      .select("current_stage, sent_by, stages")
       .eq("task_id", taskId)
       .single();
 
@@ -1233,21 +1233,28 @@ export default function TaskDetailPage() {
     setFolderPath(folder_path);
 
     if (storage_name === "processor-files") {
-      if (
-        folder_path.includes("PM_") &&
-        folder_path.includes("QC_") &&
-        folder_path.includes("QA_")
-      ) {
-        setVersion(3);
-      } else if (
-        folder_path.includes("PM_") &&
-        !folder_path.includes("QC_") &&
-        !folder_path.includes("QA_")
-      ) {
-        setVersion(1);
-      } else {
-        setVersion(2);
+      let cnt_of_processor = 0;
+      for (const stage of current_stage.stages) {
+        if (stage === "Processor") {
+          cnt_of_processor++;
+        }
       }
+      setVersion(cnt_of_processor);
+      // if (
+      //   folder_path.includes("PM_") &&
+      //   folder_path.includes("QC_") &&
+      //   folder_path.includes("QA_")
+      // ) {
+      //   setVersion(3);
+      // } else if (
+      //   folder_path.includes("PM_") &&
+      //   !folder_path.includes("QC_") &&
+      //   !folder_path.includes("QA_")
+      // ) {
+      //   setVersion(1);
+      // } else {
+      //   setVersion(2);
+      // }
     }
     console.log("Determined storage:", storage_name, "folder:", folder_path);
     if (current_stage.sent_by !== "PM") {

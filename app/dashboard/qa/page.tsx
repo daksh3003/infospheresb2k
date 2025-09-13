@@ -17,6 +17,7 @@ import LoadingScreen from "@/components/ui/loading-screen";
 
 interface QADashboardTask {
   id: string;
+  taskId: string;
   title: string;
   description: string;
   status: "pending" | "in-progress" | "completed" | "overdue";
@@ -113,6 +114,7 @@ export default function QADashboard() {
               project_id: string;
             } | null;
           }) => ({
+            taskId: item.tasks_test?.task_id,
             id: item.id,
             title: item.tasks_test?.task_name || "No Project Name",
             description: `Status: ${item.status || "N/A"}`,
@@ -147,6 +149,7 @@ export default function QADashboard() {
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
+      task.taskId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
@@ -255,6 +258,7 @@ export default function QADashboard() {
                 <TaskCard
                   key={index}
                   id={task.projectId}
+                  taskId={task.taskId}
                   title={task.title}
                   description={task.description}
                   dueDate={projectNames[task.projectId]?.delivery_date || ""}
