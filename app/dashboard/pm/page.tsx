@@ -403,7 +403,7 @@ export default function DashboardPage() {
                 <TaskCard
                   taskId={task.task_id}
                   key={index}
-                  id={task.task_id}
+                  // id={task.task_id}
                   title={task.task_name || "Untitled Task"}
                   description={
                     task.client_instruction || "No description available"

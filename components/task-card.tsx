@@ -26,7 +26,6 @@ type TaskStatus =
 type TaskPriority = "low" | "medium" | "high" | "critical";
 
 interface TaskCardProps {
-  id: string;
   taskId: string;
   title: string;
   description: string;
@@ -41,7 +40,6 @@ interface TaskCardProps {
 }
 
 export function TaskCard({
-  id,
   taskId,
   title,
   description,

@@ -303,7 +303,7 @@ export default function QCDashboard() {
               filteredTasks.map((task, index) => (
                 <TaskCard
                   key={index}
-                  id={task.projectTaskId || task.displayId}
+                  // id={task.projectTaskId || task.displayId}
                   taskId={task.taskId}
                   title={task.title}
                   description={task.description}
