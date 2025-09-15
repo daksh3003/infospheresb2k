@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+// import { emit } from 'process';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -150,6 +151,8 @@ export async function POST(request: NextRequest) {
               assigned_to: group.filesData[0].assigned_to,
               file_path: `${taskId}/${group.filesData[0].file_name}`,
               page_count: group.filesData[0].page_count,
+              uploaded_by: { id: currentUser.id, name: currentUser.name , email: currentUser.email , role : currentUser.role},
+              uploaded_at: new Date().toISOString(),
             },
           ]);
 

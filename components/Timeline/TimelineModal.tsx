@@ -214,33 +214,86 @@ export default function TimelineModal({
                                   storage_name: string;
                                   folder_path: string;
                                   index: number;
+                                  uploaded_by_name?: string;
+                                  uploaded_by_role?: string;
                                 },
                                 fileIdx: number
                               ) => (
                                 <div
                                   key={fileIdx}
-                                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                                  className="flex flex-col gap-1 p-3 bg-gray-50 rounded-md mb-2"
                                 >
-                                  <div className="flex items-center gap-3">
-                                    <Paperclip className="h-4 w-4 text-gray-500" />
-                                    <div>
-                                      <p className="font-medium">{file.name}</p>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Paperclip className="h-4 w-4 text-gray-500" />
+                                      <div>
+                                        <p className="font-medium mb-0">
+                                          {file.name}
+                                        </p>
+                                        {file.uploaded_by_name && (
+                                          <div className="mt-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md shadow-sm">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
+                                                <span className="text-xs font-bold text-white">
+                                                  {file.uploaded_by_name
+                                                    .charAt(0)
+                                                    .toUpperCase()}
+                                                </span>
+                                              </div>
+
+                                              <div className="flex items-center">
+                                                <span className="text-sm text-gray-500">
+                                                  Name:
+                                                </span>
+                                                <span className="text-sm text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full font-medium ml-1.5">
+                                                  {file.uploaded_by_name}
+                                                </span>
+                                              </div>
+
+                                              {file.uploaded_by_role && (
+                                                <div className="flex items-center">
+                                                  <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="h-3 w-3 text-gray-500 mr-1"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                  >
+                                                    <path
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      strokeWidth={2}
+                                                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                                                    />
+                                                  </svg>
+                                                  <span className="text-sm text-gray-500">
+                                                    Role:
+                                                  </span>
+                                                  <span className="text-sm text-green-800 bg-green-100 px-2 py-0.5 rounded-full font-medium ml-1.5">
+                                                    {file.uploaded_by_role}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
+                                    <button
+                                      onClick={() =>
+                                        handleDownload(
+                                          file.name,
+                                          file.storage_name,
+                                          file.folder_path,
+                                          file.index
+                                        )
+                                      }
+                                      className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+                                    >
+                                      <DownloadCloud className="h-4 w-4" />{" "}
+                                      Download
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={() =>
-                                      handleDownload(
-                                        file.name,
-                                        file.storage_name,
-                                        file.folder_path,
-                                        file.index
-                                      )
-                                    }
-                                    className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
-                                  >
-                                    <DownloadCloud className="h-4 w-4" />{" "}
-                                    Download
-                                  </button>
                                 </div>
                               )
                             )}

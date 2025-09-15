@@ -29,7 +29,7 @@ export async function GET(
 
     const stagesArray = stages.stages;
     const len = stagesArray.length;
-    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number }[]; completed: boolean; date: string }[] = [];
+    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number; uploaded_by_name: string, uploaded_by_role : string }[]; completed: boolean; date: string }[] = [];
     let cnt_of_processor = 1;
     let latest_processor_folder_path = "";
 
@@ -85,18 +85,49 @@ export async function GET(
 
       if (uploadedFilesError) {
         console.error("Error fetching uploaded files:", uploadedFilesError);
-        continue;
+        return NextResponse.json({ error: 'Failed to fetch uploaded files' }, { status: 500 });
       }
 
+      // For each file, fetch uploaded_by from files_test
+      const contentWithUploader = await Promise.all(
+        uploadedFiles.map(async (file: { name: string }, index: number) => {
+          // Query files_test for this file
+          const { data: fileTestData, error: fileTestError } = await supabase
+            .from('files_test')
+            .select('uploaded_by')
+            .eq('task_id', taskId)
+            .eq('file_name', file.name)
+            .maybeSingle();
+
+          let uploaderName = null;
+          let uploaderRole = null;
+          
+          if (!fileTestError && fileTestData && fileTestData.uploaded_by) {
+            uploaderName = fileTestData.uploaded_by.name || "Unknown";
+            uploaderRole = fileTestData.uploaded_by.role || "Unknown";
+          } else if (fileTestError) {
+            console.error("Error fetching file test data:", fileTestError);
+          }
+
+          // Always return a valid object, never undefined
+          return {
+            name: file.name,
+            storage_name,
+            folder_path,
+            index,
+            uploaded_by_name: uploaderName,
+            uploaded_by_role: uploaderRole,
+          };
+        })
+      );
+
+      // Filter out any potential undefined values (though we shouldn't have any now)
+      const validContent = contentWithUploader.filter(item => item !== undefined);
+      
       const timelineItem = {
         id: taskId,
         title: current_stage,
-        content: uploadedFiles.map((file: { name: string }, index: number) => ({
-          name: file.name,
-          storage_name,
-          folder_path,
-          index,
-        })),
+        content: validContent,
         completed: true,
         date: new Date().toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
