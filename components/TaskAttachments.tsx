@@ -167,8 +167,8 @@ export const TaskAttachments = ({
                         onClick={() =>
                           handleDownload(
                             item.name,
-                            storage_name,
-                            folder_path,
+                            "qc-files",
+                            taskId,
                             index
                           )
                         }

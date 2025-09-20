@@ -1023,6 +1023,12 @@ export default function TaskDetailPage() {
     folder_path: string,
     index: number
   ) => {
+    console.log("Downloading file:", {
+      fileName,
+      storage_name,
+      folder_path,
+      index,
+    });
     try {
       // Log the download action
       await logTaskActionHelper("download", {
@@ -1419,7 +1425,12 @@ export default function TaskDetailPage() {
             assigned_to: [], // Empty array for initial upload
             storage_name: storage_name,
             file_path: file_path,
-            uploaded_by: {id : currentUser?.id || null, name: currentUser?.name || "Unknown User", email: currentUser?.email || "Unknown Email", role : currentUser?.role || "user"},
+            uploaded_by: {
+              id: currentUser?.id || null,
+              name: currentUser?.name || "Unknown User",
+              email: currentUser?.email || "Unknown Email",
+              role: currentUser?.role || "user",
+            },
             uploaded_at: new Date(),
           });
 
