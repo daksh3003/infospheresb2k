@@ -158,13 +158,25 @@ export const api = {
   },
 
   // Project operations
-  createProject: async (projectData: any, fileGroups: any[], selectedFiles: any[], currentUser: any) => {
+  createProject: async (projectData: any, fileGroups: any[], selectedFiles: any[], currentUser: any, files?: { [key: string]: File }) => {
+    const formData = new FormData();
+    
+    // Append JSON data as strings
+    formData.append('projectData', JSON.stringify(projectData));
+    formData.append('fileGroups', JSON.stringify(fileGroups));
+    formData.append('selectedFiles', JSON.stringify(selectedFiles));
+    formData.append('currentUser', JSON.stringify(currentUser));
+    
+    // Append actual files with keys matching the expected format: file_${taskId}_${fileName}
+    if (files) {
+      for (const [fileKey, file] of Object.entries(files)) {
+        formData.append(fileKey, file);
+      }
+    }
+    
     const response = await fetch('/api/projects', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ projectData, fileGroups, selectedFiles, currentUser }),
+      body: formData, // No Content-Type header - let browser set it with boundary
     });
     
     if (!response.ok) {
@@ -191,12 +203,17 @@ export const api = {
   },
 
   uploadFile: async (taskId: string, file: File, stage: string, currentUser: any) => {
+    const formData = new FormData();
+    
+    // Append form data
+    formData.append('taskId', taskId);
+    formData.append('file', file);
+    formData.append('stage', stage);
+    formData.append('currentUser', JSON.stringify(currentUser));
+    
     const response = await fetch('/api/files', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ taskId, file, stage, currentUser }),
+      body: formData, // No Content-Type header - let browser set it with boundary
     });
     
     if (!response.ok) {
