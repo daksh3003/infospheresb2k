@@ -93,6 +93,7 @@ export default function TimelineModal({
 
   useEffect(() => {
     fetchTimelineItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

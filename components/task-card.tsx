@@ -91,6 +91,7 @@ export function TaskCard({
       );
       setRealStatus(propStatus);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propStatus]);
 
   // Use real status from database, fallback to prop status

@@ -54,6 +54,7 @@ export const DownloadHistory: React.FC<DownloadHistoryProps> = ({
 
   useEffect(() => {
     fetchDownloadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, refreshTrigger]);
 
   // Show alert when refreshTrigger changes (new download)

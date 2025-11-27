@@ -323,6 +323,7 @@ export const FooterButtons = ({
     fetchAvailableUsers();
     fetchAssignedTo();
     // fetchRealStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStage, taskId]);
 
   // Sync realStatus with status prop when it changes
@@ -333,6 +334,7 @@ export const FooterButtons = ({
       );
       setRealStatus(status);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   return (

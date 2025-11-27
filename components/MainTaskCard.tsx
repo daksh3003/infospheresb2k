@@ -294,6 +294,7 @@ export const MainTaskCard = ({
 
   useEffect(() => {
     fetchAssignedTo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.task_id]);
 
   // Sync realStatus with status prop when it changes

@@ -195,6 +195,18 @@ export default function TaskDetailPage() {
   // Download history refresh trigger
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
+  // File edits state
+  interface FileEditInfo {
+    edited_at: string;
+    edited_by: {
+      name: string;
+      email: string;
+      role: string;
+    };
+    old_file_name: string;
+  }
+  const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
+
   // New function to fetch complete task details with project information
   const fetchCompleteTaskDetails = async (): Promise<Task | null> => {
     try {
@@ -383,6 +395,19 @@ export default function TaskDetailPage() {
       }
     } catch (error) {
       console.error("Error in checkAndShowSubmitButton:", error);
+    }
+  };
+
+  // Fetch file edits
+  const fetchFileEdits = async () => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/file-edits`);
+      if (response.ok) {
+        const data = await response.json();
+        setFileEdits(data.fileEdits || {});
+      }
+    } catch (error) {
+      console.error("Error fetching file edits:", error);
     }
   };
 
@@ -846,6 +871,198 @@ export default function TaskDetailPage() {
     const newFiles = [...filesToBeUploaded];
     newFiles.splice(index, 1);
     setfilesToBeUploaded(newFiles);
+  };
+
+  // Handle deleting an already uploaded file
+  const handleDeleteUploadedFile = async (
+    fileName: string,
+    storage_name: string,
+    folder_path: string
+  ) => {
+    if (!currentUser?.role || currentUser.role !== "projectManager") {
+      toast.error("Only project managers can delete files", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${fileName}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const file_path = `${folder_path}/${fileName}`;
+
+      console.log("Deleting file with params:", {
+        storage_name,
+        file_path,
+        file_name: fileName,
+        taskId,
+      });
+
+      const response = await fetch(`/api/tasks/${taskId}/storage/delete`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storage_name,
+          file_path,
+          file_name: fileName,
+          user_id: currentUser.id,
+          user_name: currentUser.name,
+          user_email: currentUser.email,
+          user_role: currentUser.role,
+        }),
+      });
+
+      const result = await response.json();
+      console.log("Delete response:", result);
+
+      if (response.ok) {
+        toast.success("File deleted successfully", {
+          type: "success",
+          position: "top-right",
+        });
+        // Refresh file lists
+        await fetchData();
+        await fetchProcessorFiles();
+      } else {
+        console.error("Delete failed:", result);
+        toast.error(result.error || "Failed to delete file", {
+          type: "error",
+          position: "top-right",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      toast.error("Failed to delete file", {
+        type: "error",
+        position: "top-right",
+      });
+    }
+  };
+
+  // Handle replacing an already uploaded file
+  const handleReplaceUploadedFile = async (
+    fileName: string,
+    storage_name: string,
+    folder_path: string,
+    pageCount: number | null
+  ) => {
+    if (!currentUser?.role || currentUser.role !== "projectManager") {
+      toast.error("Only project managers can replace files", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    // Create file input dynamically
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.zip";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        console.log("Replacing file with params:", {
+          fileName,
+          storage_name,
+          folder_path,
+          pageCount,
+          newFileName: file.name,
+          taskId,
+        });
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("storage_name", storage_name);
+        formData.append("old_file_path", `${folder_path}/${fileName}`);
+        formData.append("old_file_name", fileName);
+        formData.append("page_count", (pageCount || 0).toString());
+        formData.append("user_id", currentUser.id);
+        formData.append("user_name", currentUser.name);
+        formData.append("user_email", currentUser.email);
+        formData.append("user_role", currentUser.role);
+
+        const response = await fetch(`/api/tasks/${taskId}/storage/replace`, {
+          method: "PUT",
+          body: formData,
+        });
+
+        const result = await response.json();
+        console.log("Replace response:", result);
+
+        if (response.ok) {
+          toast.success("File replaced successfully", {
+            type: "success",
+            position: "top-right",
+          });
+          // Refresh file lists and edits
+          await fetchData();
+          await fetchProcessorFiles();
+          await fetchFileEdits();
+        } else {
+          console.error("Replace failed:", result);
+          toast.error(result.error || "Failed to replace file", {
+            type: "error",
+            position: "top-right",
+          });
+        }
+      } catch (error) {
+        console.error("Error replacing file:", error);
+        toast.error("Failed to replace file", {
+          type: "error",
+          position: "top-right",
+        });
+      }
+    };
+    input.click();
+  };
+
+  // Handle deleting file from "Files Uploaded" section in FileUpload component
+  const handleDeleteFileFromUploadedSection = async (fileName: string) => {
+    // Determine the storage and folder based on current stage
+    let storage_name = "";
+    let folder_path = "";
+
+    if (currentStage === "Processor") {
+      storage_name = "processor-files";
+      folder_path = `${sentBy}_${taskId}`;
+    } else if (currentStage === "QC") {
+      storage_name = "qc-files";
+      folder_path = taskId;
+    } else if (currentStage === "QA") {
+      storage_name = "qa-files";
+      folder_path = taskId;
+    }
+
+    await handleDeleteUploadedFile(fileName, storage_name, folder_path);
+  };
+
+  // Handle replacing file from "Files Uploaded" section in FileUpload component
+  const handleReplaceFileFromUploadedSection = async (
+    fileName: string,
+    pageCount: number | null
+  ) => {
+    // Determine the storage and folder based on current stage
+    let storage_name = "";
+    let folder_path = "";
+
+    if (currentStage === "Processor") {
+      storage_name = "processor-files";
+      folder_path = `${sentBy}_${taskId}`;
+    } else if (currentStage === "QC") {
+      storage_name = "qc-files";
+      folder_path = taskId;
+    } else if (currentStage === "QA") {
+      storage_name = "qa-files";
+      folder_path = taskId;
+    }
+
+    await handleReplaceUploadedFile(fileName, storage_name, folder_path, pageCount);
   };
 
   const handleDownloadOffilesToBeUploaded = async (
@@ -1802,6 +2019,7 @@ export default function TaskDetailPage() {
           fetchProcessorFiles(),
           fetchData(),
           fetchRealStatus(),
+          fetchFileEdits(),
         ]);
 
         // After all data is loaded, check if submit button should be shown
@@ -1814,6 +2032,7 @@ export default function TaskDetailPage() {
     };
 
     initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
   // Show loading screen while initial data is being fetched
@@ -2011,6 +2230,9 @@ export default function TaskDetailPage() {
             handleDownload={handleDownload}
             storage_name={storage_name}
             folder_path={folder_path}
+            currentUser={currentUser}
+            onDeleteFile={handleDeleteUploadedFile}
+            onReplaceFile={handleReplaceUploadedFile}
           />
 
           {/* File upload section */}
@@ -2024,6 +2246,10 @@ export default function TaskDetailPage() {
             handleRemoveFile={handleRemoveFile}
             handleSubmitFileUpload={handleSubmitFileUpload}
             updateFilePageCount={handleUpdateFilePageCount}
+            currentUser={currentUser}
+            onDeleteUploadedFile={handleDeleteFileFromUploadedSection}
+            onReplaceUploadedFile={handleReplaceFileFromUploadedSection}
+            fileEdits={fileEdits}
           />
         </div>
       )}
