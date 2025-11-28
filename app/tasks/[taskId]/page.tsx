@@ -1554,6 +1554,33 @@ export default function TaskDetailPage() {
     }
   };
 
+  // Helper function to sanitize filename for storage
+  const sanitizeFileName = (fileName: string): string => {
+    // Get file extension
+    const lastDotIndex = fileName.lastIndexOf(".");
+    const name = lastDotIndex > -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const extension = lastDotIndex > -1 ? fileName.substring(lastDotIndex) : "";
+
+    // Replace problematic characters with safe alternatives
+    const sanitized = name
+      // Replace Chinese/special punctuation with regular ones
+      .replace(/，/g, ",")
+      .replace(/：/g, "-")
+      .replace(/；/g, ";")
+      .replace(/【/g, "[")
+      .replace(/】/g, "]")
+      .replace(/（/g, "(")
+      .replace(/）/g, ")")
+      // Remove or replace other special characters that might cause issues
+      .replace(/[<>:"|?*]/g, "-")
+      // Replace spaces with underscores
+      .replace(/\s+/g, "_")
+      // Remove any remaining problematic characters but keep alphanumeric, Chinese, and basic punctuation
+      .replace(/[^\w\u4e00-\u9fa5\-_.,()[\]]/g, "");
+
+    return sanitized + extension;
+  };
+
   const handleSubmitFileUpload = async () => {
     if (!taskId) {
       alert("Task ID is not available.");
@@ -1605,17 +1632,25 @@ export default function TaskDetailPage() {
         });
         date = date.replaceAll("/", "-");
 
+        // Sanitize the filename
+        const sanitizedFileName = sanitizeFileName(file.name);
+
+        // Log filename sanitization for debugging
+        if (file.name !== sanitizedFileName) {
+          console.log(`Sanitized filename: "${file.name}" -> "${sanitizedFileName}"`);
+        }
+
         let file_path = "";
         let storage_name = "";
 
         if (currentStage === "Processor") {
-          file_path = `${data.sent_by}_${taskId}/${date}_${file.name}`;
+          file_path = `${data.sent_by}_${taskId}/${date}_${sanitizedFileName}`;
           storage_name = "processor-files";
         } else if (currentStage === "QC") {
-          file_path = `${taskId}/${date}_${file.name}`;
+          file_path = `${taskId}/${date}_${sanitizedFileName}`;
           storage_name = "qc-files";
         } else if (currentStage === "QA") {
-          file_path = `${taskId}/${date}_${file.name}`;
+          file_path = `${taskId}/${date}_${sanitizedFileName}`;
           storage_name = "qa-files";
         }
 
@@ -1628,6 +1663,10 @@ export default function TaskDetailPage() {
           });
         if (uploadError) {
           console.error("Error uploading file:", uploadError);
+          toast(`Failed to upload "${file.name}": ${uploadError.message}`, {
+            type: "error",
+            position: "top-right",
+          });
           return;
         }
 
@@ -1636,7 +1675,7 @@ export default function TaskDetailPage() {
           .from("files_test")
           .insert({
             task_id: taskId,
-            file_name: `${date}_${file.name}`,
+            file_name: `${date}_${sanitizedFileName}`,
             page_count: (file as FileWithPageCount).pageCount,
             // taken_by: currentUser?.id || null,
             assigned_to: [], // Empty array for initial upload
