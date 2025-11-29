@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Cpu,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "Processing Team", href: "/dashboard/processor", icon: Cpu },
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
+    { name: "Analytics", href: "/dashboard/analytics", icon: ChartNoAxesCombined },
   ];
 
   const toggleSidebar = () => {
@@ -190,6 +192,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       "/dashboard/processor",
                       "/dashboard/qc",
                       "/dashboard/qa",
+                      "/dashboard/analytics",
                     ],
                     processor: ["/dashboard/processor"],
                     qcTeam: ["/dashboard/qc"],
