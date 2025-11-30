@@ -1,16 +1,28 @@
-// import { supabase } from "@/utils/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
-
-
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function POST(request: NextRequest) {
+  try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
 
     const body = await request.json();
+    const { storage_name, taskId, action } = body;
 
-    const {storage_name, taskId, action} = body;
+    if (!storage_name || !taskId || !action) {
+      return NextResponse.json(
+        { error: 'Storage name, task ID, and action are required' },
+        { status: 400 }
+      );
+    }
 
-    // // const supabase = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = await createClient();
+
+    // // const supabase = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!);
     // // Grab JWT from headers
     // const authHeader = request.headers.get("authorization");
     // const token = authHeader?.replace("Bearer ", "");
@@ -18,42 +30,46 @@ export async function POST(request: NextRequest) {
     // // Create a Supabase client with user’s access token
     // const supabase = createClient(
     //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    //   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
     //   { global: { headers: { Authorization: `Bearer ${token}` } } } 
     // );
 
-    if(action === "list"){
+    if (action === "list") {
+      const { data, error } = await supabase.storage.from(storage_name).list(`${taskId}/`);
 
-    const {data, error} = await supabase.storage.from(storage_name).list(`${taskId}/`);
+      if (error) {
+        return NextResponse.json({ error: 'Failed to list files' }, { status: 400 });
+      }
+      return NextResponse.json({ data });
+    } else if (action === "upload") {
+      const { file, file_path } = body;
 
-    if(error){
-            return NextResponse.json({error: error.message}, {status: 400});
-        }
-        console.log("Storage Name:", storage_name);
-        console.log("Task ID:", taskId);
-        console.log("Action:", action);
-        console.log("Data:", data);
+      if (!file || !file_path) {
+        return NextResponse.json(
+          { error: 'File and file path are required' },
+          { status: 400 }
+        );
+      }
 
-        return NextResponse.json({data});
-    }
-
-    else if(action === "upload"){
-
-        const {file, file_path} = body;
-
-        const { error } = await supabase.storage
+      const { error } = await supabase.storage
         .from(storage_name)
         .upload(file_path, file, {
-            contentType: file.type,
-            upsert: true,
+          contentType: file.type,
+          upsert: true,
         });
 
-        if(error){
-            return NextResponse.json({error: error.message}, {status: 400});
-        }
+      if (error) {
+        return NextResponse.json({ error: 'Failed to upload file' }, { status: 400 });
+      }
 
-        return NextResponse.json({data: "File uploaded successfully"});
+      return NextResponse.json({ data: "File uploaded successfully" });
     }
 
-    // return NextResponse.json({data});
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

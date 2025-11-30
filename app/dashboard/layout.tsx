@@ -41,10 +41,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     try {
       await authManager.signOut();
       router.push("/auth/login");
+      router.refresh(); // Refresh to clear server session
     } catch (error) {
       console.error("Error during logout:", error);
       // If there's an error, still redirect to login page
       router.push("/auth/login");
+      router.refresh();
     }
   };
 
@@ -67,10 +69,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const fetchUserRole = async (userId: string) => {
       try {
         const response = await fetch(`/api/auth/user/role?userId=${userId}`);
-        
+
         if (!response.ok) {
-          // console.error('Failed to fetch user role:', response.statusText);
-          // toast.error("Invalid login credentials. Please try again.");
           toast("Invalid login credentials", {
             type: "error",
             position: "top-right",

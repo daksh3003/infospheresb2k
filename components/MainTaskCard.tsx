@@ -3,7 +3,7 @@ import React from "react";
 import { getPriorityBadge } from "./task/priority";
 import { getStatusBadge } from "./task/status";
 import { useState } from "react";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@/lib/client";
 import { useEffect } from "react";
 import { getTaskActions } from "@/utils/taskActions";
 import {
@@ -83,6 +83,8 @@ export const MainTaskCard = ({
   >([]);
   const [realStatus, setRealStatus] = useState<string>(status);
   const [statusLoading, _setStatusLoading] = useState(false);
+
+  const supabase = createClient();
 
   const fetchAssignedTo = async () => {
     try {

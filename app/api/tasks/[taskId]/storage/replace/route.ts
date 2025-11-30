@@ -1,11 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { taskId } = await params;
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -18,17 +25,11 @@ export async function PUT(
     const user_email = formData.get("user_email") as string;
     const user_role = formData.get("user_role") as string;
 
-    console.log("REPLACE API - Received params:", {
-      taskId,
-      storage_name,
-      old_file_path,
-      old_file_name,
-      new_file_name: file?.name,
-    });
-
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
+
+    const supabase = await createClient();
 
     // Get the old file record to preserve uploaded_by info
     const { data: oldFileData } = await supabase
@@ -38,23 +39,17 @@ export async function PUT(
       .eq("file_path", old_file_path)
       .single();
 
-    console.log("REPLACE API - Old file data:", oldFileData);
-
     // Delete old file from storage
-    console.log("REPLACE API - Deleting old file from storage:", old_file_path);
     const { error: deleteError } = await supabase.storage
       .from(storage_name)
       .remove([old_file_path]);
 
     if (deleteError) {
-      console.error("REPLACE API - Error deleting old file:", deleteError);
       return NextResponse.json(
-        { error: "Failed to delete old file: " + deleteError.message },
+        { error: "Failed to delete old file" },
         { status: 400 }
       );
     }
-
-    console.log("REPLACE API - Old file deleted from storage");
 
     // Generate new file path with timestamp to ensure uniqueness
     const date = new Date().toLocaleString("en-IN", {
@@ -65,8 +60,6 @@ export async function PUT(
     const folderPath = old_file_path.substring(0, old_file_path.lastIndexOf("/"));
     const new_file_path = `${folderPath}/${date}_${file.name}`;
 
-    console.log("REPLACE API - Uploading new file to:", new_file_path);
-
     // Upload new file
     const { error: uploadError } = await supabase.storage
       .from(storage_name)
@@ -76,14 +69,11 @@ export async function PUT(
       });
 
     if (uploadError) {
-      console.error("REPLACE API - Upload error:", uploadError);
       return NextResponse.json(
-        { error: uploadError.message },
+        { error: "Failed to upload new file" },
         { status: 400 }
       );
     }
-
-    console.log("REPLACE API - New file uploaded successfully");
 
     // Delete old file record from files_test
     const { error: dbDeleteError } = await supabase
@@ -93,7 +83,7 @@ export async function PUT(
       .eq("file_path", old_file_path);
 
     if (dbDeleteError) {
-      console.error("REPLACE API - Error deleting old file record:", dbDeleteError);
+      // Error deleting old file record - non-critical
     }
 
     // Insert new file record in files_test
@@ -114,11 +104,8 @@ export async function PUT(
     });
 
     if (insertError) {
-      console.error("REPLACE API - Database insert error:", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 400 });
+      return NextResponse.json({ error: "Failed to create file record" }, { status: 400 });
     }
-
-    console.log("REPLACE API - New file record inserted in database");
 
     // Log the replace action in task_actions table
     const { error: logError } = await supabase.from("task_actions").insert({
@@ -140,8 +127,7 @@ export async function PUT(
     });
 
     if (logError) {
-      console.error("Error logging file replacement:", logError);
-      // Don't fail the request if logging fails
+      // Error logging file replacement - non-critical
     }
 
     return NextResponse.json({
@@ -151,7 +137,6 @@ export async function PUT(
       new_file_name: `${date}_${file.name}`,
     });
   } catch (error) {
-    console.error("Error in replace route:", error);
     return NextResponse.json(
       { error: "Failed to replace file" },
       { status: 500 }

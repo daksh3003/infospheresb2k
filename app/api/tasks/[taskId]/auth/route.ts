@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!
 );
 
 // GET - Get current user
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    authHeader.substring(7);
+    const token = authHeader.substring(7);
     
     // Get session from token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();

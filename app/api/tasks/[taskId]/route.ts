@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from '@/app/api/middleware/auth';
+import { AuthorizationService } from '@/app/api/middleware/authorization';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -11,12 +13,28 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const authenticatedUser = authResult;
+
     const { taskId } = await params;
 
     if (!taskId) {
       return NextResponse.json(
         { error: 'Task ID is required' },
         { status: 400 }
+      );
+    }
+
+    // Check if user can access this task
+    const canAccess = await AuthorizationService.canAccessTask(authenticatedUser.id, taskId);
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'You do not have permission to access this task' },
+        { status: 403 }
       );
     }
 
@@ -41,7 +59,7 @@ export async function GET(
       .eq("project_id", response.project_id);
 
     if (projectTasksError) {
-      console.error("Error fetching project tasks:", projectTasksError);
+      // Error fetching project tasks - non-critical
     }
 
     // Fetch task iterations
@@ -52,7 +70,7 @@ export async function GET(
       .order("iteration_number", { ascending: false });
 
     if (iterationError) {
-      console.error("Error fetching iterations:", iterationError);
+      // Error fetching iterations - non-critical
     }
 
     // Fetch stages
@@ -62,10 +80,8 @@ export async function GET(
       .eq("task_id", taskId)
       .single();
 
-    console.log("stages", stages?.stages);
-
     if (stagesError) {
-      console.error("Error fetching stages:", stagesError);
+      // Error fetching stages - non-critical
     }
 
     // Fetch assigned users
@@ -76,7 +92,7 @@ export async function GET(
       .single();
 
     if (assignedError && assignedError.code !== "PGRST116") {
-      console.error("Error fetching assigned users:", assignedError);
+      // Error fetching assigned users - non-critical
     }
 
     // Fetch available users
@@ -86,7 +102,7 @@ export async function GET(
       .order("name", { ascending: true });
 
     if (usersError) {
-      console.error("Error fetching users:", usersError);
+      // Error fetching users - non-critical
     }
 
     return NextResponse.json({
@@ -99,10 +115,8 @@ export async function GET(
     });
 
   } catch (error: unknown) {
-    console.error('Task detail error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -113,6 +127,13 @@ export async function POST(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const authenticatedUser = authResult;
+
     const { taskId } = await params;
     const { action, data } = await request.json();
 
@@ -123,11 +144,20 @@ export async function POST(
       );
     }
 
+    // Check if user can modify this task
+    const canModify = await AuthorizationService.canModifyTask(authenticatedUser.id, taskId);
+    if (!canModify) {
+      return NextResponse.json(
+        { error: 'You do not have permission to modify this task' },
+        { status: 403 }
+      );
+    }
+
     switch (action) {
       case 'assign':
-        return await handleTaskAssignment(taskId, data);
+        return await handleTaskAssignment(taskId, data, authenticatedUser);
       case 'pickup':
-        return await handleTaskPickup(taskId, data);
+        return await handleTaskPickup(taskId, authenticatedUser);
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -136,10 +166,8 @@ export async function POST(
     }
 
   } catch (error: unknown) {
-    console.error('Task action error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -194,34 +222,25 @@ async function handleTaskAssignment(taskId: string, selectedUserData: { id: stri
     return NextResponse.json({ message: 'Task assigned successfully' });
 
   } catch (error: unknown) {
-    console.error('Task assignment error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to assign task';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Failed to assign task' },
       { status: 500 }
     );
   }
 }
 
-async function handleTaskPickup(taskId: string, currentUser: {
-  role: string; id: string; name: string; email: string 
+async function handleTaskPickup(taskId: string, authenticatedUser: {
+  role: string; id: string; email: string 
 }) {
   try {
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 400 }
-      );
-    }
-
     const now = new Date().toISOString();
 
     // Create assignment entry
     const newAssignment = {
-      name: currentUser.name,
-      email: currentUser.email,
-      role: currentUser.role,
-      user_id: currentUser.id,
+      name: authenticatedUser.email, // Using email as name fallback
+      email: authenticatedUser.email,
+      role: authenticatedUser.role,
+      user_id: authenticatedUser.id,
       assigned_at: now,
     };
 
@@ -265,10 +284,8 @@ async function handleTaskPickup(taskId: string, currentUser: {
     return NextResponse.json({ message: 'Task picked up successfully' });
 
   } catch (error: unknown) {
-    console.error('Task pickup error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to pick up task';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Failed to pick up task' },
       { status: 500 }
     );
   }

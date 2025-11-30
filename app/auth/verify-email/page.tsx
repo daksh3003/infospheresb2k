@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { toast } from "react-toastify";
 import LoadingScreen from "@/components/ui/loading-screen";
 
 function VerifyEmailContent() {
@@ -87,8 +88,11 @@ function VerifyEmailContent() {
                 <p>Didn&apos;t receive the email? Check your spam folder or</p>
                 <button
                   onClick={() => {
-                    // Here you could add resend email logic
-                    console.log("Resend email clicked");
+                    // TODO: Implement resend email functionality
+                    toast("Resend email functionality coming soon", {
+                      type: "info",
+                      position: "top-right",
+                    });
                   }}
                   className="text-blue-600 hover:text-blue-500 font-medium"
                 >

@@ -11,6 +11,7 @@ export default function Signup() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -19,6 +20,26 @@ export default function Signup() {
   const [mounted, setMounted] = useState(false);
 
   const [role, setRole] = useState<string>("projectManager");
+
+  // Password validation
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'Password must contain at least one number';
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      return 'Password must contain at least one special character';
+    }
+    return null;
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -38,12 +59,42 @@ export default function Signup() {
       ...prev,
       [name]: value,
     }));
+    
+    // Validate password in real-time
+    if (name === 'password') {
+      const error = validatePassword(value);
+      setPasswordError(error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setPasswordError(null);
+
+    // Validate password before submission
+    const passwordValidationError = validatePassword(formData.password);
+    if (passwordValidationError) {
+      setPasswordError(passwordValidationError);
+      setLoading(false);
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
+    // Validate name
+    if (!formData.name.trim()) {
+      setError('Name is required');
+      setLoading(false);
+      return;
+    }
 
     try {
       await api.signup(formData.email, formData.password, formData.name, role);
@@ -53,7 +104,6 @@ export default function Signup() {
         `/auth/verify-email?email=${encodeURIComponent(formData.email)}`
       );
     } catch (error: unknown) {
-      console.error("Error signing up:", error);
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -156,8 +206,18 @@ export default function Signup() {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                    passwordError ? 'border-red-300' : 'border-gray-300'
+                  }`}
                 />
+                {passwordError && (
+                  <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+                )}
+                {!passwordError && formData.password && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Password must be at least 8 characters with uppercase, lowercase, number, and special character
+                  </p>
+                )}
               </div>
 
               <div>

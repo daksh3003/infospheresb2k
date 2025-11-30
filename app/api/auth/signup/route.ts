@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,12 +12,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = await createClient();
+
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options: {
         data: {
-          name,
+          name: name.trim(),
           role,
         },
       },
@@ -42,18 +39,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create profile entry
+    // Create profile entry with selected role
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: data.user.id,
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       role,
       created_at: new Date().toISOString(),
     });
 
     if (profileError) {
-      console.error("Error creating profile:", profileError);
-      // Continue signup process even if profile creation fails
+      return NextResponse.json(
+        {
+          error: 'Failed to create user profile'
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -62,9 +63,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('Signup error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

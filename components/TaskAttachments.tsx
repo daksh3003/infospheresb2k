@@ -162,7 +162,7 @@ export const TaskAttachments = ({
             <div className="space-y-2">
               {PMFiles.map((item, index: number) => (
                 <div
-                  key={item.name}
+                  key={`pm-${item.name}-${index}`}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                 >
                   <div className="flex items-center gap-3">
@@ -234,7 +234,7 @@ export const TaskAttachments = ({
                 <div className="space-y-2">
                   {processorFiles.map((item, index: number) => (
                     <div
-                      key={item.name}
+                      key={`processor-${item.name}-${index}`}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
                       <div className="flex items-center gap-3">
@@ -318,7 +318,7 @@ export const TaskAttachments = ({
                 <div className="space-y-2">
                   {correctionFiles.map((item, index: number) => (
                     <div
-                      key={item.name}
+                      key={`correction-${item.name}-${index}`}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                     >
                       <div className="flex items-center gap-3">

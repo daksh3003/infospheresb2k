@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { taskId } = await params;
     const { storage_name, file_path, file_name, user_id, user_name, user_email, user_role } = await request.json();
 
-    console.log("DELETE API - Received params:", {
-      taskId,
-      storage_name,
-      file_path,
-      file_name,
-    });
+    if (!storage_name || !file_path) {
+      return NextResponse.json(
+        { error: 'Storage name and file path are required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
 
     // Delete from storage bucket
     const { error: storageError } = await supabase.storage
@@ -22,14 +31,11 @@ export async function DELETE(
       .remove([file_path]);
 
     if (storageError) {
-      console.error("DELETE API - Storage error:", storageError);
       return NextResponse.json(
-        { error: storageError.message },
+        { error: "Failed to delete file from storage" },
         { status: 400 }
       );
     }
-
-    console.log("DELETE API - File deleted from storage successfully");
 
     // Delete from files_test table
     const { error: dbError } = await supabase
@@ -39,11 +45,8 @@ export async function DELETE(
       .eq("file_path", file_path);
 
     if (dbError) {
-      console.error("DELETE API - Database error:", dbError);
-      return NextResponse.json({ error: dbError.message }, { status: 400 });
+      return NextResponse.json({ error: "Failed to delete file record" }, { status: 400 });
     }
-
-    console.log("DELETE API - File record deleted from database successfully");
 
     // Log the delete action in task_actions table
     const { error: logError } = await supabase.from("task_actions").insert({
@@ -62,13 +65,11 @@ export async function DELETE(
     });
 
     if (logError) {
-      console.error("Error logging file deletion:", logError);
-      // Don't fail the request if logging fails
+      // Error logging file deletion - non-critical
     }
 
     return NextResponse.json({ success: true, message: "File deleted successfully" });
   } catch (error) {
-    console.error("Error in delete route:", error);
     return NextResponse.json(
       { error: "Failed to delete file" },
       { status: 500 }

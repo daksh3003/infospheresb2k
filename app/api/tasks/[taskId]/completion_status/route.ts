@@ -1,9 +1,25 @@
-import { NextRequest } from 'next/server';
-import { supabase } from "@/utils/supabase";
-
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function POST(request: NextRequest) {
+  try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { taskId, projectId } = await request.json();
+
+    if (!taskId || !projectId) {
+      return NextResponse.json(
+        { error: 'Task ID and Project ID are required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
 
     const { error } = await supabase
           .from("tasks_test")
@@ -12,41 +28,49 @@ export async function POST(request: NextRequest) {
           })
           .eq("task_id", taskId);
 
-        if (error) {
-          console.error("Error updating task:", error);
-          return;
-        }
+    if (error) {
+      return NextResponse.json(
+        { error: 'Failed to update task completion status' },
+        { status: 500 }
+      );
+    }
 
-        // check all the tasks mapped to the same project are completed or not
-        const { data: projectTasks, error: projectTasksError } = await supabase
+    // check all the tasks mapped to the same project are completed or not
+    const { data: projectTasks, error: projectTasksError } = await supabase
           .from("tasks_test")
           .select("completion_status")
           .eq("project_id", projectId);
 
-        console.log("projectTasks", projectTasks);
+    if (projectTasksError) {
+      return NextResponse.json(
+        { error: 'Failed to fetch project tasks' },
+        { status: 500 }
+      );
+    }
 
-        if (projectTasksError) {
-          console.error("Error fetching project tasks:", projectTasksError);
-          return;
-        }
+    const isAllTasksCompleted = projectTasks.every(
+      (task) => task.completion_status
+    );
 
-        const isAllTasksCompleted = projectTasks.every(
-          (task) => task.completion_status
+    if (isAllTasksCompleted) {
+      const { error: projectError } = await supabase
+        .from("projects_test")
+        .update({ completion_status: true })
+        .eq("project_id", projectId);
+
+      if (projectError) {
+        return NextResponse.json(
+          { error: 'Failed to update project completion status' },
+          { status: 500 }
         );
+      }
+    }
 
-        console.log("isAllTasksCompleted", isAllTasksCompleted);
-
-        if (isAllTasksCompleted) {
-          const { error: projectError } = await supabase
-            .from("projects_test")
-            .update({ completion_status: true })
-            .eq("project_id", projectId);
-
-          if (projectError) {
-            console.error("Error updating project:", projectError);
-            return;
-          }
-        }
-
-        
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }   

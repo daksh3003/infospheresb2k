@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-// import { emit } from 'process';
+import { requireAuth, requireRole } from '@/app/api/middleware/auth';
+import { AuthorizationService } from '@/app/api/middleware/authorization';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -21,9 +22,25 @@ interface FileFormData {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and project manager role
+    const roleResult = await requireRole(request, ['projectManager']);
+    if (roleResult instanceof NextResponse) {
+      return roleResult; // Return error response
+    }
+    const authenticatedUser = roleResult;
+
+    // Verify user can create projects
+    const canCreate = await AuthorizationService.canCreateProject(authenticatedUser.id);
+    if (!canCreate) {
+      return NextResponse.json(
+        { error: 'You do not have permission to create projects' },
+        { status: 403 }
+      );
+    }
+
     // Check content type to handle both JSON and FormData
     const contentType = request.headers.get('content-type') || '';
-    let projectData, fileGroups, selectedFiles, currentUser, formData = null;
+    let projectData, fileGroups, selectedFiles, formData = null;
 
     if (contentType.includes('application/json')) {
       // Handle legacy JSON format
@@ -31,21 +48,12 @@ export async function POST(request: NextRequest) {
       projectData = jsonData.projectData;
       fileGroups = jsonData.fileGroups;
       selectedFiles = jsonData.selectedFiles;
-      currentUser = jsonData.currentUser;
     } else {
       // Handle new FormData format
       formData = await request.formData();
       const projectDataStr = formData.get('projectData') as string;
       const fileGroupsStr = formData.get('fileGroups') as string;
       const selectedFilesStr = formData.get('selectedFiles') as string;
-      const currentUserStr = formData.get('currentUser') as string;
-
-      if (!currentUserStr) {
-        return NextResponse.json(
-          { error: 'You must be logged in to create a project' },
-          { status: 401 }
-        );
-      }
 
       if (!projectDataStr || !fileGroupsStr || !selectedFilesStr) {
         return NextResponse.json(
@@ -58,14 +66,6 @@ export async function POST(request: NextRequest) {
       projectData = JSON.parse(projectDataStr);
       fileGroups = JSON.parse(fileGroupsStr);
       selectedFiles = JSON.parse(selectedFilesStr);
-      currentUser = JSON.parse(currentUserStr);
-    }
-
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: 'You must be logged in to create a project' },
-        { status: 401 }
-      );
     }
 
     if (!projectData || !fileGroups || !selectedFiles) {
@@ -95,9 +95,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (projectError) {
-      console.error("Error creating project:", projectError);
       return NextResponse.json(
-        { error: `Failed to create project: ${projectError.message}` },
+        { error: 'Failed to create project' },
         { status: 400 }
       );
     }
@@ -121,9 +120,8 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (taskError) {
-        console.error("Error creating task:", taskError);
         return NextResponse.json(
-          { error: `Failed to create task ${groupIndex + 1}: ${taskError.message}` },
+          { error: `Failed to create task ${groupIndex + 1}` },
           { status: 400 }
         );
       }
@@ -144,9 +142,8 @@ export async function POST(request: NextRequest) {
         ]);
 
       if (taskIterationError) {
-        console.error("Error creating task iteration:", taskIterationError);
         return NextResponse.json(
-          { error: `Failed to create task iteration: ${taskIterationError.message}` },
+          { error: 'Failed to create task iteration' },
           { status: 400 }
         );
       }
@@ -164,9 +161,8 @@ export async function POST(request: NextRequest) {
         ]);
 
       if (process_logsError) {
-        console.error("Error creating process logs:", process_logsError);
         return NextResponse.json(
-          { error: `Failed to create process logs: ${process_logsError.message}` },
+          { error: 'Failed to create process logs' },
           { status: 400 }
         );
       }
@@ -193,7 +189,6 @@ export async function POST(request: NextRequest) {
         }
         
         if (!actualFile) {
-          console.warn(`File not found in FormData with keys: file_group_${groupIndex}_file_X or file_${taskId}_${fileName}. Skipping file upload for backward compatibility.`);
           // Skip this file if not found in FormData - for backward compatibility
           // In the future, all files should be provided in FormData
           continue;
@@ -201,7 +196,6 @@ export async function POST(request: NextRequest) {
         
         // Get file extension and determine file type
         const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-        console.log('File Extension:', fileExtension);
         // Define supported file types (same as in files API)
         // const supportedTypes: Record<string, string[]> = {
         //   documents: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'],
@@ -304,9 +298,8 @@ export async function POST(request: NextRequest) {
           });
 
         if (uploadError) {
-          console.error("Error uploading file:", uploadError);
           return NextResponse.json(
-            { error: `Failed to upload file ${fileName}: ${uploadError.message}` },
+            { error: `Failed to upload file ${fileName}` },
             { status: 400 }
           );
         }
@@ -327,19 +320,18 @@ export async function POST(request: NextRequest) {
               // mime_type: mimeType,
               // file_size: actualFile.size,
               uploaded_by: { 
-                id: currentUser.id, 
-                name: currentUser.name, 
-                email: currentUser.email, 
-                role: currentUser.role 
+                id: authenticatedUser.id, 
+                name: authenticatedUser.email, // Using email as name fallback
+                email: authenticatedUser.email, 
+                role: authenticatedUser.role 
               },
               uploaded_at: new Date().toISOString(),
             },
           ]);
 
         if (fileRecordError) {
-          console.error("Error creating file record:", fileRecordError);
           return NextResponse.json(
-            { error: `Failed to create file record for ${fileName}: ${fileRecordError.message}` },
+            { error: `Failed to create file record for ${fileName}` },
             { status: 400 }
           );
         }
@@ -352,10 +344,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('Project creation error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

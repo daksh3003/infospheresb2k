@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const body = await request.json();
     
     // Validate required fields
@@ -34,6 +41,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = await createClient();
+
     // Insert task action into database
     const { data, error } = await supabase
       .from('task_actions')
@@ -48,11 +57,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Database error:', error);
       return NextResponse.json(
         { 
-          error: "Failed to log task action", 
-          details: error.message 
+          error: "Failed to log task action"
         },
         { status: 500 }
       );
@@ -68,11 +75,9 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { 
-        error: "Internal server error", 
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        error: "Internal server error"
       },
       { status: 500 }
     );
@@ -82,6 +87,14 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve task actions
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const supabase = await createClient();
+
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('task_id');
     const userId = searchParams.get('user_id');
@@ -116,11 +129,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Database error:', error);
       return NextResponse.json(
         { 
-          error: "Failed to fetch task actions", 
-          details: error.message 
+          error: "Failed to fetch task actions"
         },
         { status: 500 }
       );
@@ -136,11 +147,9 @@ export async function GET(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { 
-        error: "Internal server error", 
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        error: "Internal server error"
       },
       { status: 500 }
     );

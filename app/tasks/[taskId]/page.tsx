@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@/lib/client";
 import { logTaskAction, createTaskActionMetadata } from "@/utils/taskActions";
 import TimelineModal from "@/components/Timeline/TimelineModal";
 import Dialog from "@/components/Dialog";
@@ -94,6 +94,16 @@ interface Task {
   attachments: string[];
   estimatedHours: number; // Will sum all estimated hours
   overall_completion_status: boolean;
+}
+
+interface FileEditInfo {
+  edited_at: string;
+  edited_by: {
+    name: string;
+    email: string;
+    role: string;
+  };
+  old_file_name: string;
 }
 
 interface FileWithPageCount extends File {
@@ -196,16 +206,10 @@ export default function TaskDetailPage() {
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
   // File edits state
-  interface FileEditInfo {
-    edited_at: string;
-    edited_by: {
-      name: string;
-      email: string;
-      role: string;
-    };
-    old_file_name: string;
-  }
+
   const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
+
+  const supabase = createClient();
 
   // New function to fetch complete task details with project information
   const fetchCompleteTaskDetails = async (): Promise<Task | null> => {
@@ -1112,7 +1116,12 @@ export default function TaskDetailPage() {
       folder_path = taskId;
     }
 
-    await handleReplaceUploadedFile(fileName, storage_name, folder_path, pageCount);
+    await handleReplaceUploadedFile(
+      fileName,
+      storage_name,
+      folder_path,
+      pageCount
+    );
   };
 
   const handleDownloadOffilesToBeUploaded = async (
@@ -1169,8 +1178,8 @@ export default function TaskDetailPage() {
         index,
       });
 
-      const { data, error } = await supabase.storage
-        .from(filesData.storage_name)
+      const { data, error } = await createClient()
+        .storage.from(filesData.storage_name)
         .download(`${filesData.file_path}`);
 
       if (error) throw new Error("Download failed: " + error.message);
@@ -1323,8 +1332,8 @@ export default function TaskDetailPage() {
         download_type: "task_file",
       });
 
-      const { data, error } = await supabase.storage
-        .from(storage_name)
+      const { data, error } = await createClient()
+        .storage.from(storage_name)
         .download(storageFilePath);
 
       if (error) throw new Error("Download failed: " + error.message);
@@ -1365,7 +1374,10 @@ export default function TaskDetailPage() {
             .single();
 
           if (fileIdError) {
-            console.error("Error fetching file_id from files_test:", fileIdError);
+            console.error(
+              "Error fetching file_id from files_test:",
+              fileIdError
+            );
             return;
           }
 
@@ -1660,7 +1672,9 @@ export default function TaskDetailPage() {
         // Keep the original filename for database and display purposes
         const originalFileName = file.name;
 
-        console.log(`File upload: "${originalFileName}" -> Storage: "${safeStorageFileName}"`);
+        console.log(
+          `File upload: "${originalFileName}" -> Storage: "${safeStorageFileName}"`
+        );
 
         let file_path = "";
         let storage_name = "";
@@ -1677,8 +1691,8 @@ export default function TaskDetailPage() {
         }
 
         // Upload the file
-        const { data: _StoreFiles, error: uploadError } = await supabase.storage
-          .from(storage_name)
+        const { data: _StoreFiles, error: uploadError } = await createClient()
+          .storage.from(storage_name)
           .upload(file_path, file, {
             contentType: file.type,
             upsert: true,
@@ -1801,10 +1815,12 @@ export default function TaskDetailPage() {
         }
 
         // Map to the expected format using original filename for display
-        const correctionFilesWithPageCount = (correctionFiles || []).map((file) => ({
-          name: file.file_name, // Use original filename (with Chinese characters)
-          pageCount: file.page_count || null,
-        }));
+        const correctionFilesWithPageCount = (correctionFiles || []).map(
+          (file) => ({
+            name: file.file_name, // Use original filename (with Chinese characters)
+            pageCount: file.page_count || null,
+          })
+        );
 
         setCorrectionFiles(correctionFilesWithPageCount);
         // }
@@ -1979,9 +1995,9 @@ export default function TaskDetailPage() {
         const fetchCurrentUser = async () => {
           const {
             data: { user },
-          } = await supabase.auth.getUser();
+          } = await createClient().auth.getUser();
           if (user) {
-            const { data: profile, error } = await supabase
+            const { data: profile, error } = await createClient()
               .from("profiles")
               .select("*")
               .eq("id", user.id)

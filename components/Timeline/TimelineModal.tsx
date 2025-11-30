@@ -221,7 +221,7 @@ export default function TimelineModal({
                                 fileIdx: number
                               ) => (
                                 <div
-                                  key={fileIdx}
+                                  key={`timeline-${index}-file-${fileIdx}-${file.name}`}
                                   className="flex flex-col gap-1 p-3 bg-gray-50 rounded-md mb-2"
                                 >
                                   <div className="flex items-center justify-between">

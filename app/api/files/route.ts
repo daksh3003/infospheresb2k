@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from '@/app/api/middleware/auth';
+import { AuthorizationService } from '@/app/api/middleware/authorization';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const authenticatedUser = authResult;
+
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('taskId');
     const stage = searchParams.get('stage');
@@ -16,6 +25,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Task ID is required' },
         { status: 400 }
+      );
+    }
+
+    // Check if user can access this task
+    const canAccess = await AuthorizationService.canAccessTask(authenticatedUser.id, taskId);
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'You do not have permission to access this task' },
+        { status: 403 }
       );
     }
 
@@ -30,7 +48,7 @@ export async function GET(request: NextRequest) {
         .eq("file_type", "processor");
 
       if (processorError) {
-        console.error("Error fetching processor files:", processorError);
+        // Error fetching processor files
       } else {
         files = processorFiles || [];
       }
@@ -41,7 +59,7 @@ export async function GET(request: NextRequest) {
         .list(`${taskId}`);
 
       if (qcError) {
-        console.error("Error fetching QC files:", qcError);
+        // Error fetching QC files
       } else {
         files = qcFiles || [];
       }
@@ -52,7 +70,7 @@ export async function GET(request: NextRequest) {
         .list(`${taskId}`);
 
       if (PMError) {
-        console.error("Error fetching PM files:", PMError);
+        // Error fetching PM files
       } else {
         files = PMFiles || [];
       }
@@ -64,7 +82,7 @@ export async function GET(request: NextRequest) {
         .eq("task_id", taskId);
 
       if (allFilesError) {
-        console.error("Error fetching all files:", allFilesError);
+        // Error fetching all files
       } else {
         files = allFiles || [];
       }
@@ -73,10 +91,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ files });
 
   } catch (error: unknown) {
-    console.error('File fetch error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -84,16 +100,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const authenticatedUser = authResult;
+
     const formData = await request.formData();
     const taskId = formData.get('taskId') as string;
     const file = formData.get('file') as File;
     const stage = formData.get('stage') as string;
-    const currentUser = JSON.parse(formData.get('currentUser') as string);
 
-    if (!taskId || !file || !stage || !currentUser) {
+    if (!taskId || !file || !stage) {
       return NextResponse.json(
-        { error: 'Task ID, file, stage, and current user are required' },
+        { error: 'Task ID, file, and stage are required' },
         { status: 400 }
+      );
+    }
+
+    // Check if user can upload files for this task/stage
+    const canUpload = await AuthorizationService.canUploadFile(authenticatedUser.id, taskId, stage);
+    if (!canUpload) {
+      return NextResponse.json(
+        { error: 'You do not have permission to upload files for this task/stage' },
+        { status: 403 }
       );
     }
 
@@ -153,8 +184,6 @@ export async function POST(request: NextRequest) {
 
       uploadResult = uploadData;
 
-      console.log('File Type:', file.type);
-
       // Create file record with comprehensive metadata
       const { data: recordData, error: recordError } = await supabase
         .from("files_test")
@@ -170,10 +199,10 @@ export async function POST(request: NextRequest) {
             file_category: fileCategory,
             mime_type: file.type || 'application/octet-stream',
             uploaded_by: {
-              id: currentUser.id,
-              name: currentUser.name,
-              email: currentUser.email,
-              role: currentUser.role
+              id: authenticatedUser.id,
+              name: authenticatedUser.email, // Will be updated with profile name if needed
+              email: authenticatedUser.email,
+              role: authenticatedUser.role
             },
             uploaded_at: new Date().toISOString(),
           },
@@ -219,10 +248,10 @@ export async function POST(request: NextRequest) {
             // file_category: fileCategory,
             // mime_type: file.type || 'application/octet-stream',
             uploaded_by: {
-              id: currentUser.id,
-              name: currentUser.name,
-              email: currentUser.email,
-              role: currentUser.role
+              id: authenticatedUser.id,
+              name: authenticatedUser.email, // Will be updated with profile name if needed
+              email: authenticatedUser.email,
+              role: authenticatedUser.role
             },
             uploaded_at: new Date().toISOString(),
           },
@@ -268,10 +297,10 @@ export async function POST(request: NextRequest) {
             file_category: fileCategory,
             mime_type: file.type || 'application/octet-stream',
             uploaded_by: {
-              id: currentUser.id,
-              name: currentUser.name,
-              email: currentUser.email,
-              role: currentUser.role
+              id: authenticatedUser.id,
+              name: authenticatedUser.email, // Will be updated with profile name if needed
+              email: authenticatedUser.email,
+              role: authenticatedUser.role
             },
             uploaded_at: new Date().toISOString(),
           },
@@ -293,7 +322,7 @@ export async function POST(request: NextRequest) {
         {
           task_id: taskId,
           current_stage: stage,
-          sent_by: currentUser.role,
+          sent_by: authenticatedUser.role,
           project_id: taskId, // This might need to be the actual project ID
           assigned_to: [],
           action: `File uploaded: ${fileName} (${fileCategory}, .${fileExtension}, ${Math.round(fileSize / 1024)}KB)`,
@@ -302,7 +331,7 @@ export async function POST(request: NextRequest) {
       ]);
 
     if (logError) {
-      console.error("Error logging upload:", logError);
+      // Error logging upload - non-critical
     }
 
     return NextResponse.json({
@@ -312,10 +341,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('File upload error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

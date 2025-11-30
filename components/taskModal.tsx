@@ -27,7 +27,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 
 import { api } from "../utils/api";
-import { supabase } from "../utils/supabase";
+import { createClient } from "@/lib/client";
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -165,10 +165,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser();
+        } = await createClient().auth.getUser();
 
         if (user) {
-          const { data: profile, error } = await supabase
+          const { data: profile, error } = await createClient()
             .from("profiles")
             .select("id, name, email, role")
             .eq("id", user.id)
@@ -653,7 +653,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <div className="space-y-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={`selected-${index}-${file.name}`}
                         className="flex items-center justify-between p-2 bg-gray-50 rounded"
                       >
                         <div className="flex items-center">
@@ -692,7 +692,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <h4 className="font-medium mb-2">Available Files</h4>
                   {selectedFiles.map((file, index) => (
                     <div
-                      key={index}
+                      key={`available-${index}-${file.name}`}
                       className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
                     >
                       <span className="text-sm">{file.name}</span>
@@ -726,7 +726,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       </div>
                       {group.files.map((file, fileIndex) => (
                         <div
-                          key={fileIndex}
+                          key={`group-${groupIndex}-file-${fileIndex}-${file.name}`}
                           className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
                         >
                           <span className="text-sm">{file.name}</span>
@@ -868,7 +868,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     <div className="grid gap-4">
                       {group.filesData.map((fileData, fileIndex) => (
                         <Card
-                          key={fileIndex}
+                          key={`group-${groupIndex}-filedata-${fileIndex}-${fileData.file_name}`}
                           className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
                         >
                           {/* File Header */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@/lib/client";
 import { authManager } from "@/utils/auth";
 
 interface Comment {
@@ -60,7 +60,7 @@ export const Comments = ({ taskId }: { taskId: string }) => {
         const {
           data: { user: authUser },
           error,
-        } = await supabase.auth.getUser();
+        } = await createClient().auth.getUser();
         if (authUser && !error) {
           // Get additional user info from profiles table
           const { data: profileData } = await supabase
