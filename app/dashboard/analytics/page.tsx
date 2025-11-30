@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 const analyticsTables = [
@@ -358,28 +358,736 @@ function AttendanceTable() {
 }
 
 function UserDailyReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string>(
+        new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+    );
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+    const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
+    // Fetch available users
+    useEffect(() => {
+        fetchAvailableUsers();
+    }, []);
+
+    const fetchAvailableUsers = async () => {
+        try {
+            const response = await fetch("/api/analytics/attendance");
+            if (response.ok) {
+                const data = await response.json();
+                // Get unique users from attendance data
+                const uniqueUsers = Array.from(
+                    new Map(data.map((record: any) => [record.employee_id, {
+                        id: record.employee_id,
+                        name: record.employee_name
+                    }])).values()
+                );
+                setAvailableUsers(uniqueUsers);
+            }
+        } catch (err) {
+            console.error("Error fetching users:", err);
+        }
+    };
+
+    // Fetch daily report when user or date changes
+    useEffect(() => {
+        if (selectedUserId) {
+            fetchDailyReport();
+        }
+    }, [selectedUserId, selectedDate]);
+
+    const fetchDailyReport = async () => {
+        if (!selectedUserId) {
+            setError("Please select a user");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+            const response = await fetch(
+                `/api/analytics/daily-user?userId=${selectedUserId}&date=${selectedDate}`
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching daily report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">User Daily Report</h3>
-            <p className="text-gray-500">View the user daily activity and performance metrics.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">User Daily Report</h3>
+                
+                <div className="flex gap-4 mb-4">
+                    {/* User Selection */}
+                    <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select User
+                        </label>
+                        <select
+                            value={selectedUserId || ""}
+                            onChange={(e) => setSelectedUserId(e.target.value || null)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Select a user...</option>
+                            {availableUsers.map((user) => (
+                                <option key={user.id} value={user.id}>
+                                    {user.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Date Selection */}
+                    <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Date
+                        </label>
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div className="flex items-end">
+                        <button
+                            onClick={fetchDailyReport}
+                            disabled={!selectedUserId || isLoading}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? "Loading..." : "Refresh"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading daily report...</p>
+                    </div>
+                </div>
+            ) : error ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchDailyReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    S.No
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Year
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Month
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Working Date
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Name
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Client Name
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    File No
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Work Type
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    No of Pages
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Start Time
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    End Time
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {reportData.length === 0 ? (
+                                <tr>
+                                    <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                                        {selectedUserId 
+                                            ? "No data found for the selected date" 
+                                            : "Please select a user and date"}
+                                    </td>
+                                </tr>
+                            ) : (
+                                reportData.map((entry, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.s_no}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.year}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.month}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.working_date}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {entry.name}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.client_name}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.file_no}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.work_type}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.no_of_pages}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.start_time}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.end_time}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }
 
 function UserMonthlyReport() {
+    const [reportData, setReportData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+    const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
+    // Fetch available users
+    useEffect(() => {
+        fetchAvailableUsers();
+    }, []);
+
+    const fetchAvailableUsers = async () => {
+        try {
+            const response = await fetch("/api/analytics/attendance");
+            if (response.ok) {
+                const data = await response.json();
+                // Get unique users from attendance data
+                const uniqueUsers = Array.from(
+                    new Map(data.map((record: any) => [record.employee_id, {
+                        id: record.employee_id,
+                        name: record.employee_name
+                    }])).values()
+                );
+                setAvailableUsers(uniqueUsers);
+            }
+        } catch (err) {
+            console.error("Error fetching users:", err);
+        }
+    };
+
+    // Fetch monthly report when user or month changes
+    useEffect(() => {
+        if (selectedUserId) {
+            fetchMonthlyReport();
+        }
+    }, [selectedUserId, selectedMonth]);
+
+    const fetchMonthlyReport = async () => {
+        if (!selectedUserId) {
+            setError("Please select a user");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+            const response = await fetch(
+                `/api/analytics/monthly-user?month=${selectedMonth}&userId=${selectedUserId}`
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching monthly report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading monthly report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchMonthlyReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!reportData || !reportData.data || reportData.data.length === 0) {
+        return (
+            <div className="bg-white rounded-lg shadow">
+                <div className="p-6 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly User Report</h3>
+                    <div className="flex gap-4 mb-4">
+                        {/* User Selection */}
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select User
+                            </label>
+                            <select
+                                value={selectedUserId || ""}
+                                onChange={(e) => setSelectedUserId(e.target.value || null)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Select a user...</option>
+                                {availableUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Month Selection */}
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Month
+                            </label>
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchMonthlyReport}
+                                disabled={!selectedUserId || isLoading}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? "Loading..." : "Refresh"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6">
+                    <p className="text-gray-500 text-center">
+                        {selectedUserId 
+                            ? "No data found for the selected month" 
+                            : "Please select a user and month"}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">User Monthly Report</h3>
-            <p className="text-gray-500">View the user monthly activity and performance metrics.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Monthly User Report</h3>
+                    <div className="flex items-center gap-4">
+                        {/* User Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select User
+                            </label>
+                            <select
+                                value={selectedUserId || ""}
+                                onChange={(e) => setSelectedUserId(e.target.value || null)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Select a user...</option>
+                                {availableUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Month Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Month
+                            </label>
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchMonthlyReport}
+                                disabled={!selectedUserId || isLoading}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? "Loading..." : "Refresh"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                                S.No
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-12 bg-gray-50 z-10">
+                                Name Of The User
+                            </th>
+                            {reportData.dates.map((date: string) => (
+                                <React.Fragment key={date}>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-gray-200">
+                                        {date}
+                                        <div className="text-xs font-normal mt-1">No Of Pages</div>
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        {date}
+                                        <div className="text-xs font-normal mt-1">PO Hours</div>
+                                    </th>
+                                </React.Fragment>
+                            ))}
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l-2 border-gray-400">
+                                Total pages
+                            </th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO hrs
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.data.map((entry: any) => (
+                            <tr key={entry.user_id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 sticky left-0 bg-white z-10">
+                                    {entry.s_no}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-12 bg-white z-10">
+                                    {entry.name}
+                                </td>
+                                {reportData.dates.map((date: string) => {
+                                    const dateData = entry.date_columns[date] || { pages: 0, hours: 0 };
+                                    return (
+                                        <React.Fragment key={date}>
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center border-l border-gray-200">
+                                                {dateData.pages || 0}
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                                {dateData.hours ? parseFloat(dateData.hours.toString()).toFixed(2) : '0.00'}
+                                            </td>
+                                        </React.Fragment>
+                                    );
+                                })}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 text-center border-l-2 border-gray-400">
+                                    {entry.total_pages}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 text-center">
+                                    {parseFloat(entry.total_hours).toFixed(2)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
 
 function POReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchPOReport();
+    }, []);
+
+    const fetchPOReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/po-report";
+            const params = new URLSearchParams();
+            if (startDate) params.append("startDate", startDate);
+            if (endDate) params.append("endDate", endDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching PO report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading PO report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchPOReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">PO Report</h3>
-            <p className="text-gray-500">View the PO data and tracking information.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">PO Report</h3>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchPOReport}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                S. No
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Received Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Project Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Received Pages
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Process
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO Hours
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Output Pages
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Delivery Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO Status
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO Number
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.length === 0 ? (
+                            <tr>
+                                <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                                    No PO report data found
+                                </td>
+                            </tr>
+                        ) : (
+                            reportData.map((entry, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.s_no}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.received_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {entry.project_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.received_pages}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.process}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po_hours}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.output_pages}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.delivery_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            entry.status === "Delivered" 
+                                                ? "bg-green-100 text-green-800" 
+                                                : "bg-yellow-100 text-yellow-800"
+                                        }`}>
+                                            {entry.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po_status}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po_number}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
