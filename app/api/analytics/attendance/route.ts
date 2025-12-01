@@ -35,7 +35,7 @@ function formatTime(timestamp: string | null): string {
 function formatDate(timestamp: string | null): string {
     if(!timestamp) return "Not set";
     const date = new Date(timestamp);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export async function GET() {
@@ -88,7 +88,7 @@ export async function GET() {
             const attendanceDate = session.session_date || (loginTime ? loginTime.split('T')[0] : null);
             
             // Determine shift based on login time
-            // If login time is after 6pm (18:00), it's Night shift, otherwise Day shift
+            // If login time is after 6pm (18:00) or before 8am (08:00), it's Night shift, otherwise Day shift
             let shift = "Day";
             let shiftInTime = "09:00";
             let shiftOutTime = "18:00";
@@ -97,13 +97,17 @@ export async function GET() {
                 const loginDate = new Date(loginTime);
                 const loginHour = loginDate.getHours();
                 
-                if (loginHour >= 18) {
+                if (loginHour >= 18 || loginHour < 8) {
                     // Night shift: starts at 18:00, ends at 08:00 next day
+                    // This covers both:
+                    // - Login between 18:00-23:59 (6 PM - 11:59 PM)
+                    // - Login between 00:00-07:59 (12 AM - 7:59 AM, continuation of previous night shift)
                     shift = "Night";
                     shiftInTime = "18:00";
                     shiftOutTime = "08:00";
                 } else {
                     // Day shift: starts at 09:00, ends at 18:00
+                    // Login between 08:00-17:59 (8 AM - 5:59 PM)
                     shift = "Day";
                     shiftInTime = "09:00";
                     shiftOutTime = "18:00";
@@ -133,13 +137,18 @@ export async function GET() {
             const workDuration = loginTime && logoutTime
                 ? calculateTimeDifference(loginTime, logoutTime)
                 : "00:00";
-            const [workHours, workMinutes] = workDuration.split(':').map(Number);
-            const totalWorkMinutes = workHours * 60 + workMinutes;
-            const standardMinutes = 8 * 60; // 8 hours
-            const overtimeMinutes = Math.max(0, totalWorkMinutes - standardMinutes);
-            const otHours = Math.floor(overtimeMinutes / 60);
-            const otMins = overtimeMinutes % 60;
-            const overtime = `${String(otHours).padStart(2, '0')}:${String(otMins).padStart(2, '0')}`;
+            
+            // Calculate overtime as logout_time - shift_out_time (only if logout is after shift end)
+            let overtime = "00:00";
+            if (logoutTime && shiftOutDateTime) {
+                const logoutDate = new Date(logoutTime);
+                const shiftEndDate = new Date(shiftOutDateTime);
+                if (logoutDate > shiftEndDate) {
+                    // Overtime = time worked beyond shift end time
+                    overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
+                }
+            }
+            
             const totalDuration = workDuration;
 
             let lateBy = "00:00";
@@ -147,7 +156,8 @@ export async function GET() {
                 const loginDate = new Date(loginTime);
                 const shiftStartDate = new Date(shiftInDateTime);
                 if(loginDate > shiftStartDate) {
-                    lateBy = calculateLateEarly(loginTime, shiftInDateTime);
+                    // Late by = loginTime - shiftInDateTime (intime - shiftintime)
+                    lateBy = calculateTimeDifference(shiftInDateTime, loginTime);
                 }
             }
 

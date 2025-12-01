@@ -169,18 +169,16 @@ export async function GET(request: NextRequest) {
                     dateEntry.pages += pageCount;
                 }
                 
-                // Use PO hours from projects_test - only count once per task per day
-                if(action.action_type === 'start' || action.action_type === 'upload') {
-                    // Check if we've already counted PO hours for this task on this date
-                    if (!taskDateCounted.has(taskDateKey)) {
-                        const pohours = taskToPOHoursMap.get(taskId) || 0;
+                // Use PO hours from projects_test - count once per task per day for any work action
+                // Changed: Count PO hours for any work action, not just 'start' or 'upload'
+                if (!taskDateCounted.has(taskDateKey)) {
+                    const pohours = taskToPOHoursMap.get(taskId) || 0;
+                    if (pohours > 0) {
                         dateEntry.hours += pohours;
                         taskDateCounted.add(taskDateKey);
                         
                         // Debug logging
-                        if (pohours > 0) {
-                            console.log(`Added ${pohours} PO hours for task ${taskId} on ${dateKey}`);
-                        }
+                        console.log(`Added ${pohours} PO hours for task ${taskId} on ${dateKey} (action: ${action.action_type})`);
                     }
                 }
             }

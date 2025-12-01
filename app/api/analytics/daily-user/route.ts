@@ -96,9 +96,9 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Updated: profile table (singular, not plural)
+        // Updated: use profiles table (plural) to match other routes
         const { data: profile, error: profilesError } = await supabase
-            .from("profile")
+            .from("profiles")  // Changed from "profile" to "profiles"
             .select("id, name")
             .eq("id", userId)
             .single();
@@ -162,7 +162,11 @@ export async function GET(request: NextRequest) {
                         s_no: reportEntries.length + 1,
                         year: actionDate.getFullYear(),
                         month: actionDate.toLocaleString('en-US', { month: 'long' }),
-                        working_date: actionDate.getDate(),
+                        working_date: actionDate.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        }),
                         name: displayName,
                         client_name: clientName,
                         file_no: fileId,

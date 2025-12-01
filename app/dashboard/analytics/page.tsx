@@ -100,8 +100,16 @@ function AttendanceTable() {
             const response = await fetch("/api/analytics/attendance");
             
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
             
             const data = await response.json();
@@ -412,8 +420,16 @@ function UserDailyReport() {
             );
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();
@@ -651,8 +667,16 @@ function UserMonthlyReport() {
             );
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();
@@ -905,8 +929,16 @@ function POReport() {
             const response = await fetch(url);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();
@@ -1093,37 +1125,878 @@ function POReport() {
 }
 
 function QAReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchQAReport();
+    }, []);
+
+    const fetchQAReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/qa-report";
+            const params = new URLSearchParams();
+            if (startDate) params.append("startDate", startDate);
+            if (endDate) params.append("endDate", endDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching QA report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading QA report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchQAReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">QA Report</h3>
-            <p className="text-gray-500">View the QA data and tracking information.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">QA Report</h3>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchQAReport}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Client Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Work Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Page Count
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Start Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                End Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Working Hours
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.length === 0 ? (
+                            <tr>
+                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                                    No QA report data found
+                                </td>
+                            </tr>
+                        ) : (
+                            reportData.map((entry, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.working_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {entry.name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.client_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.file_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.work_type}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.page_no}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.start_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.end_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.total_working_hours}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
 
 function DTPMonthlyReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+
+    useEffect(() => {
+        fetchDTPMonthlyReport(); 
+    }, [selectedMonth]);
+
+    const fetchDTPMonthlyReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await fetch(`/api/analytics/dtp-report?month=${selectedMonth}`);
+
+            if (!response.ok) {
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching DTP Monthly report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading DTP Monthly report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchDTPMonthlyReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!reportData || reportData.length === 0) {
+        return (
+            <div className="bg-white rounded-lg shadow">
+                <div className="p-6 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">DTP Monthly Report</h3>
+                    <div className="flex gap-4 mb-4">
+                        {/* Month Selection */}
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Month
+                            </label>
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchDTPMonthlyReport}
+                                disabled={isLoading}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? "Loading..." : "Refresh"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-6">
+                    <p className="text-gray-500 text-center">
+                        No DTP Monthly report data found for the selected month.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">DTP Monthly Report</h3>
-            <p className="text-gray-500">View the DTP monthly data and tracking information.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">DTP Monthly Report</h3>
+                    <div className="flex items-center gap-4">
+                        {/* Month Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Month
+                            </label>
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchDTPMonthlyReport}
+                                disabled={isLoading}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? "Loading..." : "Refresh"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                S.No
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Employee ID
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Employee Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Pages
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Hours
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.map((entry, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.s_no}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.employee_id}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {entry.employee_name}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.total_pages}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.total_hours}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
 
 function DTPTracking() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchDTPTracking();
+    }, []);
+
+    const fetchDTPTracking = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/dtp-tracking";
+            const params = new URLSearchParams();
+            if (startDate) {
+                params.append("startDate", startDate);
+            }
+            if (endDate) {
+                params.append("endDate", endDate);
+            }
+            
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Error fetching DTP Tracking:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+            setReportData([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleFilter = () => {
+        fetchDTPTracking();
+    };
+
+    const handleClearFilters = () => {
+        setStartDate("");
+        setEndDate("");
+    };
+
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading DTP Tracking data...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchDTPTracking}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">DTP Tracking</h3>
-            <p className="text-gray-500">View the DTP tracking data and information.</p>
+        <div className="bg-white rounded-lg shadow">
+            {/* Header Section */}
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900">DTP Tracking</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            View detailed DTP tracking information for all jobs
+                        </p>
+                    </div>
+                </div>
+
+                {/* Filter Section */}
+                <div className="flex items-end gap-4 mt-4">
+                    <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleFilter}
+                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                            Filter
+                        </button>
+                        {(startDate || endDate) && (
+                            <button
+                                onClick={handleClearFilters}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Table Section */}
+            <div className="overflow-x-auto p-6">
+                {reportData.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-gray-500">No DTP Tracking data found.</p>
+                        {(startDate || endDate) && (
+                            <button
+                                onClick={handleClearFilters}
+                                className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                            >
+                                Clear filters to see all data
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                {/* Job Details Columns */}
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job No</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivered by</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[500px]">Mail instruction</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task type</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Count</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page count</th>
+                                
+                                {/* DTP Process Tracking Columns */}
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Person</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Start Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP End Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Abbyy Compare</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Status</th>
+                                
+                                {/* QC Tracking Columns */}
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC taken by</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Start Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC End Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Abbyy Compare</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN taken</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN Start Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN End Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXN Status</th>
+                                
+                                {/* QA Tracking & Final Status Columns */}
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA taken by</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Start Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA End Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Abbyy Compare</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN taken</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN Start Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN End Time</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {reportData.map((entry, index) => (
+                                <tr key={entry.job_no || index} className="hover:bg-gray-50 transition-colors">
+                                    {/* Job Details Data */}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.job_no || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivered_by || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {typeof entry.po === 'number' ? entry.po.toFixed(2) : entry.po || "N/A"}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-900 min-w-[500px] max-w-[800px]">{entry.mail_instruction || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_type || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_name || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.file_count || 0}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.page_count || 0}</td>
+                                    
+                                    {/* DTP Process Tracking Data */}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.language || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.platform || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.stage || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.date || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivery_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_person || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_start_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_end_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_dtp || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_status || "N/A"}</td>
+                                    
+                                    {/* QC Tracking Data */}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_taken_by || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_start_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_end_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_qc || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_status || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_taken || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_start_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_end_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.cxn_status || "N/A"}</td>
+                                    
+                                    {/* QA Tracking & Final Status Data */}
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_taken_by || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_start_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_end_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_qa || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_status || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_taken || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_start_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_end_time || "N/A"}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.file_status || "N/A"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     );
 }
 
 function FeedbackReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchFeedbackReport();
+    }, []);
+
+    const fetchFeedbackReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/feedback-report";
+            const params = new URLSearchParams();
+            if (startDate) params.append("startDate", startDate);
+            if (endDate) params.append("endDate", endDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                // Try to get error message from response
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching Feedback Report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading Feedback Report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchFeedbackReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Feedback Report</h3>
-            <p className="text-gray-500">View the feedback data and information.</p>
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Feedback Report</h3>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchFeedbackReport}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                S.No
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Feedback Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Employee Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Feedback Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Feedback Description
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                                    No Feedback report data found
+                                </td>
+                            </tr>
+                        ) : (
+                            reportData.map((entry, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.s_no}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.feedback_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {entry.employee_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.feedback_type}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.feedback_description}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            entry.status === "Resolved" 
+                                                ? "bg-green-100 text-green-800" 
+                                                : "bg-yellow-100 text-yellow-800"
+                                        }`}>
+                                            {entry.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

@@ -135,19 +135,23 @@ export async function GET(request: NextRequest) {
             });
 
             const receivedDate = project.created_at
-                ? new Date(project.created_at).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                })
+                ? (() => {
+                    const date = new Date(project.created_at);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}-${month}-${year}`;
+                })()
                 : 'N/A';
 
             const deliveryDate = project.delivery_date
-                ? new Date(project.delivery_date).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                })
+                ? (() => {
+                    const date = new Date(project.delivery_date);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}-${month}-${year}`;
+                })()
                 : 'N/A';
 
             const pohours = project.po_hours || project.pohours || project.poHours || 0;
