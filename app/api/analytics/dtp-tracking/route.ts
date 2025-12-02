@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         // Fetch task iterations
         const { data: taskIterations, error: iterationsError } = await supabase
             .from("task_iterations")
-            .select("id, task_id, current_stage, assigned_to_processor_user_id, assigned_to_qc_user_id, assigned_to_qa_user_id, created_at, updated_at")
+            .select("id, task_id, current_stage, assigned_to_processor_user_id, assigned_to_qc_user_id, assigned_to_qa_user_id, created_at, updated_at, stages")
             .in("task_id", taskIds)
             .order("created_at", { ascending: true });
 
@@ -156,6 +156,10 @@ export async function GET(request: NextRequest) {
                 const iterations = taskToIterationsMap.get(task.task_id) || [];
                 const actions = taskToActionsMap.get(task.task_id) || [];
                 
+                // Get stages from the latest iteration (stages array contains the workflow history)
+                const latestIteration = iterations.length > 0 ? iterations[iterations.length - 1] : null;
+                const stages = latestIteration?.stages || [];
+
                 // Get DTP person (processor)
                 const dtpIteration = iterations.find((it: any) => it.current_stage === "Processor" || it.assigned_to_processor_user_id);
                 const dtpPersonId = dtpIteration?.assigned_to_processor_user_id;
@@ -171,13 +175,27 @@ export async function GET(request: NextRequest) {
                 const dtpEndTime = dtpActions[dtpActions.length - 1]?.created_at ? 
                     new Date(dtpActions[dtpActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 
-                // Get QC person
+                // Get QC person - find who actually did QC work from task_actions
+                const qcWorkActions = actions.filter((a: any) => {
+                    const metadata = a.metadata || {};
+                    const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
+                    return currentStage === "QC";
+                });
+                
+                // Get the user_id from QC work actions (the person who did the QC)
+                let qcPersonId = qcWorkActions.length > 0 ? qcWorkActions[0].user_id : null;
+                
                 const qcIteration = iterations.find((it: any) => it.current_stage === "QC" || it.assigned_to_qc_user_id);
-                const qcPersonId = qcIteration?.assigned_to_qc_user_id;
+
+                // Fallback to assigned person if no QC work actions found
+                if (!qcPersonId) {
+                    qcPersonId = qcIteration?.assigned_to_qc_user_id;
+                }
+                
                 const qcPerson = qcPersonId ? userIdToNameMap.get(qcPersonId) : "N/A";
                 
-                // Get QC start/end times
-                const qcActions = actions.filter((a: any) => 
+                // Get QC start/end times from the actual QC work actions
+                const qcActions = qcWorkActions.length > 0 ? qcWorkActions : actions.filter((a: any) => 
                     a.user_id === qcPersonId && 
                     (a.action_type === 'start' || a.action_type === 'complete')
                 );
@@ -186,13 +204,27 @@ export async function GET(request: NextRequest) {
                 const qcEndTime = qcActions[qcActions.length - 1]?.created_at ? 
                     new Date(qcActions[qcActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 
-                // Get QA person
+                // Get QA person - find who actually did QA work from task_actions
+                const qaWorkActions = actions.filter((a: any) => {
+                    const metadata = a.metadata || {};
+                    const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
+                    return currentStage === "QA";
+                });
+                
+                // Get the user_id from QA work actions (the person who did the QA)
+                let qaPersonId = qaWorkActions.length > 0 ? qaWorkActions[0].user_id : null;
+                
                 const qaIteration = iterations.find((it: any) => it.current_stage === "QA" || it.assigned_to_qa_user_id);
-                const qaPersonId = qaIteration?.assigned_to_qa_user_id;
+                
+                // Fallback to assigned person if no QA work actions found
+                if (!qaPersonId) {
+                    qaPersonId = qaIteration?.assigned_to_qa_user_id;
+                }
+                
                 const qaPerson = qaPersonId ? userIdToNameMap.get(qaPersonId) : "N/A";
                 
-                // Get QA start/end times
-                const qaActions = actions.filter((a: any) => 
+                // Get QA start/end times from the actual QA work actions
+                const qaActions = qaWorkActions.length > 0 ? qaWorkActions : actions.filter((a: any) => 
                     a.user_id === qaPersonId && 
                     (a.action_type === 'start' || a.action_type === 'complete')
                 );
@@ -204,15 +236,78 @@ export async function GET(request: NextRequest) {
                 // Format PO hours - use same format as other tables (raw decimal)
                 const poHours = project.po_hours || project.pohours || project.poHours || 0;
                 
-                // Format delivery time
-                const deliveryTime = project.delivery_time || "N/A";
+                // Format delivery time - ensure only hours and minutes (HH:MM)
+                let deliveryTime = "N/A";
+                if (project.delivery_time) {
+                    try {
+                        // If it's a timestamp or ISO string, parse it
+                        const timeObj = new Date(project.delivery_time);
+                        if (!isNaN(timeObj.getTime())) {
+                            deliveryTime = timeObj.toLocaleTimeString('en-US', { 
+                                hour12: false, 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            });
+                        } else {
+                            // If it's already a time string (e.g., "14:30:45"), extract HH:MM
+                            const timeStr = String(project.delivery_time);
+                            const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+                            if (timeMatch) {
+                                const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
+                                const minutes = timeMatch[2];
+                                deliveryTime = `${hours}:${minutes}`;
+                            } else {
+                                deliveryTime = project.delivery_time;
+                            }
+                        }
+                    } catch (e) {
+                        // If parsing fails, try to extract HH:MM from the string
+                        const timeStr = String(project.delivery_time);
+                        const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+                        if (timeMatch) {
+                            const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
+                            const minutes = timeMatch[2];
+                            deliveryTime = `${hours}:${minutes}`;
+                        } else {
+                            deliveryTime = project.delivery_time;
+                        }
+                    }
+                }
                 
-                // Format date
-                const date = project.created_at ? 
-                    new Date(project.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "N/A";
+                // Format date as "DD-MM-YYYY" (manually format to ensure hyphens)
+                let date = "N/A";
+                if (project.created_at) {
+                    const dateObj = new Date(project.created_at);
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const year = dateObj.getFullYear();
+                    date = `${day}-${month}-${year}`;
+                }
                 
                 const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
                 
+                // Determine QC ABBYY Compare: YES if Processor stage appears after QC, NO otherwise
+                let abbyyCompareQC = "No";
+                if (stages && Array.isArray(stages)) {
+                    const qcIndex = stages.indexOf("QC");
+                    if (qcIndex !== -1) {
+                        // Check if there's a Processor stage after QC
+                        const processorAfterQC = stages.slice(qcIndex + 1).includes("Processor");
+                        abbyyCompareQC = processorAfterQC ? "Yes" : "No";
+                    }
+                }
+                
+                // Determine QA ABBYY Compare: YES if Processor stage appears after QA, NO otherwise
+                let abbyyCompareQA = "No";
+                if (stages && Array.isArray(stages)) {
+                    const qaIndex = stages.indexOf("QA");
+                    if (qaIndex !== -1) {
+                        // Check if there's a Processor stage after QA
+                        const processorAfterQA = stages.slice(qaIndex + 1).includes("Processor");
+                        abbyyCompareQA = processorAfterQA ? "Yes" : "No";
+                    }
+                }
+
                 reportEntries.push({
                     // Job Details
                     job_no: jobNo++,
@@ -240,7 +335,7 @@ export async function GET(request: NextRequest) {
                     qc_taken_by: qcPerson,
                     qc_start_time: qcStartTime,
                     qc_end_time: qcEndTime,
-                    abbyy_compare_qc: "N/A",
+                    abbyy_compare_qc: abbyyCompareQC,
                     qc_status: qcIteration ? "Completed" : "Pending",
                     qc_cxn_taken: "N/A", // This might need special logic
                     qc_cxn_start_time: "N/A",
@@ -251,7 +346,7 @@ export async function GET(request: NextRequest) {
                     qa_taken_by: qaPerson,
                     qa_start_time: qaStartTime,
                     qa_end_time: qaEndTime,
-                    abbyy_compare_qa: "N/A",
+                    abbyy_compare_qa: abbyyCompareQA,
                     qa_status: qaIteration ? "Completed" : "Pending",
                     qa_cxn_taken: "N/A",
                     qa_cxn_start_time: "N/A",

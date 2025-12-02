@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const selectedMonth = searchParams.get('month');
-        const userId = searchParams.get('userId'); 
+        const userIdsParam = searchParams.get('userIds');
+        const teamType = searchParams.get('teamType');
 
         if(!selectedMonth) {
             return NextResponse.json({ error: 'Month is required' }, { status: 400 });
@@ -20,6 +21,33 @@ export async function GET(request: NextRequest) {
         const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0).toISOString();
         const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
 
+        // Parse user IDs if provided
+        let targetUserIds: string[] | null = null;
+        if (userIdsParam) {
+            targetUserIds = userIdsParam.split(',').filter(Boolean);
+        }
+
+        // If team type is provided, fetch users by role
+        if (teamType && !targetUserIds) {
+            const roleMap: Record<string, string> = {
+                "QA": "qaTeam",
+                "QC": "qcTeam",
+                "Processor": "processor"
+            };
+            const targetRole = roleMap[teamType];
+            
+            if (targetRole) {
+                const { data: profiles, error: profilesError } = await supabase
+                    .from("profiles")
+                    .select("id")
+                    .eq("role", targetRole);
+                
+                if (!profilesError && profiles) {
+                    targetUserIds = profiles.map((p: any) => p.id);
+                }
+            }
+        }
+
         let query = supabase
             .from("task_actions")
             .select("task_id, action_type, metadata, created_at, user_id")
@@ -27,8 +55,9 @@ export async function GET(request: NextRequest) {
             .lte("created_at", endOfMonth)
             .order("created_at", { ascending: true });
 
-        if (userId) {
-            query = query.eq("user_id", userId);
+        // Filter by user IDs if provided
+        if (targetUserIds && targetUserIds.length > 0) {
+            query = query.in("user_id", targetUserIds);
         }
 
         const { data: taskActions, error: actionsError } = await query;
@@ -51,20 +80,23 @@ export async function GET(request: NextRequest) {
 
         // Get tasks to get project_id
         const { data: tasks, error: tasksError } = await supabase
-            .from("task_test")
+            .from("tasks_test")  // Changed from "task_test" to "tasks_test"
             .select("task_id, project_id")
             .in("task_id", taskIds);
             
         if(tasksError) {
             console.error("Error fetching tasks:", tasksError);
+            return NextResponse.json({ error: `Error fetching tasks: ${tasksError.message}` }, { status: 500 });
         }
 
         // Create task_id to project_id map
         const taskToProjectMap = new Map();
-        if(tasks) {
+        if(tasks && tasks.length > 0) {
             tasks.forEach((task: any) => {
                 taskToProjectMap.set(task.task_id, task.project_id);
             });
+        } else {
+            console.log("No tasks found for task IDs:", taskIds);
         }
 
         // Get unique project IDs
@@ -72,37 +104,47 @@ export async function GET(request: NextRequest) {
 
         if (projectIds.length === 0) {
             console.log("No project IDs found for tasks");
+            // Return empty data instead of continuing
+            return NextResponse.json({
+                month: selectedMonth,
+                dates: [],
+                data: [],
+            });
         }
 
         // Fetch projects_test with all data including po_hours
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("*") // Get all columns from projects_test
+            .select("*")
             .in("project_id", projectIds);
 
         if(projectsError) {
             console.error("Error fetching projects:", projectsError);
+            return NextResponse.json({ error: `Error fetching projects: ${projectsError.message}` }, { status: 500 });
         }
 
         if (!projects || projects.length === 0) {
             console.log("No projects found for project IDs:", projectIds);
+            return NextResponse.json({
+                month: selectedMonth,
+                dates: [],
+                data: [],
+            });
         }
 
         // Create project_id to po_hours map (and store all project data if needed)
         const projectToPOHoursMap = new Map();
-        const projectDataMap = new Map(); // Store all project data
+        const projectDataMap = new Map();
         if(projects) {
             projects.forEach((project: any) => {
                 // Try different possible column names for PO hours
-                const pohours = project.po_hours || project.pohours || project.poHours || 0;
+                const pohours = parseFloat(project.po_hours || project.pohours || project.poHours || 0);
                 
                 // Debug logging
-                if (pohours > 0) {
-                    console.log(`Project ${project.project_id}: PO Hours = ${pohours}`);
-                }
+                console.log(`Project ${project.project_id}: PO Hours = ${pohours} (raw: ${project.po_hours || project.pohours || project.poHours || 'N/A'})`);
                 
                 projectToPOHoursMap.set(project.project_id, pohours);
-                projectDataMap.set(project.project_id, project); // Store full project data
+                projectDataMap.set(project.project_id, project);
             });
         }
 
@@ -116,7 +158,11 @@ export async function GET(request: NextRequest) {
                 // Debug logging
                 if (pohours > 0) {
                     console.log(`Task ${taskId} -> Project ${projectId}: PO Hours = ${pohours}`);
+                } else {
+                    console.log(`Task ${taskId} -> Project ${projectId}: PO Hours = 0 (not found in project map)`);
                 }
+            } else {
+                console.log(`Task ${taskId}: No project_id found`);
             }
         });
 
@@ -170,7 +216,6 @@ export async function GET(request: NextRequest) {
                 }
                 
                 // Use PO hours from projects_test - count once per task per day for any work action
-                // Changed: Count PO hours for any work action, not just 'start' or 'upload'
                 if (!taskDateCounted.has(taskDateKey)) {
                     const pohours = taskToPOHoursMap.get(taskId) || 0;
                     if (pohours > 0) {
@@ -179,6 +224,8 @@ export async function GET(request: NextRequest) {
                         
                         // Debug logging
                         console.log(`Added ${pohours} PO hours for task ${taskId} on ${dateKey} (action: ${action.action_type})`);
+                    } else {
+                        console.log(`No PO hours found for task ${taskId} on ${dateKey}`);
                     }
                 }
             }

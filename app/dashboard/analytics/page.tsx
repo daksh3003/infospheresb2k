@@ -8,6 +8,8 @@ const analyticsTables = [
     { id: "daily-user", name: "User Daily Report"},
     { id: "monthly-user", name: "User Monthly Report"},
     { id: "po-report", name: "PO Report"},
+    { id: "qc-report", name: "QC Report"},
+    { id: "processor-report", name: "Processor Report"},
     { id: "qa-report", name: "QA Report"},
     { id: "dtp-monthly", name: "DTP Monthly Report"},
     { id: "dtp-tracking", name: "DTP Tracking"},
@@ -29,6 +31,10 @@ export default function AnalyticsPage() {
                 return <POReport />;
             case "qa-report":
                 return <QAReport />;
+            case "qc-report":
+                return <QCReport />;
+            case "processor-report":
+                return <ProcessorReport />;
             case "dtp-monthly":
                 return <DTPMonthlyReport />;
             case "dtp-tracking":
@@ -553,6 +559,9 @@ function UserDailyReport() {
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     End Time
                                 </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Total Working Time
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -600,6 +609,9 @@ function UserDailyReport() {
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                             {entry.end_time}
                                         </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                            {entry.total_working_time}
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -619,61 +631,94 @@ function UserMonthlyReport() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+    const [selectedTeamType, setSelectedTeamType] = useState<string>("");
+    const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState<string>("");
+    const [isAllSelected, setIsAllSelected] = useState(false);
 
-    // Fetch available users
+    // Fetch available users with roles
     useEffect(() => {
         fetchAvailableUsers();
-    }, []);
+    }, [selectedTeamType]);
 
     const fetchAvailableUsers = async () => {
         try {
+            // Fetch all users from profiles to get roles
             const response = await fetch("/api/analytics/attendance");
             if (response.ok) {
                 const data = await response.json();
-                // Get unique users from attendance data
+                // Get unique users with roles from attendance data
                 const uniqueUsers = Array.from(
                     new Map(data.map((record: any) => [record.employee_id, {
                         id: record.employee_id,
-                        name: record.employee_name
+                        name: record.employee_name,
+                        role: record.role
                     }])).values()
                 );
-                setAvailableUsers(uniqueUsers);
+                
+                // Filter by team type if selected
+                let filteredUsers = uniqueUsers;
+                if (selectedTeamType) {
+                    const roleMap: Record<string, string> = {
+                        "QA": "qaTeam",
+                        "QC": "qcTeam",
+                        "Processor": "processor"
+                    };
+                    const targetRole = roleMap[selectedTeamType];
+                    filteredUsers = uniqueUsers.filter((user: any) => user.role === targetRole);
+                }
+                
+                setAvailableUsers(filteredUsers);
+                
+                // If team type is selected, auto-select all users of that team
+                if (selectedTeamType && filteredUsers.length > 0) {
+                    setSelectedUserIds(filteredUsers.map((u: any) => u.id));
+                } else if (!selectedTeamType) {
+                    // If no team type, select all users
+                    setSelectedUserIds(filteredUsers.map((u: any) => u.id));
+                }
             }
         } catch (err) {
             console.error("Error fetching users:", err);
         }
     };
 
-    // Fetch monthly report when user or month changes
+    // Fetch monthly report when filters change
     useEffect(() => {
-        if (selectedUserId) {
+        if (selectedUserIds.length > 0 || !selectedTeamType) {
             fetchMonthlyReport();
         }
-    }, [selectedUserId, selectedMonth]);
+    }, [selectedUserIds, selectedMonth, selectedTeamType]);
 
     const fetchMonthlyReport = async () => {
-        if (!selectedUserId) {
-            setError("Please select a user");
-            return;
-        }
-
         try {
             setIsLoading(true);
             setError(null);
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            params.append("month", selectedMonth);
+            
+            if (selectedUserIds.length > 0) {
+                params.append("userIds", selectedUserIds.join(","));
+            }
+            
+            if (selectedTeamType) {
+                params.append("teamType", selectedTeamType);
+            }
+
             const response = await fetch(
-                `/api/analytics/monthly-user?month=${selectedMonth}&userId=${selectedUserId}`
+                `/api/analytics/monthly-user?${params.toString()}`
             );
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -692,6 +737,51 @@ function UserMonthlyReport() {
             setIsLoading(false);
         }
     };
+
+    const handleUserToggle = (userId: string) => {
+        setSelectedUserIds(prev => {
+            if (prev.includes(userId)) {
+                return prev.filter(id => id !== userId);
+            } else {
+                return [...prev, userId];
+            }
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedUserIds.length === availableUsers.length) {
+            setSelectedUserIds([]);
+            setIsAllSelected(false);
+        } else {
+            setSelectedUserIds(availableUsers.map((u: any) => u.id));
+            setIsAllSelected(true);
+        }
+    };
+
+    const handleAllToggle = () => {
+        if (isAllSelected) {
+            setSelectedUserIds([]);
+            setIsAllSelected(false);
+        } else {
+            setSelectedUserIds(availableUsers.map((u: any) => u.id));
+            setIsAllSelected(true);
+        }
+    };
+
+    // Update isAllSelected when selectedUserIds changes
+    useEffect(() => {
+        setIsAllSelected(selectedUserIds.length === availableUsers.length && availableUsers.length > 0);
+    }, [selectedUserIds, availableUsers.length]);
+
+    const getSelectedUserNames = () => {
+        return availableUsers
+            .filter((u: any) => selectedUserIds.includes(u.id))
+            .map((u: any) => u.name);
+    };
+
+    const filteredUsers = availableUsers.filter((user: any) =>
+        user.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     if (isLoading) {
         return (
@@ -728,56 +818,188 @@ function UserMonthlyReport() {
         return (
             <div className="bg-white rounded-lg shadow">
                 <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly User Report</h3>
-                    <div className="flex gap-4 mb-4">
-                        {/* User Selection */}
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select User
-                            </label>
-                            <select
-                                value={selectedUserId || ""}
-                                onChange={(e) => setSelectedUserId(e.target.value || null)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Select a user...</option>
-                                {availableUsers.map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Monthly User Report</h3>
+                        <div className="flex items-center gap-4">
+                            {/* Team Type Filter */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Team Type
+                                </label>
+                                <select
+                                    value={selectedTeamType}
+                                    onChange={(e) => {
+                                        setSelectedTeamType(e.target.value);
+                                        setSelectedUserIds([]);
+                                    }}
+                                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+                                >
+                                    <option value="">All Teams</option>
+                                    <option value="QA">QA</option>
+                                    <option value="QC">QC</option>
+                                    <option value="Processor">Processor</option>
+                                </select>
+                            </div>
 
-                        {/* Month Selection */}
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Month
-                            </label>
-                            <input
-                                type="month"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
+                            {/* User Selection Dropdown */}
+                            <div className="relative">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Users
+                                </label>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                                        className="w-full min-w-[200px] px-3 py-2 text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                                    >
+                                        <span className="text-sm text-gray-700 truncate">
+                                            {isAllSelected
+                                                ? "All users"
+                                                : selectedUserIds.length === 0
+                                                ? "Select users..."
+                                                : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''} selected`}
+                                        </span>
+                                        <svg
+                                            className={`h-5 w-5 text-gray-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
 
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchMonthlyReport}
-                                disabled={!selectedUserId || isLoading}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? "Loading..." : "Refresh"}
-                            </button>
+                                    {isUserDropdownOpen && (
+                                        <>
+                                            <div
+                                                className="fixed inset-0 z-10"
+                                                onClick={() => setIsUserDropdownOpen(false)}
+                                            ></div>
+                                            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-hidden">
+                                                {/* Search Input */}
+                                                <div className="p-2 border-b border-gray-200">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search users..."
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                </div>
+
+                                                {/* All Option */}
+                                                <label
+                                                    className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-200"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isAllSelected}
+                                                        onChange={handleAllToggle}
+                                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    <span className="text-sm font-medium text-gray-700 flex-1">All</span>
+                                                </label>
+
+                                                {/* Users List */}
+                                                <div className="max-h-48 overflow-y-auto">
+                                                    {filteredUsers.length === 0 ? (
+                                                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                                            No users found
+                                                        </div>
+                                                    ) : (
+                                                        filteredUsers.map((user) => (
+                                                            <label
+                                                                key={user.id}
+                                                                className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedUserIds.includes(user.id)}
+                                                                    onChange={() => {
+                                                                        handleUserToggle(user.id);
+                                                                        if (selectedUserIds.includes(user.id)) {
+                                                                            setIsAllSelected(false);
+                                                                        }
+                                                                    }}
+                                                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                                <span className="text-sm text-gray-700 flex-1">{user.name}</span>
+                                                                {user.role && (
+                                                                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                                                        {user.role}
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Month Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Month
+                                </label>
+                                <input
+                                    type="month"
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="flex items-end">
+                                <button
+                                    onClick={fetchMonthlyReport}
+                                    disabled={isLoading}
+                                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? "Loading..." : "Refresh"}
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    {/* Selected Users Display */}
+                    {selectedUserIds.length > 0 && (
+                        <div className="mt-4">
+                            <div className="flex flex-wrap gap-2">
+                                {getSelectedUserNames().map((name: string) => {
+                                    const userId = availableUsers.find((u: any) => u.name === name)?.id;
+                                    return (
+                                        <span
+                                            key={userId}
+                                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                                        >
+                                            {name}
+                                            <button
+                                                onClick={() => handleUserToggle(userId!)}
+                                                className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                                type="button"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="p-6">
                     <p className="text-gray-500 text-center">
-                        {selectedUserId 
-                            ? "No data found for the selected month" 
-                            : "Please select a user and month"}
+                        {selectedUserIds.length > 0
+                            ? "No data found for the selected month"
+                            : "Please select users and month"}
                     </p>
                 </div>
             </div>
@@ -790,23 +1012,125 @@ function UserMonthlyReport() {
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">Monthly User Report</h3>
                     <div className="flex items-center gap-4">
-                        {/* User Selection */}
+                        {/* Team Type Filter */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select User
+                                Team Type
                             </label>
                             <select
-                                value={selectedUserId || ""}
-                                onChange={(e) => setSelectedUserId(e.target.value || null)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={selectedTeamType}
+                                onChange={(e) => {
+                                    setSelectedTeamType(e.target.value);
+                                    setSelectedUserIds([]);
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
                             >
-                                <option value="">Select a user...</option>
-                                {availableUsers.map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.name}
-                                    </option>
-                                ))}
+                                <option value="">All Teams</option>
+                                <option value="QA">QA</option>
+                                <option value="QC">QC</option>
+                                <option value="Processor">Processor</option>
                             </select>
+                        </div>
+
+                        {/* User Selection Dropdown */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Users
+                            </label>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                                    className="w-full min-w-[200px] px-3 py-2 text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                                >
+                                    <span className="text-sm text-gray-700 truncate">
+                                        {isAllSelected
+                                            ? "All users"
+                                            : selectedUserIds.length === 0
+                                            ? "Select users..."
+                                            : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''} selected`}
+                                    </span>
+                                    <svg
+                                        className={`h-5 w-5 text-gray-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {isUserDropdownOpen && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-10"
+                                            onClick={() => setIsUserDropdownOpen(false)}
+                                        ></div>
+                                        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-hidden">
+                                            {/* Search Input */}
+                                            <div className="p-2 border-b border-gray-200">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search users..."
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
+
+                                            {/* All Option */}
+                                            <label
+                                                className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-200"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isAllSelected}
+                                                    onChange={handleAllToggle}
+                                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                                <span className="text-sm font-medium text-gray-700 flex-1">All</span>
+                                            </label>
+
+                                            {/* Users List */}
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {filteredUsers.length === 0 ? (
+                                                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                                        No users found
+                                                    </div>
+                                                ) : (
+                                                    filteredUsers.map((user) => (
+                                                        <label
+                                                            key={user.id}
+                                                            className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedUserIds.includes(user.id)}
+                                                                onChange={() => {
+                                                                    handleUserToggle(user.id);
+                                                                    if (selectedUserIds.includes(user.id)) {
+                                                                        setIsAllSelected(false);
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <span className="text-sm text-gray-700 flex-1">{user.name}</span>
+                                                            {user.role && (
+                                                                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                                                    {user.role}
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Month Selection */}
@@ -825,7 +1149,7 @@ function UserMonthlyReport() {
                         <div className="flex items-end">
                             <button
                                 onClick={fetchMonthlyReport}
-                                disabled={!selectedUserId || isLoading}
+                                disabled={isLoading}
                                 className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? "Loading..." : "Refresh"}
@@ -833,65 +1157,69 @@ function UserMonthlyReport() {
                         </div>
                     </div>
                 </div>
+
+                {/* Selected Users Display */}
+                {selectedUserIds.length > 0 && (
+                    <div className="mt-4">
+                        <div className="flex flex-wrap gap-2">
+                            {getSelectedUserNames().map((name: string) => {
+                                const userId = availableUsers.find((u: any) => u.name === name)?.id;
+                                return (
+                                    <span
+                                        key={userId}
+                                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                                    >
+                                        {name}
+                                        <button
+                                            onClick={() => handleUserToggle(userId!)}
+                                            className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                            type="button"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
+            {/* Table Section */}
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 S.No
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-12 bg-gray-50 z-10">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Name Of The User
                             </th>
-                            {reportData.dates.map((date: string) => (
-                                <React.Fragment key={date}>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-gray-200">
-                                        {date}
-                                        <div className="text-xs font-normal mt-1">No Of Pages</div>
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        {date}
-                                        <div className="text-xs font-normal mt-1">PO Hours</div>
-                                    </th>
-                                </React.Fragment>
-                            ))}
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-l-2 border-gray-400">
-                                Total pages
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Page Count
                             </th>
                             <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO hrs
+                                PO Hours
                             </th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {reportData.data.map((entry: any) => (
                             <tr key={entry.user_id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 sticky left-0 bg-white z-10">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                     {entry.s_no}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-12 bg-white z-10">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                     {entry.name}
                                 </td>
-                                {reportData.dates.map((date: string) => {
-                                    const dateData = entry.date_columns[date] || { pages: 0, hours: 0 };
-                                    return (
-                                        <React.Fragment key={date}>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center border-l border-gray-200">
-                                                {dateData.pages || 0}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                                {dateData.hours ? parseFloat(dateData.hours.toString()).toFixed(2) : '0.00'}
-                                            </td>
-                                        </React.Fragment>
-                                    );
-                                })}
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 text-center border-l-2 border-gray-400">
-                                    {entry.total_pages}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                    {entry.total_pages || 0}
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 text-center">
-                                    {parseFloat(entry.total_hours).toFixed(2)}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                    {parseFloat(entry.total_hours || 0).toFixed(2)}
                                 </td>
                             </tr>
                         ))}
@@ -1492,16 +1820,37 @@ function DTPMonthlyReport() {
                                 S.No
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Employee ID
+                                Date
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Employee Name
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Pages
+                                Client Name
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Hours
+                                Job No.
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Process
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Page Count
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Start Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                End Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Time Taken
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Shift
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO Hours
                             </th>
                         </tr>
                     </thead>
@@ -1512,16 +1861,37 @@ function DTPMonthlyReport() {
                                     {entry.s_no}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.employee_id}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {entry.employee_name}
+                                    {entry.date}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.total_pages}
+                                    {entry.name}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.total_hours}
+                                    {entry.client_name}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.job_no}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.process}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.page_count}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.start_time}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.end_time}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.total_time_taken}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.shift}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    {entry.po}
                                 </td>
                             </tr>
                         ))}
@@ -1990,6 +2360,422 @@ function FeedbackReport() {
                                         }`}>
                                             {entry.status}
                                         </span>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function QCReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchQCReport();
+    }, []);
+
+    const fetchQCReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/qc-report";
+            const params = new URLSearchParams();
+            if (startDate) params.append("startDate", startDate);
+            if (endDate) params.append("endDate", endDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching QC report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading QC report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchQCReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">QC Report</h3>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchQCReport}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Client Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Work Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Page Count
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Start Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                End Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Working Hours
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.length === 0 ? (
+                            <tr>
+                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                                    No QC report data found
+                                </td>
+                            </tr>
+                        ) : (
+                            reportData.map((entry, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.working_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {entry.name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.client_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.file_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.work_type}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.page_no}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.start_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.end_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.total_working_hours}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+function ProcessorReport() {
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState<string>("");
+    const [endDate, setEndDate] = useState<string>("");
+
+    useEffect(() => {
+        fetchProcessorReport();
+    }, []);
+
+    const fetchProcessorReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            let url = "/api/analytics/processor-report";
+            const params = new URLSearchParams();
+            if (startDate) params.append("startDate", startDate);
+            if (endDate) params.append("endDate", endDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            setReportData(data);
+        } catch (err) {
+            console.error("Error fetching Processor report:", err);
+            setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading Processor report...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <p className="text-red-500 mb-4">Error: {error}</p>
+                        <button
+                            onClick={fetchProcessorReport}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Processor Report</h3>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                onClick={fetchProcessorReport}
+                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                            >
+                                Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Working Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Client Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Work Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Page Count
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Start Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                End Time
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total Working Hours
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                PO
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {reportData.length === 0 ? (
+                            <tr>
+                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                                    No Processor report data found
+                                </td>
+                            </tr>
+                        ) : (
+                            reportData.map((entry, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.working_date}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {entry.name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.client_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.file_name}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.work_type}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.page_no}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.start_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.end_time}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.total_working_hours}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        {entry.po}
                                     </td>
                                 </tr>
                             ))

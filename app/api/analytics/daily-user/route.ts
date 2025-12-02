@@ -158,6 +158,18 @@ export async function GET(request: NextRequest) {
                         endTime = timestamp;
                     }
 
+                    const startTime = new Date(timestamp);
+                    const endTimeDate = new Date(endTime);
+                    
+                    // Calculate total working time in hours
+                    const timeDifference = endTimeDate.getTime() - startTime.getTime();
+                    const totalWorkingHours = timeDifference / (1000 * 60 * 60); // Convert milliseconds to hours
+                    
+                    // Format as HH:MM
+                    const hours = Math.floor(totalWorkingHours);
+                    const minutes = Math.floor((totalWorkingHours - hours) * 60);
+                    const totalWorkingTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
                     reportEntries.push({
                         s_no: reportEntries.length + 1,
                         year: actionDate.getFullYear(),
@@ -182,6 +194,7 @@ export async function GET(request: NextRequest) {
                             hour: '2-digit',
                             minute: '2-digit',
                         }),
+                        total_working_time: totalWorkingTime,
                     });
                 }
             }
