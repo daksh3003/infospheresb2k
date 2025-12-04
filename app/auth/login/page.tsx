@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/client";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { toast } from "react-toastify";
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -54,26 +56,25 @@ export default function Login() {
       }
 
       // Track session on server
-      await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: data.user.id }),
       });
 
       // Check for redirect parameter from middleware
-      const redirect = searchParams.get('redirect');
+      const redirect = searchParams.get("redirect");
 
-      if (redirect && redirect !== '/') {
+      if (redirect && redirect !== "/") {
         // Redirect back to the original page
         router.push(redirect);
       } else {
         // Let middleware handle the redirect based on role
-        router.push('/');
+        router.push("/");
       }
 
       // Refresh to trigger middleware and update server-side session
       router.refresh();
-
     } catch (error: unknown) {
       toast("Invalid login credentials", {
         type: "error",
@@ -86,8 +87,8 @@ export default function Login() {
 
   useEffect(() => {
     // Check if redirected due to session timeout
-    const sessionTimeout = searchParams.get('session_timeout');
-    if (sessionTimeout === 'true') {
+    const sessionTimeout = searchParams.get("session_timeout");
+    if (sessionTimeout === "true") {
       toast("Session expired. Please log in again.", {
         type: "warning",
         position: "top-right",
@@ -99,7 +100,6 @@ export default function Login() {
     <>
       {loading && <LoadingScreen variant="overlay" message="Signing in..." />}
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center">
-
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-6xl">
             <div className="bg-white overflow-hidden shadow-md sm:rounded-lg flex">
@@ -217,5 +217,13 @@ export default function Login() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Loading..." />}>
+      <LoginForm />
+    </Suspense>
   );
 }

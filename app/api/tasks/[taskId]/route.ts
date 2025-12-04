@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/server';
 import { requireAuth } from '@/app/api/middleware/auth';
 import { AuthorizationService } from '@/app/api/middleware/authorization';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +15,7 @@ export async function GET(
     }
     const authenticatedUser = authResult;
 
+    const supabase = await createClient();
     const { taskId } = await params;
 
     if (!taskId) {
@@ -155,7 +151,7 @@ export async function POST(
 
     switch (action) {
       case 'assign':
-        return await handleTaskAssignment(taskId, data, authenticatedUser);
+        return await handleTaskAssignment(taskId, data);
       case 'pickup':
         return await handleTaskPickup(taskId, authenticatedUser);
       default:
@@ -175,6 +171,7 @@ export async function POST(
 
 async function handleTaskAssignment(taskId: string, selectedUserData: { id: string; name: string; email: string }) {
   try {
+    const supabase = await createClient();
     if (!selectedUserData) {
       return NextResponse.json(
         { error: 'User data is required' },
@@ -233,6 +230,7 @@ async function handleTaskPickup(taskId: string, authenticatedUser: {
   role: string; id: string; email: string 
 }) {
   try {
+    const supabase = await createClient();
     const now = new Date().toISOString();
 
     // Create assignment entry

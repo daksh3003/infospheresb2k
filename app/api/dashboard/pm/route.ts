@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/server';
 import { requireRole } from '@/app/api/middleware/auth';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Helper functions
 const calculateStatus = (deliveryDate: string, completionStatus: string) => {
@@ -50,6 +45,7 @@ export async function GET(request: NextRequest) {
     if (roleResult instanceof NextResponse) {
       return roleResult;
     }
+    const supabase = await createClient();
     // First get all projects
     const { data: projectsData, error: projectsError } = await supabase
       .from("tasks_test")

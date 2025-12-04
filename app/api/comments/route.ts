@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('task_id');
 
@@ -54,6 +50,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment, user_id, task_id, parent_comment_id } = await request.json();
 
     // Validate required fields
@@ -138,6 +135,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment_id, comment, user_id } = await request.json();
 
     // Validate required fields
@@ -221,6 +219,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment_id, user_id } = await request.json();
 
     // Validate required fields

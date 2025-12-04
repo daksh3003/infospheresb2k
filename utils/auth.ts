@@ -1,19 +1,44 @@
 // Authentication utilities for managing user session state
-import { createClient } from '@/lib/client';
 import type { User } from '@supabase/supabase-js';
 
 export interface AuthUser extends User {
   role?: string;
 }
 
+// Lazy import createClient to avoid evaluation during build
+let createClientFn: (() => any) | null = null;
+
+function getCreateClient() {
+  if (!createClientFn && typeof window !== 'undefined') {
+    // Dynamic import - only loads when actually called in browser
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const clientModule = require('@/lib/client');
+    createClientFn = clientModule.createClient;
+  }
+  return createClientFn;
+}
+
 export class AuthManager {
   private static instance: AuthManager;
   private currentUser: AuthUser | null = null;
   private authStateListeners: ((user: AuthUser | null) => void)[] = [];
-  private supabase = createClient();
+  private _supabase: any = null;
+  
+  private get supabase() {
+    if (!this._supabase && typeof window !== 'undefined') {
+      const createClient = getCreateClient();
+      if (createClient) {
+        this._supabase = createClient();
+      }
+    }
+    return this._supabase;
+  }
 
   private constructor() {
-    this.initAuthStateListener();
+    // Only initialize auth listener in browser environment
+    if (typeof window !== 'undefined') {
+      this.initAuthStateListener();
+    }
   }
 
   public static getInstance(): AuthManager {
@@ -24,7 +49,7 @@ export class AuthManager {
   }
 
   private initAuthStateListener() {
-    this.supabase.auth.onAuthStateChange(async (event, session) => {
+    this.supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       if (event === 'SIGNED_IN' && session?.user) {
         await this.setCurrentUser(session.user);
       } else if (event === 'SIGNED_OUT') {
@@ -119,8 +144,10 @@ export class AuthManager {
   }
 }
 
-// Export singleton instance
-export const authManager = AuthManager.getInstance();
+// Export singleton instance - only create in browser
+export const authManager = typeof window !== 'undefined' 
+  ? AuthManager.getInstance() 
+  : null as any; // Type assertion for build time
 
 // Helper functions
 export const getCurrentUser = () => authManager.getCurrentUser();

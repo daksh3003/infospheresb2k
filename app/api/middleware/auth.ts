@@ -11,7 +11,7 @@ export interface AuthenticatedUser {
  * Verify user is authenticated
  * Returns user object or NextResponse error
  */
-export async function requireAuth(request: NextRequest): Promise<AuthenticatedUser | NextResponse> {
+export async function requireAuth(_request: NextRequest): Promise<AuthenticatedUser | NextResponse> {
   try {
     const supabase = await createClient();
 

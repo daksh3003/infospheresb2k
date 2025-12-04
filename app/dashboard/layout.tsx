@@ -1,5 +1,6 @@
 // app/dashboard/layout.tsx
 "use client";
+
 import { useState, ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -39,7 +40,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await authManager.signOut();
+      if (authManager) {
+        await authManager.signOut();
+      }
       router.push("/auth/login");
       router.refresh(); // Refresh to clear server session
     } catch (error) {
@@ -62,6 +65,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined' || !authManager) return;
+    
     // Check current auth status on mount
     authManager.checkAuthStatus();
 
@@ -87,7 +93,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
 
     // Listen for auth state changes
-    const unsubscribe = authManager.onAuthStateChange(async (user) => {
+    const unsubscribe = authManager.onAuthStateChange(async (user: AuthUser | null) => {
       setCurrentUser(user);
 
       if (user?.id) {

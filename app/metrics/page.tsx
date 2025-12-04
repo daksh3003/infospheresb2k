@@ -1,6 +1,8 @@
 // app/metrics/page.tsx
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import DashboardLayout from "../dashboard/layout";
 import { Button } from "@/components/ui/button";
 

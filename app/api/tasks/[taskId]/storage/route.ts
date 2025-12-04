@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // // const supabase = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!);
+    // // const supabase = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     // // Grab JWT from headers
     // const authHeader = request.headers.get("authorization");
     // const token = authHeader?.replace("Bearer ", "");
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // // Create a Supabase client with user’s access token
     // const supabase = createClient(
     //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    //   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
+    //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     //   { global: { headers: { Authorization: `Bearer ${token}` } } } 
     // );
 

@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { requireAuth, requireRole } from '@/app/api/middleware/auth';
+import { createClient } from '@/lib/server';
+import { requireRole } from '@/app/api/middleware/auth';
 import { AuthorizationService } from '@/app/api/middleware/authorization';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface FileFormData {
   file_name: string;
@@ -38,6 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = await createClient();
     // Check content type to handle both JSON and FormData
     const contentType = request.headers.get('content-type') || '';
     let projectData, fileGroups, selectedFiles, formData = null;

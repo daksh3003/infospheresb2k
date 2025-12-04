@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!
-);
+import { createClient } from '@/lib/server';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  try { 
+  try {
+    const supabase = await createClient();
     const { taskId } = await params;
 
     // Get stages from task_iterations

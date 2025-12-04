@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET() {
   try {
+    const supabase = await createClient();
     // Try to get any row from comments table to see the structure
     const { data, error } = await supabase
       .from("comments")

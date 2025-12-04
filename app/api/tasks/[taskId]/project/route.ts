@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!
-);
+import { createClient } from "@/lib/server";
 
 // GET - Fetch project tasks completion status
 export async function GET(
@@ -12,6 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const supabase = await createClient();
     await params;
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
@@ -47,6 +43,7 @@ export async function PATCH(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const supabase = await createClient();
     await params;
     const body = await request.json();
     const { searchParams } = new URL(request.url);

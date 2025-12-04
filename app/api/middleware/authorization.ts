@@ -33,14 +33,17 @@ export class AuthorizationService {
     if (profile?.role === 'projectManager') return true;
 
     // Check if user is assigned to this task
-    const iteration = task.task_iterations;
-    if (!iteration) return false;
+    const iterations = task.task_iterations;
+    if (!iterations || !Array.isArray(iterations) || iterations.length === 0) return false;
+
+    // Get the latest iteration (or first if only one)
+    const iteration = iterations[0];
 
     const assignedUsers = [
       iteration.assigned_processor,
       iteration.assigned_qc,
       iteration.assigned_qa
-    ];
+    ].filter(Boolean); // Filter out null/undefined values
 
     return assignedUsers.includes(userId);
   }
@@ -76,8 +79,11 @@ export class AuthorizationService {
     // PMs can always modify
     if (profile?.role === 'projectManager') return true;
 
-    const iteration = task.task_iterations;
-    if (!iteration) return false;
+    const iterations = task.task_iterations;
+    if (!iterations || !Array.isArray(iterations) || iterations.length === 0) return false;
+
+    // Get the latest iteration (or first if only one)
+    const iteration = iterations[0];
 
     // Check if user is assigned to current stage
     const stageAssignments: Record<string, string> = {
@@ -86,7 +92,7 @@ export class AuthorizationService {
       'qa': iteration.assigned_qa
     };
 
-    const currentStageAssignment = stageAssignments[iteration.current_stage.toLowerCase()];
+    const currentStageAssignment = stageAssignments[iteration.current_stage?.toLowerCase() || ''];
     return currentStageAssignment === userId;
   }
 
@@ -137,8 +143,11 @@ export class AuthorizationService {
 
     if (!task) return false;
 
-    const iteration = task.task_iterations;
-    if (!iteration) return false;
+    const iterations = task.task_iterations;
+    if (!iterations || !Array.isArray(iterations) || iterations.length === 0) return false;
+
+    // Get the latest iteration (or first if only one)
+    const iteration = iterations[0];
 
     // Check if user is assigned to the stage they're uploading to
     const stageAssignments: Record<string, string> = {

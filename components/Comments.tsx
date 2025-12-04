@@ -26,6 +26,8 @@ export const Comments = ({ taskId }: { taskId: string }) => {
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
+  const supabase = createClient();
+
   useEffect(() => {
     const initializeData = async () => {
       const user = await getCurrentUser();
@@ -57,10 +59,11 @@ export const Comments = ({ taskId }: { taskId: string }) => {
 
       // If that doesn't work, try to get directly from Supabase auth
       if (!user) {
+        const supabase = createClient();
         const {
           data: { user: authUser },
           error,
-        } = await createClient().auth.getUser();
+        } = await supabase.auth.getUser();
         if (authUser && !error) {
           // Get additional user info from profiles table
           const { data: profileData } = await supabase

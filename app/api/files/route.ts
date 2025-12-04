@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/server';
 import { requireAuth } from '@/app/api/middleware/auth';
 import { AuthorizationService } from '@/app/api/middleware/authorization';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +12,7 @@ export async function GET(request: NextRequest) {
     }
     const authenticatedUser = authResult;
 
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('taskId');
     const stage = searchParams.get('stage');
@@ -106,6 +102,7 @@ export async function POST(request: NextRequest) {
       return authResult;
     }
     const authenticatedUser = authResult;
+    const supabase = await createClient();
 
     const formData = await request.formData();
     const taskId = formData.get('taskId') as string;

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
