@@ -80,6 +80,12 @@ export default function DashboardPage() {
       delivery_time: string;
     };
   }>({});
+  const [currentWorkers, setCurrentWorkers] = useState<{
+    [key: string]: {
+      name: string;
+      email?: string;
+    } | null;
+  }>({});
 
   const _router = useRouter();
 
@@ -126,6 +132,42 @@ export default function DashboardPage() {
       setProjectNames(projectNameMap);
     } catch (error) {
       console.error("Error fetching project names:", error);
+    }
+  };
+
+  const fetchCurrentWorkers = async (taskIds: string[]) => {
+    try {
+      const workerPromises = taskIds.map(async (taskId) => {
+        try {
+          const response = await fetch(`/api/tasks/${taskId}/current-worker`);
+          const data = await response.json();
+          return { taskId, worker: data.data || null };
+        } catch (error) {
+          console.error(`Error fetching worker for task ${taskId}:`, error);
+          return { taskId, worker: null };
+        }
+      });
+
+      const results = await Promise.all(workerPromises);
+      const workerMap = results.reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              email?: string;
+            } | null;
+          },
+          result
+        ) => {
+          acc[result.taskId] = result.worker;
+          return acc;
+        },
+        {}
+      );
+
+      setCurrentWorkers(workerMap);
+    } catch (error) {
+      console.error("Error fetching current workers:", error);
     }
   };
 
@@ -195,6 +237,9 @@ export default function DashboardPage() {
           ),
         ];
         await fetchProjectNames(uniqueProjectIds as string[]);
+
+        // Fetch current workers for all tasks
+        await fetchCurrentWorkers(processedTasks.map((task: { task_id: string }) => task.task_id));
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -389,11 +434,12 @@ export default function DashboardPage() {
           <div>
             {/* Table Header */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 <div className="col-span-2">Task Details</div>
                 <div className="text-center">Due Date</div>
                 <div className="text-center">Status</div>
                 <div className="text-center">Priority</div>
+                <div className="text-center">Working On</div>
                 <div className="text-center">Actions</div>
               </div>
             </div>
@@ -412,6 +458,7 @@ export default function DashboardPage() {
                   dueTime={projectNames[task.project_id]?.delivery_time || ""}
                   status={task.status || "pending"}
                   priority={task.priority || "medium"}
+                  currentWorker={currentWorkers[task.task_id] || null}
                 />
               ))}
             </div>

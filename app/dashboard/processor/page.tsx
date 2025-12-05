@@ -69,6 +69,12 @@ export default function ProcessorDashboard() {
       delivery_time: string;
     };
   }>({});
+  const [currentWorkers, setCurrentWorkers] = useState<{
+    [key: string]: {
+      name: string;
+      email?: string;
+    } | null;
+  }>({});
 
   useEffect(() => {
     setMounted(true);
@@ -114,6 +120,42 @@ export default function ProcessorDashboard() {
       setProjectNames(projectNameMap);
     } catch (error) {
       console.error("Error fetching project names:", error);
+    }
+  };
+
+  const fetchCurrentWorkers = async (taskIds: string[]) => {
+    try {
+      const workerPromises = taskIds.map(async (taskId) => {
+        try {
+          const response = await fetch(`/api/tasks/${taskId}/current-worker`);
+          const data = await response.json();
+          return { taskId, worker: data.data || null };
+        } catch (error) {
+          console.error(`Error fetching worker for task ${taskId}:`, error);
+          return { taskId, worker: null };
+        }
+      });
+
+      const results = await Promise.all(workerPromises);
+      const workerMap = results.reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              email?: string;
+            } | null;
+          },
+          result
+        ) => {
+          acc[result.taskId] = result.worker;
+          return acc;
+        },
+        {}
+      );
+
+      setCurrentWorkers(workerMap);
+    } catch (error) {
+      console.error("Error fetching current workers:", error);
     }
   };
 
@@ -172,6 +214,9 @@ export default function ProcessorDashboard() {
           ...new Set(processedTasks.map((task) => task.projectId)),
         ];
         await fetchProjectNames(uniqueProjectIds);
+
+        // Fetch current workers for all tasks
+        await fetchCurrentWorkers(processedTasks.map((task) => task.taskId));
       } else {
         console.log("No tasks found");
         setTasks([]);
@@ -315,6 +360,7 @@ export default function ProcessorDashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.calculatedStatus}
                   priority={task.calculatedPriority}
+                  currentWorker={currentWorkers[task.taskId] || null}
                 />
               ))
             )}
