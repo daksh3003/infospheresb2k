@@ -37,9 +37,9 @@ interface TaskModalProps {
 
 interface ProjectFormData {
   project_name: string;
+  client_name: string;
   po_hours: number;
   mail_instruction: string;
-  list_of_files: number;
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
@@ -57,6 +57,7 @@ interface TaskFormData {
   completion_status: boolean;
   project_id: string;
   created_by: string;
+  task_type: string;
 }
 
 interface FileFormData {
@@ -113,9 +114,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
   // Project form data
   const [projectData, setProjectData] = useState<ProjectFormData>({
     project_name: "",
+    client_name: "",
     po_hours: 0,
     mail_instruction: "",
-    list_of_files: 0,
     reference_file: "",
     delivery_date: "",
     delivery_time: "",
@@ -278,6 +279,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
@@ -302,6 +304,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: [],
       },
@@ -323,6 +326,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: [],
       },
@@ -546,6 +550,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   onChange={handleProjectChange}
                   className="w-full p-2 border rounded-md"
                   placeholder="Enter project name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Client Name
+                  <Tooltip content="Enter the client name for this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  name="client_name"
+                  value={projectData.client_name}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Enter client name"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -789,6 +809,29 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       rows={3}
                       placeholder="Enter client instructions"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Task Type *
+                    </label>
+                    <select
+                      value={group.taskData.task_type}
+                      onChange={(e) =>
+                        updateTaskData(
+                          groupIndex,
+                          "task_type",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="">Select task type</option>
+                      <option value="dtp">DTP</option>
+                      <option value="ocr_review">OCR Review</option>
+                      <option value="prep">Prep</option>
+                      <option value="image_processing">Image Processing</option>
+                      <option value="other">Other</option>
+                    </select>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>

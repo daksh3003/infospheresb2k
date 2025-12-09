@@ -1,6 +1,6 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, useEffect } from "react";
@@ -79,7 +79,7 @@ interface Task {
   project_name: string;
   po_hours: number;
   mail_instruction: string;
-  list_of_files: string[];
+  list_of_files: string[]; // Deprecated - kept for interface compatibility, populated from files_test
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
@@ -236,7 +236,9 @@ export default function TaskDetailPage() {
       // Fetch project data
       const { data: projectData, error: projectError } = await supabase
         .from("projects_test")
-        .select("*")
+        .select(
+          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by"
+        )
         .eq("project_id", taskData.project_id)
         .single();
 
@@ -244,6 +246,15 @@ export default function TaskDetailPage() {
         console.error("Error fetching project data:", projectError);
         return null;
       }
+
+      // Fetch file names from files_test table
+      const { data: filesData, error: _filesError } = await supabase
+        .from("files_test")
+        .select("file_name")
+        .eq("task_id", taskData.task_id)
+        .eq("storage_name", "task-files");
+
+      const fileNames = filesData?.map((f) => f.file_name) || [];
 
       // Fetch creator information
       let creatorData: UserProfile = {
@@ -293,7 +304,7 @@ export default function TaskDetailPage() {
         project_name: projectData.project_name,
         po_hours: projectData.po_hours || 0,
         mail_instruction: projectData.mail_instruction || "",
-        list_of_files: projectData.list_of_files || [],
+        list_of_files: fileNames,
         reference_file: projectData.reference_file || "",
         delivery_date: projectData.delivery_date || "",
         delivery_time: projectData.delivery_time || "",
@@ -307,7 +318,7 @@ export default function TaskDetailPage() {
         dueDate: projectData.delivery_date || "",
         deliveryTime: projectData.delivery_time || "",
         assignedTo: "", // Will be populated separately if needed
-        attachments: projectData.list_of_files || [],
+        attachments: fileNames,
         estimatedHours: totalEstimatedHours,
         overall_completion_status: taskData.completion_status || false,
       };

@@ -84,15 +84,15 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           ...projectData,
-          list_of_files: selectedFiles.map((f: { name: string }) => f.name),
         },
       ])
       .select("project_id")
       .single();
 
     if (projectError) {
+      console.error('Project creation error:', projectError);
       return NextResponse.json(
-        { error: 'Failed to create project' },
+        { error: 'Failed to create project', details: projectError.message },
         { status: 400 }
       );
     }
@@ -103,21 +103,27 @@ export async function POST(request: NextRequest) {
     for (let groupIndex = 0; groupIndex < fileGroups.length; groupIndex++) {
       const group = fileGroups[groupIndex];
 
-      // Create task
+      // Create task - normalize task_type (empty string to null) and remove processor_type if it doesn't exist in table
+      const { processor_type: _processor_type, ...taskDataWithoutProcessorType } = group.taskData;
+      const taskDataToInsert = {
+        ...taskDataWithoutProcessorType,
+        project_id: projectId,
+        // Convert empty string to null for task_type
+        task_type: group.taskData.task_type && group.taskData.task_type.trim() !== '' 
+          ? group.taskData.task_type 
+          : null,
+      };
+
       const { data: taskResult, error: taskError } = await supabase
         .from("tasks_test")
-        .insert([
-          {
-            ...group.taskData,
-            project_id: projectId,
-          },
-        ])
+        .insert([taskDataToInsert])
         .select("task_id")
         .single();
 
       if (taskError) {
+        console.error('Task creation error:', taskError);
         return NextResponse.json(
-          { error: `Failed to create task ${groupIndex + 1}` },
+          { error: `Failed to create task ${groupIndex + 1}`, details: taskError.message },
           { status: 400 }
         );
       }

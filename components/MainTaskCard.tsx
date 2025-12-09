@@ -32,7 +32,7 @@ interface Task {
   project_name: string;
   po_hours: number;
   mail_instruction: string;
-  list_of_files: string[];
+  list_of_files: string[]; // Deprecated - kept for interface compatibility, populated from files_test
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
