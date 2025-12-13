@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
         // Fetch all projects with their tasks
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name, po_hours, mail_instruction, delivery_date, delivery_time, created_by, created_at")
+            .select("project_id, project_name, po_hours, mail_instruction, delivery_date, delivery_time, created_by, created_at, language, platform")
             .order("created_at", { ascending: false });
 
         if (projectsError) {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         // Fetch tasks for these projects
         const { data: tasks, error: tasksError } = await supabase
             .from("tasks_test")
-            .select("task_id, task_name, project_id, processor_type, created_at")
+            .select("task_id, task_name, project_id, task_type, created_at")
             .in("project_id", projectIds);
 
         if (tasksError) {
@@ -37,7 +37,27 @@ export async function GET(request: NextRequest) {
 
         const taskIds = tasks?.map((t: any) => t.task_id) || [];
 
-        // Fetch files for these tasks
+        // Fetch user profiles for project creators (needed for early return case)
+        const projectCreatorIds = new Set<string>();
+        if (projects) projects.forEach((p: any) => p.created_by && projectCreatorIds.add(p.created_by));
+
+        const { data: projectProfiles, error: projectProfilesError } = await supabase
+            .from("profiles")
+            .select("id, name")
+            .in("id", Array.from(projectCreatorIds));
+
+        if (projectProfilesError) {
+            console.error("Error fetching project creator profiles:", projectProfilesError);
+        }
+
+        const userIdToNameMap = new Map();
+        if (projectProfiles) {
+            projectProfiles.forEach((profile: any) => {
+                userIdToNameMap.set(profile.id, profile.name);
+            });
+        }
+
+        // Fetch files for these tasks (even if empty, we'll handle projects without tasks in the main loop)
         const { data: files, error: filesError } = await supabase
             .from("files_test")
             .select("file_id, task_id, file_name, page_count")
@@ -50,7 +70,7 @@ export async function GET(request: NextRequest) {
         // Fetch task iterations
         const { data: taskIterations, error: iterationsError } = await supabase
             .from("task_iterations")
-            .select("id, task_id, current_stage, assigned_to_processor_user_id, assigned_to_qc_user_id, assigned_to_qa_user_id, created_at, updated_at, stages")
+            .select("id, task_id, current_stage, stages, assigned_to_processor_user_id, assigned_to_qc_user_id, assigned_to_qa_user_id, created_at, updated_at")
             .in("task_id", taskIds)
             .order("created_at", { ascending: true });
 
@@ -69,34 +89,36 @@ export async function GET(request: NextRequest) {
             console.error("Error fetching task actions:", actionsError);
         }
 
-        // Fetch user profiles
-        const userIds = new Set<string>();
-        if (projects) projects.forEach((p: any) => p.created_by && userIds.add(p.created_by));
+        // Fetch all user profiles (including task-related users)
+        const allUserIds = new Set<string>();
+        if (projects) projects.forEach((p: any) => p.created_by && allUserIds.add(p.created_by));
         if (taskIterations) {
             taskIterations.forEach((ti: any) => {
-                if (ti.assigned_to_processor_user_id) userIds.add(ti.assigned_to_processor_user_id);
-                if (ti.assigned_to_qc_user_id) userIds.add(ti.assigned_to_qc_user_id);
-                if (ti.assigned_to_qa_user_id) userIds.add(ti.assigned_to_qa_user_id);
+                if (ti.assigned_to_processor_user_id) allUserIds.add(ti.assigned_to_processor_user_id);
+                if (ti.assigned_to_qc_user_id) allUserIds.add(ti.assigned_to_qc_user_id);
+                if (ti.assigned_to_qa_user_id) allUserIds.add(ti.assigned_to_qa_user_id);
             });
         }
         if (taskActions) {
-            taskActions.forEach((ta: any) => ta.user_id && userIds.add(ta.user_id));
+            taskActions.forEach((ta: any) => ta.user_id && allUserIds.add(ta.user_id));
         }
 
-        const { data: profiles, error: profilesError } = await supabase
-            .from("profiles")
-            .select("id, name")
-            .in("id", Array.from(userIds));
+        // Fetch all profiles and update the map
+        if (allUserIds.size > 0) {
+            const { data: allProfiles, error: allProfilesError } = await supabase
+                .from("profiles")
+                .select("id, name")
+                .in("id", Array.from(allUserIds));
 
-        if (profilesError) {
-            console.error("Error fetching profiles:", profilesError);
-        }
+            if (allProfilesError) {
+                console.error("Error fetching all profiles:", allProfilesError);
+            }
 
-        const userIdToNameMap = new Map();
-        if (profiles) {
-            profiles.forEach((profile: any) => {
-                userIdToNameMap.set(profile.id, profile.name);
-            });
+            if (allProfiles) {
+                allProfiles.forEach((profile: any) => {
+                    userIdToNameMap.set(profile.id, profile.name);
+                });
+            }
         }
 
         // Build maps for easier lookup
@@ -147,6 +169,93 @@ export async function GET(request: NextRequest) {
         projects.forEach((project: any) => {
             const projectTasks = projectToTasksMap.get(project.project_id) || [];
             
+            // If no tasks for this project, still create an entry
+            if (projectTasks.length === 0) {
+                // Format date as "DD-MM-YYYY"
+                let date = "N/A";
+                if (project.created_at) {
+                    const dateObj = new Date(project.created_at);
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const year = dateObj.getFullYear();
+                    date = `${day}-${month}-${year}`;
+                }
+                
+                // Format delivery time
+                let deliveryTime = "N/A";
+                if (project.delivery_time) {
+                    try {
+                        const timeObj = new Date(project.delivery_time);
+                        if (!isNaN(timeObj.getTime())) {
+                            deliveryTime = timeObj.toLocaleTimeString('en-US', { 
+                                hour12: false, 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                            });
+                        } else {
+                            const timeStr = String(project.delivery_time);
+                            const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+                            if (timeMatch) {
+                                const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
+                                const minutes = timeMatch[2];
+                                deliveryTime = `${hours}:${minutes}`;
+                            }
+                        }
+                    } catch (e) {
+                        const timeStr = String(project.delivery_time);
+                        const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+                        if (timeMatch) {
+                            const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
+                            const minutes = timeMatch[2];
+                            deliveryTime = `${hours}:${minutes}`;
+                        }
+                    }
+                }
+                
+                const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
+                const poHours = project.po_hours || project.pohours || project.poHours || 0;
+                
+                reportEntries.push({
+                    job_no: jobNo++,
+                    delivered_by: deliveredBy,
+                    po: poHours || 0,
+                    mail_instruction: project.mail_instruction || "N/A",
+                    task_type: "N/A",
+                    task_name: "N/A",
+                    file_count: 0,
+                    page_count: 0,
+                    language: project.language || "N/A",
+                    platform: project.platform || "N/A",
+                    stage: "Pending",
+                    date: date,
+                    delivery_time: deliveryTime,
+                    dtp_person: "N/A",
+                    dtp_start_time: "N/A",
+                    dtp_end_time: "N/A",
+                    abbyy_compare_dtp: "N/A",
+                    dtp_status: "Pending",
+                    qc_taken_by: "N/A",
+                    qc_start_time: "N/A",
+                    qc_end_time: "N/A",
+                    abbyy_compare_qc: "N/A",
+                    qc_status: "Pending",
+                    qc_cxn_taken: "N/A",
+                    qc_cxn_start_time: "N/A",
+                    qc_cxn_end_time: "N/A",
+                    cxn_status: "N/A",
+                    qa_taken_by: "N/A",
+                    qa_start_time: "N/A",
+                    qa_end_time: "N/A",
+                    abbyy_compare_qa: "N/A",
+                    qa_status: "Pending",
+                    qa_cxn_taken: "N/A",
+                    qa_cxn_start_time: "N/A",
+                    qa_cxn_end_time: "N/A",
+                    file_status: project.completion_status ? "RFD" : "In Progress",
+                });
+                return; // Skip to next project
+            }
+            
             projectTasks.forEach((task: any) => {
                 const taskFiles = taskToFilesMap.get(task.task_id) || [];
                 const fileCount = taskFiles.length;
@@ -156,78 +265,224 @@ export async function GET(request: NextRequest) {
                 const iterations = taskToIterationsMap.get(task.task_id) || [];
                 const actions = taskToActionsMap.get(task.task_id) || [];
                 
-                // Get stages from the latest iteration (stages array contains the workflow history)
-                const latestIteration = iterations.length > 0 ? iterations[iterations.length - 1] : null;
-                const stages = latestIteration?.stages || [];
-
-                // Get DTP person (processor)
-                const dtpIteration = iterations.find((it: any) => it.current_stage === "Processor" || it.assigned_to_processor_user_id);
-                const dtpPersonId = dtpIteration?.assigned_to_processor_user_id;
+                // Sort iterations by created_at to get the most recent one
+                const sortedIterations = [...iterations].sort((a: any, b: any) => 
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+                
+                // Get stages array from the most recent iteration (it contains the full history)
+                // The 'stages' column is a JSON array with the complete stage history
+                let stages: string[] = [];
+                if (sortedIterations.length > 0) {
+                    const mostRecentIteration = sortedIterations[sortedIterations.length - 1];
+                    // Use the 'stages' column if available, otherwise fall back to current_stage
+                    if (mostRecentIteration.stages && Array.isArray(mostRecentIteration.stages)) {
+                        stages = mostRecentIteration.stages;
+                    } else if (mostRecentIteration.current_stage) {
+                        // Fallback: if no stages array, use current_stage from all iterations
+                        stages = sortedIterations.map((it: any) => it.current_stage);
+                    }
+                }
+                
+                // Debug logging - show detailed stage information
+                if (stages.length > 0) {
+                    console.log(`\n=== Task ${task.task_id} ===`);
+                    console.log(`Iterations count: ${iterations.length}`);
+                    console.log(`Stages array (from stages column):`, JSON.stringify(stages));
+                    console.log(`Stages array length: ${stages.length}`);
+                    console.log(`Sorted iterations details:`, sortedIterations.map((it: any, idx: number) => ({
+                        index: idx,
+                        current_stage: it.current_stage,
+                        stages: it.stages,
+                        created_at: it.created_at,
+                        processor_user_id: it.assigned_to_processor_user_id
+                    })));
+                }
+                
+                // Check for QC CXN: Processor stage immediately after QC stage
+                // The stages array contains the full history, so we check if Processor comes immediately after QC
+                let hasQCCXN = false;
+                let qcCXNPersonId = null;
+                let qcCXNStartTime = "N/A";
+                let qcCXNEndTime = "N/A";
+                
+                for (let i = 0; i < stages.length; i++) {
+                    const stage = String(stages[i]).trim();
+                    console.log(`  [QC Check] Index ${i}: stage="${stage}"`);
+                    if (stage === "QC" || stage.toUpperCase() === "QC") {
+                        console.log(`    ✓ Found QC at index ${i}`);
+                        // Check if the immediate next stage is Processor
+                        if (i + 1 < stages.length) {
+                            const nextStage = String(stages[i + 1]).trim();
+                            console.log(`    Next stage at index ${i + 1}: "${nextStage}"`);
+                            if (nextStage === "Processor" || nextStage.toUpperCase() === "PROCESSOR") {
+                                hasQCCXN = true;
+                                // Find the iteration where current_stage is "Processor" that corresponds to this correction
+                                // Look for the first Processor iteration created after a QC iteration
+                                const qcIteration = sortedIterations.find((it: any) => 
+                                    (it.current_stage === "QC" || it.current_stage?.toUpperCase() === "QC") &&
+                                    new Date(it.created_at).getTime() <= new Date().getTime()
+                                );
+                                if (qcIteration) {
+                                    const qcCreatedAt = new Date(qcIteration.created_at).getTime();
+                                    const processorIteration = sortedIterations.find((it: any) => 
+                                        (it.current_stage === "Processor" || it.current_stage?.toUpperCase() === "PROCESSOR") &&
+                                        new Date(it.created_at).getTime() > qcCreatedAt
+                                    );
+                                    if (processorIteration) {
+                                        qcCXNPersonId = processorIteration.assigned_to_processor_user_id;
+                                    }
+                                }
+                                // Fallback: if we can't find by date, use the last Processor iteration
+                                if (!qcCXNPersonId) {
+                                    const processorIteration = sortedIterations
+                                        .filter((it: any) => it.current_stage === "Processor" || it.current_stage?.toUpperCase() === "PROCESSOR")
+                                        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+                                    if (processorIteration) {
+                                        qcCXNPersonId = processorIteration.assigned_to_processor_user_id;
+                                    }
+                                }
+                                console.log(`    ✓✓✓ QC CXN FOUND: Processor immediately after QC at index ${i}`);
+                                console.log(`    QC CXN Person ID: ${qcCXNPersonId}`);
+                                break; // Found correction, no need to check further
+                            } else {
+                                console.log(`    ✗ Next stage is "${nextStage}", not Processor`);
+                            }
+                        } else {
+                            console.log(`    ✗ No next stage (end of array)`);
+                        }
+                    }
+                }
+                
+                // Check for QA CXN: Processor stage immediately after QA stage
+                // The stages array contains the full history, so we check if Processor comes immediately after QA
+                let hasQACXN = false;
+                let qaCXNPersonId = null;
+                let qaCXNStartTime = "N/A";
+                let qaCXNEndTime = "N/A";
+                
+                for (let i = 0; i < stages.length; i++) {
+                    const stage = String(stages[i]).trim();
+                    if (stage === "QA" || stage.toUpperCase() === "QA") {
+                        console.log(`    ✓ Found QA at index ${i}`);
+                        // Check if the immediate next stage is Processor
+                        if (i + 1 < stages.length) {
+                            const nextStage = String(stages[i + 1]).trim();
+                            console.log(`    Next stage at index ${i + 1}: "${nextStage}"`);
+                            if (nextStage === "Processor" || nextStage.toUpperCase() === "PROCESSOR") {
+                                hasQACXN = true;
+                                // Find the iteration where current_stage is "Processor" that corresponds to this correction
+                                // Look for the first Processor iteration created after a QA iteration
+                                const qaIteration = sortedIterations.find((it: any) => 
+                                    (it.current_stage === "QA" || it.current_stage?.toUpperCase() === "QA") &&
+                                    new Date(it.created_at).getTime() <= new Date().getTime()
+                                );
+                                if (qaIteration) {
+                                    const qaCreatedAt = new Date(qaIteration.created_at).getTime();
+                                    const processorIteration = sortedIterations.find((it: any) => 
+                                        (it.current_stage === "Processor" || it.current_stage?.toUpperCase() === "PROCESSOR") &&
+                                        new Date(it.created_at).getTime() > qaCreatedAt
+                                    );
+                                    if (processorIteration) {
+                                        qaCXNPersonId = processorIteration.assigned_to_processor_user_id;
+                                    }
+                                }
+                                // Fallback: if we can't find by date, use the last Processor iteration
+                                if (!qaCXNPersonId) {
+                                    const processorIteration = sortedIterations
+                                        .filter((it: any) => it.current_stage === "Processor" || it.current_stage?.toUpperCase() === "PROCESSOR")
+                                        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+                                    if (processorIteration) {
+                                        qaCXNPersonId = processorIteration.assigned_to_processor_user_id;
+                                    }
+                                }
+                                console.log(`    ✓✓✓ QA CXN FOUND: Processor immediately after QA at index ${i}`);
+                                console.log(`    QA CXN Person ID: ${qaCXNPersonId}`);
+                                break; // Found correction, no need to check further
+                            } else {
+                                console.log(`    ✗ Next stage is "${nextStage}", not Processor`);
+                            }
+                        } else {
+                            console.log(`    ✗ No next stage (end of array)`);
+                        }
+                    }
+                }
+                
+                console.log(`Task ${task.task_id} - Final result: hasQCCXN=${hasQCCXN}, hasQACXN=${hasQACXN}`);
+                console.log(`=== End Task ${task.task_id} ===\n`);
+                
+                // Get CXN times from actions if correction exists
+                if (hasQCCXN && qcCXNPersonId) {
+                    const qcCXNActions = actions.filter((a: any) => {
+                        const metadata = a.metadata || {};
+                        const currentStage = metadata.current_stage || metadata.upload_stage;
+                        return currentStage === "Processor" && 
+                               a.user_id === qcCXNPersonId &&
+                               (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload');
+                    });
+                    if (qcCXNActions.length > 0) {
+                        qcCXNStartTime = new Date(qcCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                        qcCXNEndTime = new Date(qcCXNActions[qcCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    }
+                }
+                
+                if (hasQACXN && qaCXNPersonId) {
+                    const qaCXNActions = actions.filter((a: any) => {
+                        const metadata = a.metadata || {};
+                        const currentStage = metadata.current_stage || metadata.upload_stage;
+                        return currentStage === "Processor" && 
+                               a.user_id === qaCXNPersonId &&
+                               (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload');
+                    });
+                    if (qaCXNActions.length > 0) {
+                        qaCXNStartTime = new Date(qaCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                        qaCXNEndTime = new Date(qaCXNActions[qaCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    }
+                }
+                
+                // Get DTP person (processor) - find from actions where current_stage is "Processor"
+                const dtpActions = actions.filter((a: any) => {
+                    const metadata = a.metadata || {};
+                    const currentStage = metadata.current_stage || metadata.upload_stage;
+                    return currentStage === "Processor" && 
+                           (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload');
+                });
+                const dtpPersonId = dtpActions.length > 0 ? dtpActions[0].user_id : 
+                    (iterations.find((it: any) => it.current_stage === "Processor" || it.assigned_to_processor_user_id)?.assigned_to_processor_user_id || null);
                 const dtpPerson = dtpPersonId ? userIdToNameMap.get(dtpPersonId) : "N/A";
                 
-                // Get DTP start/end times from actions
-                const dtpActions = actions.filter((a: any) => 
-                    a.user_id === dtpPersonId && 
-                    (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload')
-                );
                 const dtpStartTime = dtpActions[0]?.created_at ? 
                     new Date(dtpActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 const dtpEndTime = dtpActions[dtpActions.length - 1]?.created_at ? 
                     new Date(dtpActions[dtpActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 
-                // Get QC person - find who actually did QC work from task_actions
-                const qcWorkActions = actions.filter((a: any) => {
+                // Get QC person - find from actions where current_stage is "QC"
+                const qcActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
-                    const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
-                    return currentStage === "QC";
+                    const currentStage = metadata.current_stage || metadata.upload_stage;
+                    return currentStage === "QC" && 
+                           (a.action_type === 'start' || a.action_type === 'complete');
                 });
-                
-                // Get the user_id from QC work actions (the person who did the QC)
-                let qcPersonId = qcWorkActions.length > 0 ? qcWorkActions[0].user_id : null;
-                
-                const qcIteration = iterations.find((it: any) => it.current_stage === "QC" || it.assigned_to_qc_user_id);
-
-                // Fallback to assigned person if no QC work actions found
-                if (!qcPersonId) {
-                    qcPersonId = qcIteration?.assigned_to_qc_user_id;
-                }
-                
+                const qcPersonId = qcActions.length > 0 ? qcActions[0].user_id : 
+                    (iterations.find((it: any) => it.current_stage === "QC" || it.assigned_to_qc_user_id)?.assigned_to_qc_user_id || null);
                 const qcPerson = qcPersonId ? userIdToNameMap.get(qcPersonId) : "N/A";
                 
-                // Get QC start/end times from the actual QC work actions
-                const qcActions = qcWorkActions.length > 0 ? qcWorkActions : actions.filter((a: any) => 
-                    a.user_id === qcPersonId && 
-                    (a.action_type === 'start' || a.action_type === 'complete')
-                );
                 const qcStartTime = qcActions[0]?.created_at ? 
                     new Date(qcActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 const qcEndTime = qcActions[qcActions.length - 1]?.created_at ? 
                     new Date(qcActions[qcActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 
-                // Get QA person - find who actually did QA work from task_actions
-                const qaWorkActions = actions.filter((a: any) => {
+                // Get QA person - find from actions where current_stage is "QA"
+                const qaActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
-                    const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
-                    return currentStage === "QA";
+                    const currentStage = metadata.current_stage || metadata.upload_stage;
+                    return currentStage === "QA" && 
+                           (a.action_type === 'start' || a.action_type === 'complete');
                 });
-                
-                // Get the user_id from QA work actions (the person who did the QA)
-                let qaPersonId = qaWorkActions.length > 0 ? qaWorkActions[0].user_id : null;
-                
-                const qaIteration = iterations.find((it: any) => it.current_stage === "QA" || it.assigned_to_qa_user_id);
-                
-                // Fallback to assigned person if no QA work actions found
-                if (!qaPersonId) {
-                    qaPersonId = qaIteration?.assigned_to_qa_user_id;
-                }
-                
+                const qaPersonId = qaActions.length > 0 ? qaActions[0].user_id : 
+                    (iterations.find((it: any) => it.current_stage === "QA" || it.assigned_to_qa_user_id)?.assigned_to_qa_user_id || null);
                 const qaPerson = qaPersonId ? userIdToNameMap.get(qaPersonId) : "N/A";
                 
-                // Get QA start/end times from the actual QA work actions
-                const qaActions = qaWorkActions.length > 0 ? qaWorkActions : actions.filter((a: any) => 
-                    a.user_id === qaPersonId && 
-                    (a.action_type === 'start' || a.action_type === 'complete')
-                );
                 const qaStartTime = qaActions[0]?.created_at ? 
                     new Date(qaActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
                 const qaEndTime = qaActions[qaActions.length - 1]?.created_at ? 
@@ -286,75 +541,58 @@ export async function GET(request: NextRequest) {
                 
                 const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
                 
-                // Determine QC ABBYY Compare: YES if Processor stage appears after QC, NO otherwise
-                let abbyyCompareQC = "No";
-                if (stages && Array.isArray(stages)) {
-                    const qcIndex = stages.indexOf("QC");
-                    if (qcIndex !== -1) {
-                        // Check if there's a Processor stage after QC
-                        const processorAfterQC = stages.slice(qcIndex + 1).includes("Processor");
-                        abbyyCompareQC = processorAfterQC ? "Yes" : "No";
-                    }
-                }
-                
-                // Determine QA ABBYY Compare: YES if Processor stage appears after QA, NO otherwise
-                let abbyyCompareQA = "No";
-                if (stages && Array.isArray(stages)) {
-                    const qaIndex = stages.indexOf("QA");
-                    if (qaIndex !== -1) {
-                        // Check if there's a Processor stage after QA
-                        const processorAfterQA = stages.slice(qaIndex + 1).includes("Processor");
-                        abbyyCompareQA = processorAfterQA ? "Yes" : "No";
-                    }
-                }
-
                 reportEntries.push({
                     // Job Details
                     job_no: jobNo++,
                     delivered_by: deliveredBy,
                     po: poHours || 0,
                     mail_instruction: project.mail_instruction || "N/A",
-                    task_type: task.processor_type || "N/A",
+                    task_type: task.task_type || "N/A",
                     task_name: task.task_name || "N/A",
                     file_count: fileCount,
                     page_count: pageCount,
                     
                     // DTP Process
-                    language: "N/A", // This might need to come from metadata or another source
-                    platform: "Word", // Default or from metadata
-                    stage: dtpIteration?.current_stage || "Initial",
+                    language: project.language || "N/A", // This might need to come from metadata or another source
+                    platform: project.platform || "N/A", // Default or from metadata
+                    stage: iterations.find((it: any) => it.current_stage === "Processor" || it.assigned_to_processor_user_id) ? "Completed" : "Pending",
                     date: date,
                     delivery_time: deliveryTime,
                     dtp_person: dtpPerson,
                     dtp_start_time: dtpStartTime,
                     dtp_end_time: dtpEndTime,
                     abbyy_compare_dtp: "N/A", // This might need to come from metadata
-                    dtp_status: dtpIteration ? "Completed" : "Pending",
+                    dtp_status: dtpPersonId ? "Completed" : "Pending",
                     
                     // QC Tracking
                     qc_taken_by: qcPerson,
                     qc_start_time: qcStartTime,
                     qc_end_time: qcEndTime,
-                    abbyy_compare_qc: abbyyCompareQC,
-                    qc_status: qcIteration ? "Completed" : "Pending",
-                    qc_cxn_taken: "N/A", // This might need special logic
-                    qc_cxn_start_time: "N/A",
-                    qc_cxn_end_time: "N/A",
-                    cxn_status: "N/A",
+                    abbyy_compare_qc: iterations.length === 0 ? "N/A" : (hasQCCXN ? "Yes" : "No"),
+                    qc_status: qcPersonId ? "Completed" : "Pending",
+                    qc_cxn_taken: hasQCCXN && qcCXNPersonId ? userIdToNameMap.get(qcCXNPersonId) : "N/A",
+                    qc_cxn_start_time: qcCXNStartTime,
+                    qc_cxn_end_time: qcCXNEndTime,
+                    cxn_status: hasQCCXN ? "Correction" : "N/A",
                     
                     // QA Tracking
                     qa_taken_by: qaPerson,
                     qa_start_time: qaStartTime,
                     qa_end_time: qaEndTime,
-                    abbyy_compare_qa: abbyyCompareQA,
-                    qa_status: qaIteration ? "Completed" : "Pending",
-                    qa_cxn_taken: "N/A",
-                    qa_cxn_start_time: "N/A",
-                    qa_cxn_end_time: "N/A",
+                    abbyy_compare_qa: iterations.length === 0 ? "N/A" : (hasQACXN ? "Yes" : "No"),
+                    qa_status: qaPersonId ? "Completed" : "Pending",
+                    qa_cxn_taken: hasQACXN && qaCXNPersonId ? userIdToNameMap.get(qaCXNPersonId) : "N/A",
+                    qa_cxn_start_time: qaCXNStartTime,
+                    qa_cxn_end_time: qaCXNEndTime,
                     file_status: project.completion_status ? "RFD" : "In Progress",
                 });
             });
         });
+
+        console.log(`DTP Tracking: Found ${reportEntries.length} entries`);
+        if (reportEntries.length === 0) {
+            console.log("No report entries created. Projects:", projects?.length || 0, "Tasks:", tasks?.length || 0);
+        }
 
         return NextResponse.json(reportEntries);
     } catch (error) {

@@ -2203,27 +2203,29 @@ function FeedbackReport() {
                 url += `?${params.toString()}`;
             }
 
+            console.log("Feedback Report: Fetching from URL:", url);
             const response = await fetch(url);
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
             }
 
             const data = await response.json();
+            console.log("Feedback Report API Response:", data);
+            console.log("Feedback Report Data Length:", Array.isArray(data) ? data.length : "Not an array");
+            
             if (data.error) {
                 throw new Error(data.error);
             }
 
-            setReportData(data);
+            setReportData(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("Error fetching Feedback Report:", err);
             setError(err instanceof Error ? err.message : "An error occurred");
@@ -2307,60 +2309,67 @@ function FeedbackReport() {
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                S.No
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Feedback Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Employee Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Feedback Type
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Feedback Description
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
+                            {/* Section 1: Job Details */}
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pages</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task Type</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Process</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QC</th>
+                            
+                            {/* Section 2: Quality Assurance */}
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivery</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Internal Auditor</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Internal Comments</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">External Comments</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total No. Errors</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
+                            
+                            {/* Section 3: Impact and RCA */}
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impact</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RCA</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RCA</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {reportData.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                                <td colSpan={22} className="px-6 py-4 text-center text-gray-500">
                                     No Feedback report data found
                                 </td>
                             </tr>
                         ) : (
                             reportData.map((entry, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.s_no}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.feedback_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {entry.employee_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.feedback_type}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.feedback_description}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                            entry.status === "Resolved" 
-                                                ? "bg-green-100 text-green-800" 
-                                                : "bg-yellow-100 text-yellow-800"
-                                        }`}>
-                                            {entry.status}
-                                        </span>
-                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.s_no}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.date}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.client}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.filename}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.pages}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.language}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_type}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.process}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivery}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.internal_auditor}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.internal_comments}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.external_comments}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.total_errors}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.remarks}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.impact}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.action}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.rca}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.action_2}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.rca_2}</td>
                                 </tr>
                             ))
                         )}
