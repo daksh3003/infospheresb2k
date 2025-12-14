@@ -8,6 +8,15 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(request: NextRequest) {
   try {
+    // Validate environment variables
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase environment variables');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     // Get user ID from query parameters
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
@@ -30,24 +39,26 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching user role:', error);
+      // If user profile doesn't exist, return null role instead of error
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ role: null });
+      }
       return NextResponse.json(
-        { error: 'Failed to fetch user role' },
+        { error: 'Failed to fetch user role', details: error.message },
         { status: 500 }
       );
     }
 
     if (!data) {
-      return NextResponse.json(
-        { error: 'User profile not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ role: null });
     }
 
-    return NextResponse.json({ role: data.role });
+    return NextResponse.json({ role: data.role || null });
   } catch (error) {
     console.error('Error in user role API:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }

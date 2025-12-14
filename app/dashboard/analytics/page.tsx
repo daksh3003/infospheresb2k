@@ -3,6 +3,24 @@
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+
 const analyticsTables = [
     { id: "attendance", name: "Attendance"},
     { id: "daily-user", name: "User Daily Report"},
@@ -48,18 +66,21 @@ export default function AnalyticsPage() {
 
     return (
         <div className="flex h-[calc(100vh-6rem)]">
-            <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
-                <div className="p-4 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-900">Analytics Tables</h2>
+            <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+                <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-sm font-semibold text-gray-900">Analytics</h2>
                 </div>
                 <nav className="flex-1 overflow-y-auto p-2">
+                    <div className="px-3 py-2 mb-1">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Reports</p>
+                    </div>
                     {analyticsTables.map((table) => {
                         const isActive = selectedTable === table.id;
                         return (
                             <button
                                 key={table.id}
                                 onClick={() => setSelectedTable(table.id)}
-                                className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md mb-1 transition-colors ${
+                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors mb-0.5 ${
                                     isActive
                                         ? "bg-blue-600 text-white"
                                         : "text-gray-700 hover:bg-gray-100"
@@ -73,16 +94,18 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto bg-white">
-                <div className="p-6">
+                <div className="p-8">
                     <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900">
+                        <h1 className="text-2xl font-semibold text-gray-900">
                             {analyticsTables.find((table) => table.id === selectedTable)?.name || "Attendance Report"}
-                        </h2>
-                        <p className="mt-2 text-sm text-gray-600">
+                        </h1>
+                        <p className="mt-1.5 text-sm text-gray-600">
                             View the latest analytics and metrics for your projects and tasks.
                         </p>
                     </div>
-                    {renderTable()}
+                    <div>
+                        {renderTable()}
+                    </div>
                 </div>
             </div>
         </div>
@@ -90,286 +113,176 @@ export default function AnalyticsPage() {
 }
 
 function AttendanceTable() {
-    const [attendanceData, setAttendanceData] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedUser, setSelectedUser] = useState<string | null>(null); // null = all users
-
+    const [attendanceData, setAttendanceData] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  
     useEffect(() => {
-        fetchAttendanceData();
-    }, []);
-
+      fetchAttendanceData()
+    }, [])
+  
     const fetchAttendanceData = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const response = await fetch("/api/analytics/attendance");
-            
-            if (!response.ok) {
-                // Try to get error message from response
-                let errorMessage = `HTTP error! status: ${response.status}`;
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error || errorMessage;
-                } catch {
-                    // If response is not JSON, use status text
-                    errorMessage = response.statusText || errorMessage;
-                }
-                throw new Error(errorMessage);
-            }
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            
-            setAttendanceData(data);
-        } catch (err) {
-            console.error("Error fetching attendance:", err);
-            setError(err instanceof Error ? err.message : "An error occurred");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Get unique usernames from attendance data
+      try {
+        setIsLoading(true)
+        setError(null)
+  
+        const response = await fetch("/api/analytics/attendance")
+        if (!response.ok) throw new Error("Failed to fetch attendance data")
+  
+        const data = await response.json()
+        setAttendanceData(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  
     const uniqueUsers = Array.from(
-        new Set(attendanceData.map((record) => record.employee_name))
-    ).filter(Boolean).sort();
-
-    // Filter attendance data based on selected user
+      new Set(attendanceData.map((r) => r.employee_name))
+    ).filter(Boolean)
+  
     const filteredData = selectedUser
-        ? attendanceData.filter((record) => record.employee_name === selectedUser)
-        : attendanceData;
-
+      ? attendanceData.filter((r) => r.employee_name === selectedUser)
+      : attendanceData
+  
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading attendance data...</p>
-                    </div>
-                </div>
-            </div>
-        );
+      return <Skeleton className="h-[400px] w-full rounded-lg" />
     }
-
+  
+    /* -------------------- ERROR -------------------- */
     if (error) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchAttendanceData}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
+      return (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+          <Button onClick={fetchAttendanceData} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+            Retry
+          </Button>
+        </Alert>
+      )
     }
-
+  
     return (
-        <div className="flex gap-4">
-            {/* User List Sidebar */}
-            <div className="w-64 bg-white rounded-lg shadow border border-gray-200 flex flex-col">
-                <div className="p-4 border-b border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-900">Filter by Employee</h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                        ({uniqueUsers.length})
-                    </p>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                    <button
-                        onClick={() => setSelectedUser(null)}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-md mb-1 transition-colors ${
-                            selectedUser === null
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                    >
-                        All ({attendanceData.length})
-                    </button>
-                    {uniqueUsers.map((userName) => {
-                        const userRecordCount = attendanceData.filter(
-                            (record) => record.employee_name === userName
-                        ).length;
-                        return (
-                            <button
-                                key={userName}
-                                onClick={() => setSelectedUser(userName)}
-                                className={`w-full text-left px-3 py-2 text-sm rounded-md mb-1 transition-colors ${
-                                    selectedUser === userName
-                                        ? "bg-blue-600 text-white"
-                                        : "text-gray-700 hover:bg-gray-100"
-                                }`}
-                            >
-                                {userName} ({userRecordCount})
-                            </button>
-                        );
-                    })}
-                </div>
+      <div className="flex gap-6">
+        {/* -------------------- SIDEBAR -------------------- */}
+        <Card className="w-64 shrink-0">
+          <CardHeader>
+            <CardTitle className="text-sm">Filter by Employee</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {uniqueUsers.length} employees
+            </p>
+          </CardHeader>
+  
+          <CardContent className="space-y-1">
+            <Button
+              variant={selectedUser === null ? "default" : "ghost"}
+              className={`w-full justify-start ${selectedUser === null ? "bg-blue-600 text-white hover:bg-blue-700" : ""}`}
+              onClick={() => setSelectedUser(null)}
+            >
+              All ({attendanceData.length})
+            </Button>
+  
+            {uniqueUsers.map((user) => {
+              const count = attendanceData.filter(
+                (r) => r.employee_name === user
+              ).length
+  
+              return (
+                <Button
+                  key={user}
+                  variant={selectedUser === user ? "default" : "ghost"}
+                  className={`w-full justify-start ${selectedUser === user ? "bg-blue-600 text-white hover:bg-blue-700" : ""}`}
+                  onClick={() => setSelectedUser(user)}
+                >
+                  {user} ({count})
+                </Button>
+              )
+            })}
+          </CardContent>
+        </Card>
+  
+        {/* -------------------- TABLE -------------------- */}
+        <Card className="flex-1">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Attendance Report</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {selectedUser ?? "All employees"} · {filteredData.length} records
+              </p>
             </div>
-
-            {/* Attendance Table */}
-            <div className="flex-1 bg-white rounded-lg shadow">
-                <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Attendance Report</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {selectedUser 
-                                ? `Showing records for: ${selectedUser}` 
-                                : "Showing all employees"}
-                            {" "}({filteredData.length} record{filteredData.length !== 1 ? 's' : ''})
-                        </p>
-                    </div>
-                    <button
-                        onClick={fetchAttendanceData}
-                        className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                    >
-                        Refresh
-                    </button>
-                </div>
-                
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Department
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Employee ID
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Employee Name
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Role
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Attendance Date
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    InTime
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    OutTime
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Shift
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Shift InTime
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Shift OutTime
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Work Duration
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    OT
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total Duration
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    LateBy
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    EarlyGoingBy
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Punch Records
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredData.length === 0 ? (
-                                <tr>
-                                    <td colSpan={17} className="px-6 py-4 text-center text-gray-500">
-                                        No attendance data found
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredData.map((record, index) => (
-                                    <tr key={record.id || index} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.department}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.employee_id}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {record.employee_name}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.role}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.attendance_date}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.in_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.out_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.shift}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.shift_in_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.shift_out_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.work_duration}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.ot}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.total_duration}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.late_by}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.early_going_by}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                record.status === "Present" 
-                                                    ? "bg-green-100 text-green-800" 
-                                                    : "bg-red-100 text-red-800"
-                                            }`}>
-                                                {record.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {record.punch_records}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-}
+  
+            <Button onClick={fetchAttendanceData} className="bg-blue-600 text-white hover:bg-blue-700">Refresh</Button>
+          </CardHeader>
+  
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-center">Department</TableHead>
+                  <TableHead className="text-center">Employee ID</TableHead>
+                  <TableHead className="text-center">Employee Name</TableHead>
+                  <TableHead className="text-center">Role</TableHead>
+                  <TableHead className="text-center">Date</TableHead>
+                  <TableHead className="text-center">In</TableHead>
+                  <TableHead className="text-center">Out</TableHead>
+                  <TableHead className="text-center">Shift</TableHead>
+                  <TableHead className="text-center">Work</TableHead>
+                  <TableHead className="text-center">OT</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+  
+              <TableBody>
+                {filteredData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center">
+                      No data found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredData.map((r, i) => (
+                    <TableRow key={r.id ?? i}>
+                      <TableCell className="text-center">{r.department}</TableCell>
+                      <TableCell className="text-center">{r.employee_id}</TableCell>
+                      <TableCell className="text-center font-medium">
+                        {r.employee_name}
+                      </TableCell>
+                      <TableCell className="text-center">{r.role}</TableCell>
+                      <TableCell className="text-center">{r.attendance_date}</TableCell>
+                      <TableCell className="text-center">{r.in_time}</TableCell>
+                      <TableCell className="text-center">{r.out_time}</TableCell>
+                      <TableCell className="text-center">{r.shift}</TableCell>
+                      <TableCell className="text-center">{r.work_duration}</TableCell>
+                      <TableCell className="text-center">{r.ot}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          className={
+                            r.status === "Present"
+                              ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                              : "bg-white-100 text-black-700 hover:bg-red-200 border-transparent"
+                          }
+                        >
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                              r.status === "Present" ? "bg-green-500" : "bg-red-500"
+                            }`}
+                          />
+                          {r.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
 function UserDailyReport() {
     const [reportData, setReportData] = useState<any[]>([]);
@@ -426,13 +339,11 @@ function UserDailyReport() {
             );
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -446,18 +357,46 @@ function UserDailyReport() {
             setReportData(data);
         } catch (err) {
             console.error("Error fetching daily report:", err);
-            setError(err instanceof Error ? err.message : "An error occurred");
+            setError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
             setIsLoading(false);
         }
     };
 
+    /* -------------------- LOADING -------------------- */
+    if (isLoading) {
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
+    }
+
+    /* -------------------- ERROR -------------------- */
+    if (error) {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchDailyReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">User Daily Report</h3>
-                
-                <div className="flex gap-4 mb-4">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>User Daily Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {selectedUserId && reportData.length > 0
+                            ? `${reportData.length} record${reportData.length !== 1 ? 's' : ''} found`
+                            : "Select a user and date to view daily report"}
+                    </p>
+                </div>
+            </CardHeader>
+
+            <CardContent>
+                {/* Filters */}
+                <div className="flex items-end gap-4 mb-6">
                     {/* User Selection */}
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -466,7 +405,7 @@ function UserDailyReport() {
                         <select
                             value={selectedUserId || ""}
                             onChange={(e) => setSelectedUserId(e.target.value || null)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">Select a user...</option>
                             {availableUsers.map((user) => (
@@ -479,147 +418,85 @@ function UserDailyReport() {
 
                     {/* Date Selection */}
                     <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
                             Select Date
                         </label>
                         <input
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
-                    <div className="flex items-end">
-                        <button
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
+                            Refresh
+                        </label>
+                        <Button
                             onClick={fetchDailyReport}
                             disabled={!selectedUserId || isLoading}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                             {isLoading ? "Loading..." : "Refresh"}
-                        </button>
+                        </Button>
                     </div>
                 </div>
-            </div>
 
-            {isLoading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading daily report...</p>
-                    </div>
-                </div>
-            ) : error ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchDailyReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            ) : (
+                {/* Table */}
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    S.No
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Year
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Month
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Working Date
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Name
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Client Name
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    File No
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Work Type
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    No of Pages
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Start Time
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    End Time
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total Working Time
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">S.No</TableHead>
+                                <TableHead className="text-center">Year</TableHead>
+                                <TableHead className="text-center">Month</TableHead>
+                                <TableHead className="text-center">Working Date</TableHead>
+                                <TableHead className="text-center">Name</TableHead>
+                                <TableHead className="text-center">Client Name</TableHead>
+                                <TableHead className="text-center">File No</TableHead>
+                                <TableHead className="text-center">Work Type</TableHead>
+                                <TableHead className="text-center">No of Pages</TableHead>
+                                <TableHead className="text-center">Start Time</TableHead>
+                                <TableHead className="text-center">End Time</TableHead>
+                                <TableHead className="text-center">Total Working Time</TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
                             {reportData.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
-                                        {selectedUserId 
-                                            ? "No data found for the selected date" 
+                                <TableRow>
+                                    <TableCell colSpan={12} className="text-center">
+                                        {selectedUserId
+                                            ? "No data found for the selected date"
                                             : "Please select a user and date"}
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ) : (
                                 reportData.map((entry, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.s_no}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.year}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.month}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.working_date}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.s_no}</TableCell>
+                                        <TableCell className="text-center">{entry.year}</TableCell>
+                                        <TableCell className="text-center">{entry.month}</TableCell>
+                                        <TableCell className="text-center">{entry.working_date}</TableCell>
+                                        <TableCell className="text-center font-medium">
                                             {entry.name}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.client_name}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.file_no}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.work_type}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.no_of_pages}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.start_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.end_time}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {entry.total_working_time}
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.client_name}</TableCell>
+                                        <TableCell className="text-center">{entry.file_no}</TableCell>
+                                        <TableCell className="text-center">{entry.work_type}</TableCell>
+                                        <TableCell className="text-center">{entry.no_of_pages}</TableCell>
+                                        <TableCell className="text-center">{entry.start_time}</TableCell>
+                                        <TableCell className="text-center">{entry.end_time}</TableCell>
+                                        <TableCell className="text-center">{entry.total_working_time}</TableCell>
+                                    </TableRow>
                                 ))
                             )}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </Table>
                 </div>
-            )}
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -783,44 +660,33 @@ function UserMonthlyReport() {
         user.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading monthly report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchMonthlyReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchMonthlyReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     if (!reportData || !reportData.data || reportData.data.length === 0) {
         return (
-            <div className="bg-white rounded-lg shadow">
-                <div className="p-6 border-b border-gray-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Monthly User Report</h3>
-                        <div className="flex items-center gap-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Monthly User Report</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {/* Filters */}
+                    <div className="flex items-end gap-4 mb-4">
                             {/* Team Type Filter */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -832,7 +698,7 @@ function UserMonthlyReport() {
                                         setSelectedTeamType(e.target.value);
                                         setSelectedUserIds([]);
                                     }}
-                                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+                                    className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
                                 >
                                     <option value="">All Teams</option>
                                     <option value="QA">QA</option>
@@ -850,7 +716,7 @@ function UserMonthlyReport() {
                                     <button
                                         type="button"
                                         onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                                        className="w-full min-w-[200px] px-3 py-2 text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                                        className="w-full min-w-[200px] px-3 py-2 h-[42px] text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
                                     >
                                         <span className="text-sm text-gray-700 truncate">
                                             {isAllSelected
@@ -951,19 +817,21 @@ function UserMonthlyReport() {
                                     type="month"
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
 
-                            <div className="flex items-end">
-                                <button
-                                    onClick={fetchMonthlyReport}
-                                    disabled={isLoading}
-                                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                >
-                                    {isLoading ? "Loading..." : "Refresh"}
-                                </button>
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
+                                Refresh
+                            </label>
+                            <Button
+                                onClick={fetchMonthlyReport}
+                                disabled={isLoading}
+                                className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? "Loading..." : "Refresh"}
+                            </Button>
                         </div>
                     </div>
 
@@ -974,7 +842,7 @@ function UserMonthlyReport() {
                                 {getSelectedUserNames().map((name: string) => {
                                     const userId = availableUsers.find((u: any) => u.name === name)?.id;
                                     return (
-                                        <span
+                                        <Badge
                                             key={userId}
                                             className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
                                         >
@@ -988,30 +856,37 @@ function UserMonthlyReport() {
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
                                             </button>
-                                        </span>
+                                        </Badge>
                                     );
                                 })}
                             </div>
                         </div>
                     )}
-                </div>
-                <div className="p-6">
-                    <p className="text-gray-500 text-center">
+
+                    <p className="text-gray-500 text-center mt-4">
                         {selectedUserIds.length > 0
                             ? "No data found for the selected month"
                             : "Please select users and month"}
                     </p>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Monthly User Report</h3>
-                    <div className="flex items-center gap-4">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Monthly User Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.data.length} record{reportData.data.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+            </CardHeader>
+
+            <CardContent>
+                {/* Filters */}
+                <div className="flex items-end gap-4 mb-6">
                         {/* Team Type Filter */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1023,7 +898,7 @@ function UserMonthlyReport() {
                                     setSelectedTeamType(e.target.value);
                                     setSelectedUserIds([]);
                                 }}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+                                className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
                             >
                                 <option value="">All Teams</option>
                                 <option value="QA">QA</option>
@@ -1041,7 +916,7 @@ function UserMonthlyReport() {
                                 <button
                                     type="button"
                                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                                    className="w-full min-w-[200px] px-3 py-2 text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                                    className="w-full min-w-[200px] px-3 py-2 h-[42px] text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
                                 >
                                     <span className="text-sm text-gray-700 truncate">
                                         {isAllSelected
@@ -1142,19 +1017,21 @@ function UserMonthlyReport() {
                                 type="month"
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
 
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchMonthlyReport}
-                                disabled={isLoading}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? "Loading..." : "Refresh"}
-                            </button>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
+                            Refresh
+                        </label>
+                        <Button
+                            onClick={fetchMonthlyReport}
+                            disabled={isLoading}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? "Loading..." : "Refresh"}
+                        </Button>
                     </div>
                 </div>
 
@@ -1165,7 +1042,7 @@ function UserMonthlyReport() {
                             {getSelectedUserNames().map((name: string) => {
                                 const userId = availableUsers.find((u: any) => u.name === name)?.id;
                                 return (
-                                    <span
+                                    <Badge
                                         key={userId}
                                         className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
                                     >
@@ -1179,54 +1056,38 @@ function UserMonthlyReport() {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                             </svg>
                                         </button>
-                                    </span>
+                                    </Badge>
                                 );
                             })}
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Table Section */}
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                S.No
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Name Of The User
-                            </th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Page Count
-                            </th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO Hours
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {reportData.data.map((entry: any) => (
-                            <tr key={entry.user_id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.s_no}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {entry.name}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                    {entry.total_pages || 0}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                    {parseFloat(entry.total_hours || 0).toFixed(2)}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">S.No</TableHead>
+                                <TableHead className="text-center">Name Of The User</TableHead>
+                                <TableHead className="text-center">Page Count</TableHead>
+                                <TableHead className="text-center">PO Hours</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {reportData.data.map((entry: any) => (
+                                <TableRow key={entry.user_id}>
+                                    <TableCell className="text-center">{entry.s_no}</TableCell>
+                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
+                                    <TableCell className="text-center">{parseFloat(entry.total_hours || 0).toFixed(2)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -1283,172 +1144,136 @@ function POReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading PO report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchPOReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchPOReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">PO Report</h3>
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchPOReport}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                                Filter
-                            </button>
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>PO Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Filter
+                        </label>
+                        <Button
+                            onClick={fetchPOReport}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Filter
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                S. No
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Received Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Project Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Received Pages
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Process
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO Hours
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Output Pages
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Delivery Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO Status
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO Number
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-center">S. No</TableHead>
+                            <TableHead className="text-center">Received Date</TableHead>
+                            <TableHead className="text-center">Project Name</TableHead>
+                            <TableHead className="text-center">Received Pages</TableHead>
+                            <TableHead className="text-center">Process</TableHead>
+                            <TableHead className="text-center">PO Hours</TableHead>
+                            <TableHead className="text-center">Output Pages</TableHead>
+                            <TableHead className="text-center">Delivery Date</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
+                            <TableHead className="text-center">PO Status</TableHead>
+                            <TableHead className="text-center">PO Number</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.length === 0 ? (
-                            <tr>
-                                <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                            <TableRow>
+                                <TableCell colSpan={11} className="text-center">
                                     No PO report data found
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             reportData.map((entry, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.s_no}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.received_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {entry.project_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.received_pages}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.process}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po_hours}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.output_pages}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.delivery_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                            entry.status === "Delivered" 
-                                                ? "bg-green-100 text-green-800" 
-                                                : "bg-yellow-100 text-yellow-800"
-                                        }`}>
-                                            {entry.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po_status}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po_number}
-                                    </td>
-                                </tr>
+                                <TableRow key={index}>
+                                    <TableCell className="text-center">{entry.s_no}</TableCell>
+                                    <TableCell className="text-center">{entry.received_date}</TableCell>
+                                    <TableCell className="text-center font-medium">{entry.project_name}</TableCell>
+                                    <TableCell className="text-center">{entry.received_pages}</TableCell>
+                                    <TableCell className="text-center">{entry.process}</TableCell>
+                                    <TableCell className="text-center">{entry.po_hours}</TableCell>
+                                    <TableCell className="text-center">{entry.output_pages}</TableCell>
+                                    <TableCell className="text-center">{entry.delivery_date}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge
+                                            className={
+                                                entry.status === "Delivered" || entry.status === "Completed"
+                                                    ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                    : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                            }
+                                        >
+                                            <span
+                                                className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                    entry.status === "Delivered" || entry.status === "Completed"
+                                                        ? "bg-green-500"
+                                                        : "bg-yellow-500"
+                                                }`}
+                                            />
+                                            {entry.status === "Delivered" || entry.status === "Completed"
+                                                ? "Completed"
+                                                : entry.status === "In Progress"
+                                                ? "In Progress"
+                                                : entry.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">{entry.po_status}</TableCell>
+                                    <TableCell className="text-center">{entry.po_number}</TableCell>
+                                </TableRow>
                             ))
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -1505,160 +1330,113 @@ function QAReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading QA report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchQAReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchQAReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">QA Report</h3>
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchQAReport}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                                Filter
-                            </button>
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>QA Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Filter
+                        </label>
+                        <Button
+                            onClick={fetchQAReport}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Filter
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Working Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Client Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Work Type
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Page Count
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Start Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                End Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Working Hours
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-center">Working Date</TableHead>
+                            <TableHead className="text-center">Name</TableHead>
+                            <TableHead className="text-center">Client Name</TableHead>
+                            <TableHead className="text-center">File Name</TableHead>
+                            <TableHead className="text-center">Work Type</TableHead>
+                            <TableHead className="text-center">Page Count</TableHead>
+                            <TableHead className="text-center">Start Time</TableHead>
+                            <TableHead className="text-center">End Time</TableHead>
+                            <TableHead className="text-center">Total Working Hours</TableHead>
+                            <TableHead className="text-center">PO</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.length === 0 ? (
-                            <tr>
-                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                            <TableRow>
+                                <TableCell colSpan={10} className="text-center">
                                     No QA report data found
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             reportData.map((entry, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.working_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {entry.name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.client_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.file_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.work_type}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.page_no}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.start_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.end_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.total_working_hours}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po}
-                                    </td>
-                                </tr>
+                                <TableRow key={index}>
+                                    <TableCell className="text-center">{entry.working_date}</TableCell>
+                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableCell className="text-center">{entry.client_name}</TableCell>
+                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                    <TableCell className="text-center">{entry.work_type}</TableCell>
+                                    <TableCell className="text-center">{entry.page_no}</TableCell>
+                                    <TableCell className="text-center">{entry.start_time}</TableCell>
+                                    <TableCell className="text-center">{entry.end_time}</TableCell>
+                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                    <TableCell className="text-center">{entry.po}</TableCell>
+                                </TableRow>
                             ))
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -1710,43 +1488,33 @@ function DTPMonthlyReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading DTP Monthly report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchDTPMonthlyReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchDTPMonthlyReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     if (!reportData || reportData.length === 0) {
         return (
-            <div className="bg-white rounded-lg shadow">
-                <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">DTP Monthly Report</h3>
-                    <div className="flex gap-4 mb-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>DTP Monthly Report</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {/* Filters */}
+                    <div className="flex items-end gap-4 mb-4">
                         {/* Month Selection */}
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1756,149 +1524,109 @@ function DTPMonthlyReport() {
                                 type="month"
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
 
-                        <div className="flex items-end">
-                            <button
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
+                                Refresh
+                            </label>
+                            <Button
                                 onClick={fetchDTPMonthlyReport}
                                 disabled={isLoading}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? "Loading..." : "Refresh"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
-                </div>
-                <div className="p-6">
-                    <p className="text-gray-500 text-center">
+
+                    <p className="text-gray-500 text-center mt-4">
                         No DTP Monthly report data found for the selected month.
                     </p>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">DTP Monthly Report</h3>
-                    <div className="flex items-center gap-4">
-                        {/* Month Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Month
-                            </label>
-                            <input
-                                type="month"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>DTP Monthly Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    {/* Month Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Month
+                        </label>
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
 
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchDTPMonthlyReport}
-                                disabled={isLoading}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? "Loading..." : "Refresh"}
-                            </button>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
+                            Refresh
+                        </label>
+                        <Button
+                            onClick={fetchDTPMonthlyReport}
+                            disabled={isLoading}
+                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? "Loading..." : "Refresh"}
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                S.No
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Employee Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Client Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Job No.
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Process
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Page Count
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Start Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                End Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Time Taken
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Shift
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO Hours
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-center">S.No</TableHead>
+                            <TableHead className="text-center">Date</TableHead>
+                            <TableHead className="text-center">Employee Name</TableHead>
+                            <TableHead className="text-center">Client Name</TableHead>
+                            <TableHead className="text-center">Job No.</TableHead>
+                            <TableHead className="text-center">Process</TableHead>
+                            <TableHead className="text-center">Page Count</TableHead>
+                            <TableHead className="text-center">Start Time</TableHead>
+                            <TableHead className="text-center">End Time</TableHead>
+                            <TableHead className="text-center">Total Time Taken</TableHead>
+                            <TableHead className="text-center">Shift</TableHead>
+                            <TableHead className="text-center">PO Hours</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.map((entry, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.s_no}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.date}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.name}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.client_name}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.job_no}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.process}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.page_count}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.start_time}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.end_time}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.total_time_taken}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.shift}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                    {entry.po}
-                                </td>
-                            </tr>
+                            <TableRow key={index}>
+                                <TableCell className="text-center">{entry.s_no}</TableCell>
+                                <TableCell className="text-center">{entry.date}</TableCell>
+                                <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                <TableCell className="text-center">{entry.client_name}</TableCell>
+                                <TableCell className="text-center">{entry.job_no}</TableCell>
+                                <TableCell className="text-center">{entry.process}</TableCell>
+                                <TableCell className="text-center">{entry.page_count}</TableCell>
+                                <TableCell className="text-center">{entry.start_time}</TableCell>
+                                <TableCell className="text-center">{entry.end_time}</TableCell>
+                                <TableCell className="text-center">{entry.total_time_taken}</TableCell>
+                                <TableCell className="text-center">{entry.shift}</TableCell>
+                                <TableCell className="text-center">{entry.po}</TableCell>
+                            </TableRow>
                         ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -1969,47 +1697,31 @@ function DTPTracking() {
         setEndDate("");
     };
 
-    // Loading state
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading DTP Tracking data...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
-    // Error state
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchDTPTracking}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchDTPTracking} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            {/* Header Section */}
-            <div className="p-6 border-b border-gray-200">
+        <Card>
+            <CardHeader>
                 <div className="flex justify-between items-center mb-4">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">DTP Tracking</h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <CardTitle>DTP Tracking</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
                             View detailed DTP tracking information for all jobs
                         </p>
                     </div>
@@ -2018,164 +1730,308 @@ function DTPTracking() {
                 {/* Filter Section */}
                 <div className="flex items-end gap-4 mt-4">
                     <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
                             Start Date
                         </label>
                         <input
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                     </div>
                     <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
                             End Date
                         </label>
                         <input
                             type="date"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleFilter}
-                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
                             Filter
-                        </button>
-                        {(startDate || endDate) && (
-                            <button
-                                onClick={handleClearFilters}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                        </label>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleFilter}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
                             >
-                                Clear
-                            </button>
-                        )}
+                                Filter
+                            </Button>
+                            {(startDate || endDate) && (
+                                <Button
+                                    onClick={handleClearFilters}
+                                    variant="outline"
+                                    className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            {/* Table Section */}
-            <div className="overflow-x-auto p-6">
+            <CardContent className="overflow-x-auto">
                 {reportData.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-gray-500">No DTP Tracking data found.</p>
                         {(startDate || endDate) && (
-                            <button
+                            <Button
                                 onClick={handleClearFilters}
+                                variant="link"
                                 className="mt-2 text-sm text-blue-600 hover:text-blue-700"
                             >
                                 Clear filters to see all data
-                            </button>
+                            </Button>
                         )}
                     </div>
                 ) : (
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
                                 {/* Job Details Columns */}
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job No</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivered by</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[500px]">Mail instruction</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task type</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Name</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Count</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page count</th>
+                                <TableHead className="text-center">Job No</TableHead>
+                                <TableHead className="text-center">Delivered by</TableHead>
+                                <TableHead className="text-center">PO</TableHead>
+                                <TableHead className="text-center min-w-[500px]">Mail instruction</TableHead>
+                                <TableHead className="text-center">Task type</TableHead>
+                                <TableHead className="text-center">Task Name</TableHead>
+                                <TableHead className="text-center">File Count</TableHead>
+                                <TableHead className="text-center">Page count</TableHead>
                                 
                                 {/* DTP Process Tracking Columns */}
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Person</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Start Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP End Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Abbyy Compare</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DTP Status</th>
+                                <TableHead className="text-center">Language</TableHead>
+                                <TableHead className="text-center">Platform</TableHead>
+                                <TableHead className="text-center">Stage</TableHead>
+                                <TableHead className="text-center">Date</TableHead>
+                                <TableHead className="text-center">Delivery Time</TableHead>
+                                <TableHead className="text-center">DTP Person</TableHead>
+                                <TableHead className="text-center">DTP Start Time</TableHead>
+                                <TableHead className="text-center">DTP End Time</TableHead>
+                                <TableHead className="text-center">DTP Abbyy Compare</TableHead>
+                                <TableHead className="text-center">DTP Status</TableHead>
                                 
                                 {/* QC Tracking Columns */}
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC taken by</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Start Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC End Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Abbyy Compare</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN taken</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN Start Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QC CXN End Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXN Status</th>
+                                <TableHead className="text-center">QC taken by</TableHead>
+                                <TableHead className="text-center">QC Start Time</TableHead>
+                                <TableHead className="text-center">QC End Time</TableHead>
+                                <TableHead className="text-center">QC Abbyy Compare</TableHead>
+                                <TableHead className="text-center">QC Status</TableHead>
+                                <TableHead className="text-center">QC CXN taken</TableHead>
+                                <TableHead className="text-center">QC CXN Start Time</TableHead>
+                                <TableHead className="text-center">QC CXN End Time</TableHead>
+                                <TableHead className="text-center">CXN Status</TableHead>
                                 
                                 {/* QA Tracking & Final Status Columns */}
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA taken by</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Start Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA End Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Abbyy Compare</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN taken</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN Start Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QA CXN End Time</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                                <TableHead className="text-center">QA taken by</TableHead>
+                                <TableHead className="text-center">QA Start Time</TableHead>
+                                <TableHead className="text-center">QA End Time</TableHead>
+                                <TableHead className="text-center">QA Abbyy Compare</TableHead>
+                                <TableHead className="text-center">QA Status</TableHead>
+                                <TableHead className="text-center">QA CXN taken</TableHead>
+                                <TableHead className="text-center">QA CXN Start Time</TableHead>
+                                <TableHead className="text-center">QA CXN End Time</TableHead>
+                                <TableHead className="text-center">File Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {reportData.map((entry, index) => (
-                                <tr key={entry.job_no || index} className="hover:bg-gray-50 transition-colors">
+                                <TableRow key={entry.job_no || index}>
                                     {/* Job Details Data */}
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.job_no || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivered_by || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                    <TableCell className="text-center">{entry.job_no || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.delivered_by || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
                                         {typeof entry.po === 'number' ? entry.po.toFixed(2) : entry.po || "N/A"}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-gray-900 min-w-[500px] max-w-[800px]">{entry.mail_instruction || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_type || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_name || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.file_count || 0}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.page_count || 0}</td>
+                                    </TableCell>
+                                    <TableCell className="text-center min-w-[500px] max-w-[800px] whitespace-normal break-words">{entry.mail_instruction || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.task_type || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.task_name || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.file_count || 0}</TableCell>
+                                    <TableCell className="text-center">{entry.page_count || 0}</TableCell>
                                     
                                     {/* DTP Process Tracking Data */}
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.language || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.platform || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.stage || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.date || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivery_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_person || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_start_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_end_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_dtp || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.dtp_status || "N/A"}</td>
+                                    <TableCell className="text-center">{entry.language || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.platform || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.stage && entry.stage !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.stage === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.stage === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.stage === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.stage === "Completed" ? "Completed" : entry.stage === "Pending" ? "Pending" : entry.stage}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-center">{entry.date || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.delivery_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.dtp_person || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.dtp_start_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.dtp_end_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.abbyy_compare_dtp || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.dtp_status && entry.dtp_status !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.dtp_status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.dtp_status === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.dtp_status === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.dtp_status === "Completed" ? "Completed" : entry.dtp_status === "Pending" ? "Pending" : entry.dtp_status}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
                                     
                                     {/* QC Tracking Data */}
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_taken_by || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_start_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_end_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_qc || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_status || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_taken || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_start_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc_cxn_end_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.cxn_status || "N/A"}</td>
+                                    <TableCell className="text-center">{entry.qc_taken_by || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qc_start_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qc_end_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.abbyy_compare_qc || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.qc_status && entry.qc_status !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.qc_status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.qc_status === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.qc_status === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.qc_status === "Completed" ? "Completed" : entry.qc_status === "Pending" ? "Pending" : entry.qc_status}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-center">{entry.qc_cxn_taken || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qc_cxn_start_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qc_cxn_end_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.cxn_status && entry.cxn_status !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.cxn_status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.cxn_status === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.cxn_status === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.cxn_status === "Completed" ? "Completed" : entry.cxn_status === "Pending" ? "Pending" : entry.cxn_status}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
                                     
                                     {/* QA Tracking & Final Status Data */}
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_taken_by || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_start_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_end_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.abbyy_compare_qa || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_status || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_taken || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_start_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa_cxn_end_time || "N/A"}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.file_status || "N/A"}</td>
-                                </tr>
+                                    <TableCell className="text-center">{entry.qa_taken_by || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qa_start_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qa_end_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.abbyy_compare_qa || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.qa_status && entry.qa_status !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.qa_status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.qa_status === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.qa_status === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.qa_status === "Completed" ? "Completed" : entry.qa_status === "Pending" ? "Pending" : entry.qa_status}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-center">{entry.qa_cxn_taken || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qa_cxn_start_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">{entry.qa_cxn_end_time || "N/A"}</TableCell>
+                                    <TableCell className="text-center">
+                                        {entry.file_status && entry.file_status !== "N/A" ? (
+                                            <Badge
+                                                className={
+                                                    entry.file_status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                        entry.file_status === "Completed"
+                                                            ? "bg-green-500"
+                                                            : entry.file_status === "Pending"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-yellow-500"
+                                                    }`}
+                                                />
+                                                {entry.file_status === "Completed" ? "Completed" : entry.file_status === "Pending" ? "Pending" : entry.file_status}
+                                            </Badge>
+                                        ) : (
+                                            "N/A"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </Table>
                 )}
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -2234,149 +2090,142 @@ function FeedbackReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading Feedback Report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchFeedbackReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchFeedbackReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Feedback Report</h3>
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchFeedbackReport}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                                Filter
-                            </button>
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Feedback Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Filter
+                        </label>
+                        <Button
+                            onClick={fetchFeedbackReport}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Filter
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
                             {/* Section 1: Job Details */}
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pages</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task Type</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Process</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QC</th>
+                            <TableHead className="text-center">S.No</TableHead>
+                            <TableHead className="text-center">Date</TableHead>
+                            <TableHead className="text-center">Client</TableHead>
+                            <TableHead className="text-center">Task</TableHead>
+                            <TableHead className="text-center">Filename</TableHead>
+                            <TableHead className="text-center">Pages</TableHead>
+                            <TableHead className="text-center">Language</TableHead>
+                            <TableHead className="text-center">Task Type</TableHead>
+                            <TableHead className="text-center">Process</TableHead>
+                            <TableHead className="text-center">QC</TableHead>
                             
                             {/* Section 2: Quality Assurance */}
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivery</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Internal Auditor</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Internal Comments</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">External Comments</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total No. Errors</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
+                            <TableHead className="text-center">QA</TableHead>
+                            <TableHead className="text-center">Delivery</TableHead>
+                            <TableHead className="text-center">Internal Auditor</TableHead>
+                            <TableHead className="text-center">Internal Comments</TableHead>
+                            <TableHead className="text-center">External Comments</TableHead>
+                            <TableHead className="text-center">Total No. Errors</TableHead>
+                            <TableHead className="text-center">Remarks</TableHead>
                             
                             {/* Section 3: Impact and RCA */}
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impact</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RCA</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RCA</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                            <TableHead className="text-center">Impact</TableHead>
+                            <TableHead className="text-center">Action</TableHead>
+                            <TableHead className="text-center">RCA</TableHead>
+                            <TableHead className="text-center">Action</TableHead>
+                            <TableHead className="text-center">RCA</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.length === 0 ? (
-                            <tr>
-                                <td colSpan={22} className="px-6 py-4 text-center text-gray-500">
+                            <TableRow>
+                                <TableCell colSpan={22} className="text-center">
                                     No Feedback report data found
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             reportData.map((entry, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.s_no}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.date}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.client}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.filename}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.pages}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.language}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.task_type}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.process}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qc}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.qa}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.delivery}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.internal_auditor}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.internal_comments}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.external_comments}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.total_errors}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.remarks}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.impact}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.action}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.rca}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-900">{entry.action_2}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{entry.rca_2}</td>
-                                </tr>
+                                <TableRow key={index}>
+                                    <TableCell className="text-center">{entry.s_no}</TableCell>
+                                    <TableCell className="text-center">{entry.date}</TableCell>
+                                    <TableCell className="text-center">{entry.client}</TableCell>
+                                    <TableCell className="text-center">{entry.task}</TableCell>
+                                    <TableCell className="text-center">{entry.filename}</TableCell>
+                                    <TableCell className="text-center">{entry.pages}</TableCell>
+                                    <TableCell className="text-center">{entry.language}</TableCell>
+                                    <TableCell className="text-center">{entry.task_type}</TableCell>
+                                    <TableCell className="text-center">{entry.process}</TableCell>
+                                    <TableCell className="text-center">{entry.qc}</TableCell>
+                                    <TableCell className="text-center">{entry.qa}</TableCell>
+                                    <TableCell className="text-center">{entry.delivery}</TableCell>
+                                    <TableCell className="text-center">{entry.internal_auditor}</TableCell>
+                                    <TableCell className="text-center">{entry.internal_comments}</TableCell>
+                                    <TableCell className="text-center">{entry.external_comments}</TableCell>
+                                    <TableCell className="text-center">{entry.total_errors}</TableCell>
+                                    <TableCell className="text-center">{entry.remarks}</TableCell>
+                                    <TableCell className="text-center">{entry.impact}</TableCell>
+                                    <TableCell className="text-center">{entry.action}</TableCell>
+                                    <TableCell className="text-center">{entry.rca}</TableCell>
+                                    <TableCell className="text-center">{entry.action_2}</TableCell>
+                                    <TableCell className="text-center">{entry.rca_2}</TableCell>
+                                </TableRow>
                             ))
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -2431,160 +2280,113 @@ function QCReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading QC report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchQCReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchQCReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">QC Report</h3>
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchQCReport}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                                Filter
-                            </button>
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>QC Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Filter
+                        </label>
+                        <Button
+                            onClick={fetchQCReport}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Filter
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Working Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Client Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Work Type
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Page Count
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Start Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                End Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Working Hours
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-center">Working Date</TableHead>
+                            <TableHead className="text-center">Name</TableHead>
+                            <TableHead className="text-center">Client Name</TableHead>
+                            <TableHead className="text-center">File Name</TableHead>
+                            <TableHead className="text-center">Work Type</TableHead>
+                            <TableHead className="text-center">Page Count</TableHead>
+                            <TableHead className="text-center">Start Time</TableHead>
+                            <TableHead className="text-center">End Time</TableHead>
+                            <TableHead className="text-center">Total Working Hours</TableHead>
+                            <TableHead className="text-center">PO</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.length === 0 ? (
-                            <tr>
-                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                            <TableRow>
+                                <TableCell colSpan={10} className="text-center">
                                     No QC report data found
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             reportData.map((entry, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.working_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {entry.name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.client_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.file_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.work_type}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.page_no}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.start_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.end_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.total_working_hours}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po}
-                                    </td>
-                                </tr>
+                                <TableRow key={index}>
+                                    <TableCell className="text-center">{entry.working_date}</TableCell>
+                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableCell className="text-center">{entry.client_name}</TableCell>
+                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                    <TableCell className="text-center">{entry.work_type}</TableCell>
+                                    <TableCell className="text-center">{entry.page_no}</TableCell>
+                                    <TableCell className="text-center">{entry.start_time}</TableCell>
+                                    <TableCell className="text-center">{entry.end_time}</TableCell>
+                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                    <TableCell className="text-center">{entry.po}</TableCell>
+                                </TableRow>
                             ))
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -2639,159 +2441,112 @@ function ProcessorReport() {
         }
     };
 
+    /* -------------------- LOADING -------------------- */
     if (isLoading) {
-        return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading Processor report...</p>
-                    </div>
-                </div>
-            </div>
-        );
+        return <Skeleton className="h-[400px] w-full rounded-lg" />;
     }
 
+    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <p className="text-red-500 mb-4">Error: {error}</p>
-                        <button
-                            onClick={fetchProcessorReport}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchProcessorReport} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Processor Report</h3>
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={fetchProcessorReport}
-                                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                            >
-                                Filter
-                            </button>
-                        </div>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Processor Report</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                    </p>
+                </div>
+                <div className="flex items-end gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Filter
+                        </label>
+                        <Button
+                            onClick={fetchProcessorReport}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Filter
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Working Date
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Client Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Work Type
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Page Count
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Start Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                End Time
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total Working Hours
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                PO
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+            <CardContent className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-center">Working Date</TableHead>
+                            <TableHead className="text-center">Name</TableHead>
+                            <TableHead className="text-center">Client Name</TableHead>
+                            <TableHead className="text-center">File Name</TableHead>
+                            <TableHead className="text-center">Work Type</TableHead>
+                            <TableHead className="text-center">Page Count</TableHead>
+                            <TableHead className="text-center">Start Time</TableHead>
+                            <TableHead className="text-center">End Time</TableHead>
+                            <TableHead className="text-center">Total Working Hours</TableHead>
+                            <TableHead className="text-center">PO</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {reportData.length === 0 ? (
-                            <tr>
-                                <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                            <TableRow>
+                                <TableCell colSpan={10} className="text-center">
                                     No Processor report data found
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         ) : (
                             reportData.map((entry, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.working_date}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {entry.name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.client_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.file_name}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.work_type}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.page_no}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.start_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.end_time}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.total_working_hours}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {entry.po}
-                                    </td>
-                                </tr>
+                                <TableRow key={index}>
+                                    <TableCell className="text-center">{entry.working_date}</TableCell>
+                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableCell className="text-center">{entry.client_name}</TableCell>
+                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                    <TableCell className="text-center">{entry.work_type}</TableCell>
+                                    <TableCell className="text-center">{entry.page_no}</TableCell>
+                                    <TableCell className="text-center">{entry.start_time}</TableCell>
+                                    <TableCell className="text-center">{entry.end_time}</TableCell>
+                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                    <TableCell className="text-center">{entry.po}</TableCell>
+                                </TableRow>
                             ))
                         )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }

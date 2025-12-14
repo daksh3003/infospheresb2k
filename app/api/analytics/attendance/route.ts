@@ -11,6 +11,10 @@ function calculateTimeDifference(start: string, end: string): string {
     const startTime = new Date(start);
     const endTime = new Date(end);
     const timeDiff = endTime.getTime() - startTime.getTime();
+    
+    // Ensure non-negative time difference
+    if (timeDiff < 0) return "00:00";
+    
     const hours = Math.floor(timeDiff / (1000 * 60 * 60));
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -119,32 +123,44 @@ export async function GET() {
                 ? `${attendanceDate}T${shiftInTime}:00`
                 : null;
             
-            // Calculate shift out datetime - for night shift, it's next day
+            // Calculate shift out datetime - for night shift, it depends on login time
             let shiftOutDateTime = null;
-            if (attendanceDate && shiftOutTime) {
+            if (attendanceDate && shiftOutTime && loginTime) {
                 if (shift === "Night") {
-                    // Night shift ends next day at 08:00
-                    const nextDay = new Date(attendanceDate);
-                    nextDay.setDate(nextDay.getDate() + 1);
-                    const nextDayStr = nextDay.toISOString().split('T')[0];
-                    shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
+                    const loginDate = new Date(loginTime);
+                    const loginHour = loginDate.getHours();
+                    
+                    if (loginHour >= 18) {
+                        // Login between 18:00-23:59, shift ends next day at 08:00
+                        const nextDay = new Date(attendanceDate);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        const nextDayStr = nextDay.toISOString().split('T')[0];
+                        shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
+                    } else {
+                        // Login between 00:00-07:59, shift ends same day at 08:00
+                        // (This is continuation of previous night shift that started at 18:00 previous day)
+                        shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
+                    }
                 } else {
                     // Day shift ends same day
                     shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
                 }
             }
             
+            // Calculate work duration (total time from login to logout)
             const workDuration = loginTime && logoutTime
                 ? calculateTimeDifference(loginTime, logoutTime)
                 : "00:00";
             
-            // Calculate overtime as logout_time - shift_out_time (only if logout is after shift end)
+            // Calculate overtime as time worked beyond shift end time
+            // Overtime = logout_time - shift_out_time (only if logout is after shift end)
             let overtime = "00:00";
             if (logoutTime && shiftOutDateTime) {
                 const logoutDate = new Date(logoutTime);
                 const shiftEndDate = new Date(shiftOutDateTime);
+                
+                // Calculate overtime if logout is after shift end time
                 if (logoutDate > shiftEndDate) {
-                    // Overtime = time worked beyond shift end time
                     overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
                 }
             }
