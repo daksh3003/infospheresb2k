@@ -42,6 +42,83 @@ function formatDate(timestamp: string | null): string {
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function determineShift(loginTime: string | null, logoutTime: string | null): { shift: string; shiftInTime: string; shiftOutTime: string } {
+    // Default values
+    let shift = "General";
+    let shiftInTime = "10:00";
+    let shiftOutTime = "19:00";
+    
+    if (!loginTime) {
+        return { shift, shiftInTime, shiftOutTime };
+    }
+    
+    const loginDate = new Date(loginTime);
+    const loginHour = loginDate.getHours();
+    const loginMinute = loginDate.getMinutes();
+    const loginTimeMinutes = loginHour * 60 + loginMinute;
+    
+    // Define all shifts with their time ranges
+    const shifts = [
+        { name: "Night", start: 22 * 60, end: 6 * 60, startTime: "22:00", endTime: "06:00", spansMidnight: true },
+        { name: "Evening", start: 18 * 60, end: 2 * 60, startTime: "18:00", endTime: "02:00", spansMidnight: true },
+        { name: "Afternoon", start: 14 * 60, end: 22 * 60, startTime: "14:00", endTime: "22:00", spansMidnight: false },
+        { name: "Middle", start: 11 * 60, end: 20 * 60, startTime: "11:00", endTime: "20:00", spansMidnight: false },
+        { name: "General", start: 10 * 60, end: 19 * 60, startTime: "10:00", endTime: "19:00", spansMidnight: false },
+    ];
+    
+    // Find all shifts that the login time falls into
+    const matchingShifts = shifts.filter(s => {
+        if (s.spansMidnight) {
+            // For shifts that span midnight, check if login is after start OR before end
+            return loginTimeMinutes >= s.start || loginTimeMinutes < s.end;
+        } else {
+            // For regular shifts, check if login is between start and end
+            return loginTimeMinutes >= s.start && loginTimeMinutes < s.end;
+        }
+    });
+    
+    // If multiple shifts match, prioritize:
+    // 1. Shifts that span midnight (Night, Evening)
+    // 2. Shifts whose start time is closest to login time
+    if (matchingShifts.length > 0) {
+        // First, prefer shifts that span midnight
+        const midnightShifts = matchingShifts.filter(s => s.spansMidnight);
+        if (midnightShifts.length > 0) {
+            // Among midnight shifts, pick the one whose start is closest to login time
+            midnightShifts.sort((a, b) => {
+                const distA = Math.min(
+                    Math.abs(loginTimeMinutes - a.start),
+                    loginTimeMinutes < a.end ? Math.abs(loginTimeMinutes - (a.start - 1440)) : Infinity
+                );
+                const distB = Math.min(
+                    Math.abs(loginTimeMinutes - b.start),
+                    loginTimeMinutes < b.end ? Math.abs(loginTimeMinutes - (b.start - 1440)) : Infinity
+                );
+                return distA - distB;
+            });
+            const selected = midnightShifts[0];
+            shift = selected.name;
+            shiftInTime = selected.startTime;
+            shiftOutTime = selected.endTime;
+        } else {
+            // No midnight shifts, pick the one whose start is closest to login time
+            matchingShifts.sort((a, b) => Math.abs(loginTimeMinutes - a.start) - Math.abs(loginTimeMinutes - b.start));
+            const selected = matchingShifts[0];
+            shift = selected.name;
+            shiftInTime = selected.startTime;
+            shiftOutTime = selected.endTime;
+        }
+    } else {
+        // No matching shift found, assign to General as default
+        // This handles edge cases like login before 10am
+        shift = "General";
+        shiftInTime = "10:00";
+        shiftOutTime = "19:00";
+    }
+    
+    return { shift, shiftInTime, shiftOutTime };
+}
+
 export async function GET() {
     try {
         // Fetch user_sessions data
@@ -91,58 +168,56 @@ export async function GET() {
             const logoutTime = session.logout_time;
             const attendanceDate = session.session_date || (loginTime ? loginTime.split('T')[0] : null);
             
-            // Determine shift based on login time
-            // If login time is after 6pm (18:00) or before 8am (08:00), it's Night shift, otherwise Day shift
-            let shift = "Day";
-            let shiftInTime = "09:00";
-            let shiftOutTime = "18:00";
+            // Determine shift based on login and logout times
+            const shiftInfo = determineShift(loginTime, logoutTime);
+            const shift = shiftInfo.shift;
+            const shiftInTime = shiftInfo.shiftInTime;
+            const shiftOutTime = shiftInfo.shiftOutTime;
             
-            if (loginTime) {
-                const loginDate = new Date(loginTime);
-                const loginHour = loginDate.getHours();
-                
-                if (loginHour >= 18 || loginHour < 8) {
-                    // Night shift: starts at 18:00, ends at 08:00 next day
-                    // This covers both:
-                    // - Login between 18:00-23:59 (6 PM - 11:59 PM)
-                    // - Login between 00:00-07:59 (12 AM - 7:59 AM, continuation of previous night shift)
-                    shift = "Night";
-                    shiftInTime = "18:00";
-                    shiftOutTime = "08:00";
-                } else {
-                    // Day shift: starts at 09:00, ends at 18:00
-                    // Login between 08:00-17:59 (8 AM - 5:59 PM)
-                    shift = "Day";
-                    shiftInTime = "09:00";
-                    shiftOutTime = "18:00";
-                }
-            }
-            
-            // For night shift, shift out time is next day
+            // Calculate shift in datetime
             const shiftInDateTime = attendanceDate && shiftInTime 
                 ? `${attendanceDate}T${shiftInTime}:00`
                 : null;
             
-            // Calculate shift out datetime - for night shift, it depends on login time
+            // Calculate shift out datetime - handle shifts that span midnight
             let shiftOutDateTime = null;
             if (attendanceDate && shiftOutTime && loginTime) {
+                const loginDate = new Date(loginTime);
+                const loginHour = loginDate.getHours();
+                const loginMinute = loginDate.getMinutes();
+                const loginTimeMinutes = loginHour * 60 + loginMinute;
+                
+                // Parse shift out time to minutes
+                const [outHour, outMinute] = shiftOutTime.split(':').map(Number);
+                const shiftOutTimeMinutes = outHour * 60 + outMinute;
+                
+                // Shifts that span midnight: Night (22:00-06:00) and Evening (18:00-02:00)
                 if (shift === "Night") {
-                    const loginDate = new Date(loginTime);
-                    const loginHour = loginDate.getHours();
-                    
-                    if (loginHour >= 18) {
-                        // Login between 18:00-23:59, shift ends next day at 08:00
+                    // Night shift: 22:00 - 06:00
+                    if (loginTimeMinutes >= 1320) {
+                        // Login between 22:00-23:59, shift ends next day at 06:00
                         const nextDay = new Date(attendanceDate);
                         nextDay.setDate(nextDay.getDate() + 1);
                         const nextDayStr = nextDay.toISOString().split('T')[0];
                         shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
                     } else {
-                        // Login between 00:00-07:59, shift ends same day at 08:00
-                        // (This is continuation of previous night shift that started at 18:00 previous day)
+                        // Login between 00:00-05:59, shift ends same day at 06:00
+                        shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
+                    }
+                } else if (shift === "Evening") {
+                    // Evening shift: 18:00 - 02:00
+                    if (loginTimeMinutes >= 1080) {
+                        // Login between 18:00-23:59, shift ends next day at 02:00
+                        const nextDay = new Date(attendanceDate);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        const nextDayStr = nextDay.toISOString().split('T')[0];
+                        shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
+                    } else {
+                        // Login between 00:00-01:59, shift ends same day at 02:00
                         shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
                     }
                 } else {
-                    // Day shift ends same day
+                    // All other shifts end same day
                     shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
                 }
             }
@@ -155,13 +230,76 @@ export async function GET() {
             // Calculate overtime as time worked beyond shift end time
             // Overtime = logout_time - shift_out_time (only if logout is after shift end)
             let overtime = "00:00";
-            if (logoutTime && shiftOutDateTime) {
+            if (logoutTime && shiftOutDateTime && loginTime) {
                 const logoutDate = new Date(logoutTime);
                 const shiftEndDate = new Date(shiftOutDateTime);
+                const loginDate = new Date(loginTime);
                 
-                // Calculate overtime if logout is after shift end time
-                if (logoutDate > shiftEndDate) {
-                    overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
+                // Ensure we're comparing dates correctly - normalize to same date context
+                // For shifts that span midnight, we need to handle date boundaries properly
+                if (shift === "Night" || shift === "Evening") {
+                    // For shifts spanning midnight, if logout is on a different calendar day than shift end,
+                    // we need to check if logout is actually after the shift end time
+                    const logoutDateOnly = logoutTime.split('T')[0];
+                    const shiftEndDateOnly = shiftOutDateTime.split('T')[0];
+                    
+                    // If logout is on the same day or next day as shift end, compare times
+                    if (logoutDateOnly === shiftEndDateOnly || 
+                        (new Date(logoutDateOnly).getTime() - new Date(shiftEndDateOnly).getTime()) === 86400000) {
+                        // Same day or next day - compare times
+                        if (logoutDate > shiftEndDate) {
+                            overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
+                        }
+                    } else if (logoutDateOnly < shiftEndDateOnly) {
+                        // Logout is before shift end date - this shouldn't happen, but handle gracefully
+                        overtime = "00:00";
+                    } else {
+                        // Logout is more than one day after shift end - calculate normally
+                        if (logoutDate > shiftEndDate) {
+                            overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
+                        }
+                    }
+                } else {
+                    // For regular shifts, simple comparison
+                    if (logoutDate > shiftEndDate) {
+                        overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
+                    }
+                }
+                
+                // Sanity check: Overtime should never exceed work duration
+                // Parse work duration and overtime to minutes for comparison
+                const [workHours, workMins] = workDuration.split(':').map(Number);
+                const workTotalMins = workHours * 60 + workMins;
+                
+                const [otHours, otMins] = overtime.split(':').map(Number);
+                const otTotalMins = otHours * 60 + otMins;
+                
+                // Calculate shift duration
+                const [shiftInH, shiftInM] = shiftInTime.split(':').map(Number);
+                const [shiftOutH, shiftOutM] = shiftOutTime.split(':').map(Number);
+                let shiftDurationMins = 0;
+                
+                if (shift === "Night" || shift === "Evening") {
+                    // For shifts spanning midnight: (24:00 - shiftIn) + shiftOut
+                    shiftDurationMins = (24 * 60 - (shiftInH * 60 + shiftInM)) + (shiftOutH * 60 + shiftOutM);
+                } else {
+                    // Regular shift: shiftOut - shiftIn
+                    shiftDurationMins = (shiftOutH * 60 + shiftOutM) - (shiftInH * 60 + shiftInM);
+                }
+                
+                // Overtime should be: max(0, workDuration - shiftDuration)
+                // But also ensure it doesn't exceed what we calculated from logout time
+                const expectedOvertimeMins = Math.max(0, workTotalMins - shiftDurationMins);
+                const calculatedOvertimeMins = otTotalMins;
+                
+                // Use the minimum of calculated overtime and expected overtime
+                // Also ensure overtime never exceeds work duration (safety check)
+                const finalOvertimeMins = Math.min(calculatedOvertimeMins, expectedOvertimeMins, workTotalMins);
+                
+                if (finalOvertimeMins !== otTotalMins) {
+                    const finalHours = Math.floor(finalOvertimeMins / 60);
+                    const finalMins = finalOvertimeMins % 60;
+                    overtime = `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}`;
                 }
             }
             

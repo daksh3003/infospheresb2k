@@ -151,8 +151,7 @@ function AttendanceTable() {
     if (isLoading) {
       return <Skeleton className="h-[400px] w-full rounded-lg" />
     }
-  
-    /* -------------------- ERROR -------------------- */
+
     if (error) {
       return (
         <Alert variant="destructive">
@@ -1948,14 +1947,14 @@ function DTPTracking() {
                                         {entry.cxn_status && entry.cxn_status !== "N/A" ? (
                                             <Badge
                                                 className={
-                                                    entry.cxn_status === "Completed"
+                                                    entry.cxn_status === "Yes"
                                                         ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
                                                         : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
                                                 }
                                             >
                                                 <span
                                                     className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                                                        entry.cxn_status === "Completed"
+                                                        entry.cxn_status === "Yes"
                                                             ? "bg-green-500"
                                                             : entry.cxn_status === "Pending"
                                                             ? "bg-yellow-500"
