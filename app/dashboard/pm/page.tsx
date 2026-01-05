@@ -137,35 +137,22 @@ export default function DashboardPage() {
 
   const fetchCurrentWorkers = async (taskIds: string[]) => {
     try {
-      const workerPromises = taskIds.map(async (taskId) => {
-        try {
-          const response = await fetch(`/api/tasks/${taskId}/current-worker`);
-          const data = await response.json();
-          return { taskId, worker: data.data || null };
-        } catch (error) {
-          console.error(`Error fetching worker for task ${taskId}:`, error);
-          return { taskId, worker: null };
-        }
+      // Use batch endpoint to fetch all workers in a single API call
+      const response = await fetch("/api/tasks/current-workers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ taskIds }),
       });
 
-      const results = await Promise.all(workerPromises);
-      const workerMap = results.reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              email?: string;
-            } | null;
-          },
-          result
-        ) => {
-          acc[result.taskId] = result.worker;
-          return acc;
-        },
-        {}
-      );
+      const result = await response.json();
 
-      setCurrentWorkers(workerMap);
+      if (response.ok && result.data) {
+        setCurrentWorkers(result.data);
+      } else {
+        console.error("Error fetching current workers:", result.error);
+      }
     } catch (error) {
       console.error("Error fetching current workers:", error);
     }
@@ -407,11 +394,10 @@ export default function DashboardPage() {
                 </span>
               </div>
               <Badge
-                className={`px-3 py-1.5 text-sm font-medium ${
-                  group.completionPercentage === 100
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
-                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
+                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                  }`}
               >
                 {group.completionPercentage === 100 ? (
                   <span className="flex items-center">
