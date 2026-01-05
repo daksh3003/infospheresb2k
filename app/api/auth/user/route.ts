@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET() {
   try {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    const supabase = await createClient();
+
+    const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error) {
       return NextResponse.json(
@@ -35,7 +29,6 @@ export async function GET() {
       .single();
 
     if (profileError) {
-      console.error("Error fetching profile:", profileError);
       // Return user data even if profile fetch fails
       return NextResponse.json({
         user: user,
@@ -49,10 +42,8 @@ export async function GET() {
     });
 
   } catch (error: unknown) {
-    console.error('Get user error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Failed to fetch user information' },
       { status: 500 }
     );
   }

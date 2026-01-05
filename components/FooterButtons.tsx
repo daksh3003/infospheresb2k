@@ -131,10 +131,16 @@ export const FooterButtons = ({
 
   const fetchAvailableUsers = async () => {
     try {
+      // Only fetch if currentStage is valid
+      if (!currentStage || currentStage.trim() === "") {
+        setAvailableUsers([]);
+        return;
+      }
       const result = await api.getAvailableUsers(currentStage);
       setAvailableUsers(result.users || []);
     } catch (error) {
       console.error("Error in fetchAvailableUsers:", error);
+      setAvailableUsers([]);
     }
   };
 

@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/server';
+import { requireRole } from '@/app/api/middleware/auth';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Require QA team role (or project manager who can access all)
+    const roleResult = await requireRole(request, ['qaTeam', 'projectManager']);
+    if (roleResult instanceof NextResponse) {
+      return roleResult;
+    }
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("task_iterations")
       .select(
@@ -23,7 +25,6 @@ export async function GET() {
       .eq("current_stage", "QA");
 
     if (error) {
-      console.error("Error fetching QA tasks:", error);
       return NextResponse.json({ error: 'Failed to fetch QA tasks' }, { status: 500 });
     }
 
@@ -48,7 +49,6 @@ export async function GET() {
       return NextResponse.json({ tasks: [] });
     }
   } catch (error) {
-    console.error('Error in getQADashboard:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

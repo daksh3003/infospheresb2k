@@ -80,6 +80,12 @@ export default function DashboardPage() {
       delivery_time: string;
     };
   }>({});
+  const [currentWorkers, setCurrentWorkers] = useState<{
+    [key: string]: {
+      name: string;
+      email?: string;
+    } | null;
+  }>({});
 
   const _router = useRouter();
 
@@ -126,6 +132,29 @@ export default function DashboardPage() {
       setProjectNames(projectNameMap);
     } catch (error) {
       console.error("Error fetching project names:", error);
+    }
+  };
+
+  const fetchCurrentWorkers = async (taskIds: string[]) => {
+    try {
+      // Use batch endpoint to fetch all workers in a single API call
+      const response = await fetch("/api/tasks/current-workers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ taskIds }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.data) {
+        setCurrentWorkers(result.data);
+      } else {
+        console.error("Error fetching current workers:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching current workers:", error);
     }
   };
 
@@ -195,6 +224,9 @@ export default function DashboardPage() {
           ),
         ];
         await fetchProjectNames(uniqueProjectIds as string[]);
+
+        // Fetch current workers for all tasks
+        await fetchCurrentWorkers(processedTasks.map((task: { task_id: string }) => task.task_id));
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -362,11 +394,10 @@ export default function DashboardPage() {
                 </span>
               </div>
               <Badge
-                className={`px-3 py-1.5 text-sm font-medium ${
-                  group.completionPercentage === 100
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
-                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
+                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                  }`}
               >
                 {group.completionPercentage === 100 ? (
                   <span className="flex items-center">
@@ -389,11 +420,12 @@ export default function DashboardPage() {
           <div>
             {/* Table Header */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 <div className="col-span-2">Task Details</div>
                 <div className="text-center">Due Date</div>
                 <div className="text-center">Status</div>
                 <div className="text-center">Priority</div>
+                <div className="text-center">Working On</div>
                 <div className="text-center">Actions</div>
               </div>
             </div>
@@ -412,6 +444,7 @@ export default function DashboardPage() {
                   dueTime={projectNames[task.project_id]?.delivery_time || ""}
                   status={task.status || "pending"}
                   priority={task.priority || "medium"}
+                  currentWorker={currentWorkers[task.task_id] || null}
                 />
               ))}
             </div>

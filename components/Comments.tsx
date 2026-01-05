@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@/lib/client";
 import { authManager } from "@/utils/auth";
 
 interface Comment {
@@ -25,6 +25,8 @@ export const Comments = ({ taskId }: { taskId: string }) => {
   } | null>(null);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+
+  const supabase = createClient();
 
   useEffect(() => {
     const initializeData = async () => {
@@ -57,6 +59,7 @@ export const Comments = ({ taskId }: { taskId: string }) => {
 
       // If that doesn't work, try to get directly from Supabase auth
       if (!user) {
+        const supabase = createClient();
         const {
           data: { user: authUser },
           error,

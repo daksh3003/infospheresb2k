@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('task_id');
 
@@ -17,8 +13,6 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log("Fetching comments for task:", taskId);
 
     // Fetch comments for the specific task, ordered by creation date
     const { data: comments, error } = await supabase
@@ -36,23 +30,19 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error("Database error:", error);
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: 'Failed to fetch comments' },
         { status: 400 }
       );
     }
-
-    console.log(`Found ${comments?.length || 0} comments for task ${taskId}`);
 
     return NextResponse.json({ 
       comments: comments || [],
       taskId: taskId
     });
   } catch (error: unknown) {
-    console.error('API error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -60,6 +50,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment, user_id, task_id, parent_comment_id } = await request.json();
 
     // Validate required fields
@@ -84,13 +75,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Attempting to save comment:", { 
-      comment: comment.trim(), 
-      user_id, 
-      task_id, 
-      parent_comment_id 
-    });
-
     // Insert new comment
     const { data, error } = await supabase
       .from("comments")
@@ -112,8 +96,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Database error:", error);
-      
       // Handle specific error cases
       if (error.message?.includes('row-level security')) {
         return NextResponse.json(
@@ -142,12 +124,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Comment saved successfully:", data);
     return NextResponse.json({ comment: data });
   } catch (error: unknown) {
-    console.error('API error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -155,6 +135,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment_id, comment, user_id } = await request.json();
 
     // Validate required fields
@@ -179,12 +160,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    console.log("Attempting to update comment:", { 
-      comment_id, 
-      comment: comment.trim(), 
-      user_id 
-    });
-
     // First, verify that the user owns this comment
     const { data: existingComment, error: fetchError } = await supabase
       .from("comments")
@@ -193,7 +168,6 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (fetchError) {
-      console.error("Error fetching comment:", fetchError);
       return NextResponse.json(
         { error: 'Comment not found' },
         { status: 404 }
@@ -228,19 +202,16 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Database error:", error);
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: 'Failed to update comment' },
         { status: 400 }
       );
     }
 
-    console.log("Comment updated successfully:", data);
     return NextResponse.json({ comment: data });
   } catch (error: unknown) {
-    console.error('API error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -248,6 +219,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { comment_id, user_id } = await request.json();
 
     // Validate required fields
@@ -265,8 +237,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log("Attempting to delete comment:", { comment_id, user_id });
-
     // First, verify that the user owns this comment
     const { data: existingComment, error: fetchError } = await supabase
       .from("comments")
@@ -275,7 +245,6 @@ export async function DELETE(request: NextRequest) {
       .single();
 
     if (fetchError) {
-      console.error("Error fetching comment:", fetchError);
       return NextResponse.json(
         { error: 'Comment not found' },
         { status: 404 }
@@ -297,19 +266,16 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user_id);
 
     if (error) {
-      console.error("Database error:", error);
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: 'Failed to delete comment' },
         { status: 400 }
       );
     }
 
-    console.log("Comment deleted successfully");
     return NextResponse.json({ message: 'Comment deleted successfully' });
   } catch (error: unknown) {
-    console.error('API error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

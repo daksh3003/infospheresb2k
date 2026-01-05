@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from "@/lib/server";
 
 // GET - Fetch current user profile
 export async function GET(
@@ -12,6 +7,7 @@ export async function GET(
   { params: _params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const supabase = await createClient();
     const authHeader = request.headers.get("authorization");
     
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

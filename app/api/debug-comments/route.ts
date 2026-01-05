@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET() {
   try {
+    const supabase = await createClient();
     // Try to get any row from comments table to see the structure
     const { data, error } = await supabase
       .from("comments")
@@ -15,9 +11,8 @@ export async function GET() {
       .limit(1);
 
     if (error) {
-      console.error("Database error:", error);
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: 'Failed to fetch comments data' },
         { status: 400 }
       );
     }
@@ -30,10 +25,8 @@ export async function GET() {
       sampleData: data
     });
   } catch (error: unknown) {
-    console.error('API error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

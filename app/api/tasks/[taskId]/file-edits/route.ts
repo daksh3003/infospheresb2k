@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/utils/supabase";
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { taskId } = await params;
+
+    const supabase = await createClient();
 
     // Fetch all file_replaced actions for this task
     const { data: fileActions, error } = await supabase
@@ -17,8 +26,7 @@ export async function GET(
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching file actions:", error);
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: 'Failed to fetch file actions' }, { status: 400 });
     }
 
     interface FileEditInfo {
@@ -60,7 +68,6 @@ export async function GET(
 
     return NextResponse.json({ fileEdits: fileEditsMap });
   } catch (error) {
-    console.error("Error in file-edits route:", error);
     return NextResponse.json(
       { error: "Failed to fetch file edits" },
       { status: 500 }

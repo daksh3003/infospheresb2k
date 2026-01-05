@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('taskId');
 
@@ -35,9 +31,8 @@ export async function GET(request: NextRequest) {
       .order("file_name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching download history:", error);
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to fetch download history' },
         { status: 400 }
       );
     }
@@ -65,9 +60,8 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('Download history error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -75,6 +69,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { taskId, fileId, fileName, storageName, folderPath, downloadDetails } = await request.json();
 
     if (!taskId || !fileId || !fileName || !storageName || !folderPath || !downloadDetails) {
@@ -135,9 +130,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Download tracked successfully' });
 
   } catch (error: unknown) {
-    console.error('Download tracking error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

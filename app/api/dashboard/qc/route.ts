@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/server';
+import { requireRole } from '@/app/api/middleware/auth';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Require QC team role (or project manager who can access all)
+    const roleResult = await requireRole(request, ['qcTeam', 'projectManager']);
+    if (roleResult instanceof NextResponse) {
+      return roleResult;
+    }
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("task_iterations")
       .select(
@@ -72,7 +74,7 @@ export async function GET() {
         .in("project_id", uniqueProjectIds);
 
       if (projectNamesError) {
-        console.error("Error fetching project names:", projectNamesError);
+        // Error fetching project names - non-critical
       }
 
       const projectNameMap = projectNamesData?.reduce(
@@ -108,10 +110,8 @@ export async function GET() {
     });
 
   } catch (error: unknown) {
-    console.error('QC Dashboard error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -1,12 +1,11 @@
 // API utility functions to replace direct Supabase calls
-import { supabase } from "./supabase";
+import { createClient } from '@/lib/client';
 
 export const api = {
   // Authentication
   login: async (email: string, password: string) => {
-    // Import supabase here to avoid circular dependency
-    
-    
+    // Use client-side Supabase client for browser authentication
+    const supabase = createClient();
     // Authenticate directly with Supabase client to establish session
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -255,7 +254,13 @@ export const api = {
 
   // Get available users for assignment
   getAvailableUsers: async (stage: string) => {
-    const response = await fetch(`/api/users/available?stage=${stage}`);
+    if (!stage || stage.trim() === '') {
+      throw new Error('Stage parameter is required');
+    }
+    
+    // Properly encode the stage parameter
+    const encodedStage = encodeURIComponent(stage);
+    const response = await fetch(`/api/users/available?stage=${encodedStage}`);
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch available users');

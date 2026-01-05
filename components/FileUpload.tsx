@@ -128,7 +128,7 @@ export const FileUpload = ({
               )}
               {uploadedFiles?.map((item, index: number) => (
                 <div
-                  key={item.name}
+                  key={`${item.name}-${index}`}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                 >
                   <div className="flex items-center gap-3">

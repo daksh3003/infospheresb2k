@@ -1,30 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function POST() {
   try {
+    const supabase = await createClient();
+
     // Get the current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
       // Update the most recent session with logout time
       const { error: sessionError } = await supabase
         .from("user_sessions")
-        .update({
-          logout_time: new Date().toISOString(),
-        })
+        .update({ logout_time: new Date().toISOString() })
         .eq("user_id", user.id)
-        .is("logout_time", null);
+        .is("logout_time", null)
+        .order("login_time", { ascending: false })
+        .limit(1);
 
       if (sessionError) {
-        console.error("Error updating logout time:", sessionError);
+        // Log error server-side but continue with logout
       }
     }
 
@@ -33,7 +28,7 @@ export async function POST() {
 
     if (error) {
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to log out. Please try again.' },
         { status: 400 }
       );
     }
@@ -43,10 +38,8 @@ export async function POST() {
     });
 
   } catch (error: unknown) {
-    console.error('Logout error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'An error occurred during logout. Please try again.' },
       { status: 500 }
     );
   }

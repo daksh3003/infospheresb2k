@@ -1,10 +1,6 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/server';
+import { requireRole } from '@/app/api/middleware/auth';
 
 // Helper functions
 const calculateStatus = (deliveryDate: string, completionStatus: string) => {
@@ -42,8 +38,14 @@ const getTaskType = (processType: string) => {
   return typeMap[processType] || "other";
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Require project manager role
+    const roleResult = await requireRole(request, ['projectManager']);
+    if (roleResult instanceof NextResponse) {
+      return roleResult;
+    }
+    const supabase = await createClient();
     // First get all projects
     const { data: projectsData, error: projectsError } = await supabase
       .from("tasks_test")
@@ -97,7 +99,7 @@ export async function GET() {
         .in("project_id", uniqueProjectIds);
 
       if (projectNamesError) {
-        console.error("Error fetching project names:", projectNamesError);
+        // Error fetching project names - non-critical
       }
 
       const projectNameMap = projectNamesData?.reduce(
@@ -133,10 +135,8 @@ export async function GET() {
     });
 
   } catch (error: unknown) {
-    console.error('PM Dashboard error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from '@/lib/server';
+import { requireAuth } from '@/app/api/middleware/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const stage = searchParams.get('stage');
 
-    if (!stage) {
+    if (!stage || stage.trim() === '') {
       return NextResponse.json({ error: 'Stage parameter is required' }, { status: 400 });
     }
+
+    const supabase = await createClient();
 
     // Get all users first
     const { data: users, error } = await supabase
@@ -21,7 +25,6 @@ export async function GET(request: NextRequest) {
       .select('*');
 
     if (error) {
-      console.error('Error fetching users:', error);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
@@ -41,7 +44,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ users: filteredUsers || [] });
   } catch (error) {
-    console.error('Error in getAvailableUsers:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

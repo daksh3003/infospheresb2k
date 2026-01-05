@@ -1,11 +1,13 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { TaskDetailBackButton } from "@/components/task-detail-back-button";
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { api } from "@/utils/api";
-import { supabase } from "@/utils/supabase";
+import { createClient } from "@/lib/client";
 import { logTaskAction, createTaskActionMetadata } from "@/utils/taskActions";
 import TimelineModal from "@/components/Timeline/TimelineModal";
 import Dialog from "@/components/Dialog";
@@ -77,7 +79,7 @@ interface Task {
   project_name: string;
   po_hours: number;
   mail_instruction: string;
-  list_of_files: string[];
+  list_of_files: string[]; // Deprecated - kept for interface compatibility, populated from files_test
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
@@ -94,6 +96,16 @@ interface Task {
   attachments: string[];
   estimatedHours: number; // Will sum all estimated hours
   overall_completion_status: boolean;
+}
+
+interface FileEditInfo {
+  edited_at: string;
+  edited_by: {
+    name: string;
+    email: string;
+    role: string;
+  };
+  old_file_name: string;
 }
 
 interface FileWithPageCount extends File {
@@ -196,16 +208,10 @@ export default function TaskDetailPage() {
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
 
   // File edits state
-  interface FileEditInfo {
-    edited_at: string;
-    edited_by: {
-      name: string;
-      email: string;
-      role: string;
-    };
-    old_file_name: string;
-  }
+
   const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
+
+  const supabase = createClient();
 
   // New function to fetch complete task details with project information
   const fetchCompleteTaskDetails = async (): Promise<Task | null> => {
@@ -230,7 +236,9 @@ export default function TaskDetailPage() {
       // Fetch project data
       const { data: projectData, error: projectError } = await supabase
         .from("projects_test")
-        .select("*")
+        .select(
+          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by"
+        )
         .eq("project_id", taskData.project_id)
         .single();
 
@@ -238,6 +246,15 @@ export default function TaskDetailPage() {
         console.error("Error fetching project data:", projectError);
         return null;
       }
+
+      // Fetch file names from files_test table
+      const { data: filesData, error: _filesError } = await supabase
+        .from("files_test")
+        .select("file_name")
+        .eq("task_id", taskData.task_id)
+        .eq("storage_name", "task-files");
+
+      const fileNames = filesData?.map((f) => f.file_name) || [];
 
       // Fetch creator information
       let creatorData: UserProfile = {
@@ -287,7 +304,7 @@ export default function TaskDetailPage() {
         project_name: projectData.project_name,
         po_hours: projectData.po_hours || 0,
         mail_instruction: projectData.mail_instruction || "",
-        list_of_files: projectData.list_of_files || [],
+        list_of_files: fileNames,
         reference_file: projectData.reference_file || "",
         delivery_date: projectData.delivery_date || "",
         delivery_time: projectData.delivery_time || "",
@@ -301,7 +318,7 @@ export default function TaskDetailPage() {
         dueDate: projectData.delivery_date || "",
         deliveryTime: projectData.delivery_time || "",
         assignedTo: "", // Will be populated separately if needed
-        attachments: projectData.list_of_files || [],
+        attachments: fileNames,
         estimatedHours: totalEstimatedHours,
         overall_completion_status: taskData.completion_status || false,
       };
@@ -877,7 +894,7 @@ export default function TaskDetailPage() {
   const handleDeleteUploadedFile = async (
     fileName: string,
     storage_name: string,
-    folder_path: string
+    _folder_path: string
   ) => {
     if (!currentUser?.role || currentUser.role !== "projectManager") {
       toast.error("Only project managers can delete files", {
@@ -893,7 +910,26 @@ export default function TaskDetailPage() {
     if (!confirmed) return;
 
     try {
-      const file_path = `${folder_path}/${fileName}`;
+      // Look up the actual storage file_path from database
+      // fileName is now the original display name, we need the safe storage path
+      const { data: fileData, error: fileError } = await supabase
+        .from("files_test")
+        .select("file_path")
+        .eq("task_id", taskId)
+        .eq("file_name", fileName)
+        .eq("storage_name", storage_name)
+        .single();
+
+      if (fileError) {
+        console.error("Error fetching file_path from database:", fileError);
+        toast.error("Could not find file in database", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      const file_path = fileData.file_path;
 
       console.log("Deleting file with params:", {
         storage_name,
@@ -947,11 +983,42 @@ export default function TaskDetailPage() {
   const handleReplaceUploadedFile = async (
     fileName: string,
     storage_name: string,
-    folder_path: string,
+    _folder_path: string,
     pageCount: number | null
   ) => {
     if (!currentUser?.role || currentUser.role !== "projectManager") {
       toast.error("Only project managers can replace files", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    // Look up the actual storage file_path from database
+    // fileName is now the original display name, we need the safe storage path
+    let old_file_path = "";
+    try {
+      const { data: fileData, error: fileError } = await supabase
+        .from("files_test")
+        .select("file_path")
+        .eq("task_id", taskId)
+        .eq("file_name", fileName)
+        .eq("storage_name", storage_name)
+        .single();
+
+      if (fileError) {
+        console.error("Error fetching file_path from database:", fileError);
+        toast.error("Could not find file in database", {
+          type: "error",
+          position: "top-right",
+        });
+        return;
+      }
+
+      old_file_path = fileData.file_path;
+    } catch (error) {
+      console.error("Error looking up file path:", error);
+      toast.error("Could not find file in database", {
         type: "error",
         position: "top-right",
       });
@@ -979,7 +1046,7 @@ export default function TaskDetailPage() {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("storage_name", storage_name);
-        formData.append("old_file_path", `${folder_path}/${fileName}`);
+        formData.append("old_file_path", old_file_path);
         formData.append("old_file_name", fileName);
         formData.append("page_count", (pageCount || 0).toString());
         formData.append("user_id", currentUser.id);
@@ -1062,7 +1129,12 @@ export default function TaskDetailPage() {
       folder_path = taskId;
     }
 
-    await handleReplaceUploadedFile(fileName, storage_name, folder_path, pageCount);
+    await handleReplaceUploadedFile(
+      fileName,
+      storage_name,
+      folder_path,
+      pageCount
+    );
   };
 
   const handleDownloadOffilesToBeUploaded = async (
@@ -1119,8 +1191,8 @@ export default function TaskDetailPage() {
         index,
       });
 
-      const { data, error } = await supabase.storage
-        .from(filesData.storage_name)
+      const { data, error } = await createClient()
+        .storage.from(filesData.storage_name)
         .download(`${filesData.file_path}`);
 
       if (error) throw new Error("Download failed: " + error.message);
@@ -1247,18 +1319,35 @@ export default function TaskDetailPage() {
       index,
     });
     try {
+      // Look up the actual storage file_path from database
+      // fileName is now the original display name, we need the safe storage path
+      const { data: fileData, error: fileError } = await supabase
+        .from("files_test")
+        .select("file_path")
+        .eq("task_id", taskId)
+        .eq("file_name", fileName)
+        .eq("storage_name", storage_name)
+        .single();
+
+      if (fileError) {
+        console.error("Error fetching file_path from database:", fileError);
+        throw new Error("Could not find file in database");
+      }
+
+      const storageFilePath = fileData.file_path;
+
       // Log the download action
       await logTaskActionHelper("download", {
         file_name: fileName,
         storage_name: storage_name,
-        file_path: folder_path,
+        file_path: storageFilePath,
         file_index: index,
         download_type: "task_file",
       });
 
-      const { data, error } = await supabase.storage
-        .from(storage_name)
-        .download(`${folder_path}/${fileName}`);
+      const { data, error } = await createClient()
+        .storage.from(storage_name)
+        .download(storageFilePath);
 
       if (error) throw new Error("Download failed: " + error.message);
       if (!data) throw new Error("No file data found");
@@ -1286,30 +1375,26 @@ export default function TaskDetailPage() {
       URL.revokeObjectURL(url);
 
       // Log the download to database
-      // console.log("task_id:", taskId);
-      // console.log("fileName:", fileName);
-      // console.log("folder_path:", folder_path);
       if (currentUser) {
         try {
-          // Get file_id from files_test table based on task_id, file_name and file_path
-          const { data: fileData, error: fileError } = await supabase
+          // Get file_id from files_test table based on task_id, file_name and storage_name
+          const { data: fileIdData, error: fileIdError } = await supabase
             .from("files_test")
             .select("file_id")
             .eq("task_id", taskId)
             .eq("file_name", fileName)
-            .eq("file_path", `${folder_path}/${fileName}`) // Adjusted to include fileName in path
+            .eq("storage_name", storage_name)
             .single();
 
-          //       console.log("task_id:", taskId);
-          // console.log("fileName:", fileName);
-          // console.log("folder_path:", folder_path);
-
-          if (fileError) {
-            console.error("Error fetching file_id from files_test:", fileError);
+          if (fileIdError) {
+            console.error(
+              "Error fetching file_id from files_test:",
+              fileIdError
+            );
             return;
           }
 
-          const file_id = fileData.file_id;
+          const file_id = fileIdData.file_id;
 
           // Check if a record for this file already exists
           const { data: existingRecord, error: checkError } = await supabase
@@ -1397,9 +1482,12 @@ export default function TaskDetailPage() {
 
     let isQcInLoop = true;
 
-    const { data: qcData, error: qcError } = await supabase.storage
-      .from("qc-files")
-      .list(taskId);
+    // Check if there are any QC files in the database instead of storage listing
+    const { data: qcData, error: qcError } = await supabase
+      .from("files_test")
+      .select("file_name")
+      .eq("task_id", taskId)
+      .eq("storage_name", "qc-files");
 
     if (qcData && qcData.length === 0) {
       console.log("Error fetching QC data:", qcError);
@@ -1481,51 +1569,29 @@ export default function TaskDetailPage() {
     }
     console.log("Determined storage:", storage_name, "folder:", folder_path);
     if (current_stage.sent_by !== "PM") {
-      const { data: processorFiles, error: processorError } =
-        await supabase.storage.from(storage_name).list(folder_path);
+      // Fetch processor files directly from database instead of storage listing
+      const { data: processorFiles, error: processorError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", storage_name);
 
       if (processorError) {
         console.error("Error fetching processor files:", processorError);
         return;
       }
-      if (processorFiles === null) {
+      if (!processorFiles || processorFiles.length === 0) {
         console.warn("No processor files found for this task.");
         setfilesToBeUploaded([]);
         return;
       }
 
-      // Fetch page counts from files_test table for processor files
-      const processorFilesWithPageCount = await Promise.all(
-        processorFiles.map(async (file) => {
-          try {
-            console.log("Fetching page count for:", file.name);
-            const { data: fileInfo, error: fileInfoError } = await supabase
-              .from("files_test")
-              .select("page_count")
-              .eq("task_id", taskId)
-              .eq("file_name", file.name)
-              .single();
+      // Map to the expected format using original filename for display
+      const processorFilesWithPageCount = processorFiles.map((file) => ({
+        name: file.file_name, // Use original filename (with Chinese characters)
+        pageCount: file.page_count || null,
+      }));
 
-            if (fileInfoError && fileInfoError.code !== "PGRST116") {
-              console.warn(
-                `Error fetching page count for ${file.name}:`,
-                fileInfoError
-              );
-            }
-
-            return {
-              name: file.name,
-              pageCount: fileInfo?.page_count || null,
-            };
-          } catch (error) {
-            console.warn(`Failed to fetch page count for ${file.name}:`, error);
-            return {
-              name: file.name,
-              pageCount: null,
-            };
-          }
-        })
-      );
       console.log(
         "Processor files with page count:",
         processorFilesWithPageCount
@@ -1552,6 +1618,19 @@ export default function TaskDetailPage() {
         );
       }
     }
+  };
+
+  // Helper function to generate safe storage filename (ASCII only)
+  const generateSafeStorageFileName = (fileName: string): string => {
+    // Get file extension
+    const lastDotIndex = fileName.lastIndexOf(".");
+    const extension = lastDotIndex > -1 ? fileName.substring(lastDotIndex) : "";
+
+    // Generate a unique safe filename using timestamp and random string
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+
+    return `file_${timestamp}_${randomStr}${extension}`;
   };
 
   const handleSubmitFileUpload = async () => {
@@ -1600,34 +1679,43 @@ export default function TaskDetailPage() {
       });
 
       for (const file of filesToBeUploaded) {
-        let date = new Date().toLocaleString("en-IN", {
-          timeZone: "Asia/Kolkata",
-        });
-        date = date.replaceAll("/", "-");
+        // Generate a safe storage filename (ASCII only, no special characters)
+        const safeStorageFileName = generateSafeStorageFileName(file.name);
+
+        // Keep the original filename for database and display purposes
+        const originalFileName = file.name;
+
+        console.log(
+          `File upload: "${originalFileName}" -> Storage: "${safeStorageFileName}"`
+        );
 
         let file_path = "";
         let storage_name = "";
 
         if (currentStage === "Processor") {
-          file_path = `${data.sent_by}_${taskId}/${date}_${file.name}`;
+          file_path = `${data.sent_by}_${taskId}/${safeStorageFileName}`;
           storage_name = "processor-files";
         } else if (currentStage === "QC") {
-          file_path = `${taskId}/${date}_${file.name}`;
+          file_path = `${taskId}/${safeStorageFileName}`;
           storage_name = "qc-files";
         } else if (currentStage === "QA") {
-          file_path = `${taskId}/${date}_${file.name}`;
+          file_path = `${taskId}/${safeStorageFileName}`;
           storage_name = "qa-files";
         }
 
         // Upload the file
-        const { data: _StoreFiles, error: uploadError } = await supabase.storage
-          .from(storage_name)
+        const { data: _StoreFiles, error: uploadError } = await createClient()
+          .storage.from(storage_name)
           .upload(file_path, file, {
             contentType: file.type,
             upsert: true,
           });
         if (uploadError) {
           console.error("Error uploading file:", uploadError);
+          toast(`Failed to upload "${file.name}": ${uploadError.message}`, {
+            type: "error",
+            position: "top-right",
+          });
           return;
         }
 
@@ -1636,12 +1724,12 @@ export default function TaskDetailPage() {
           .from("files_test")
           .insert({
             task_id: taskId,
-            file_name: `${date}_${file.name}`,
+            file_name: originalFileName, // Store original filename with Chinese characters
             page_count: (file as FileWithPageCount).pageCount,
             // taken_by: currentUser?.id || null,
             assigned_to: [], // Empty array for initial upload
             storage_name: storage_name,
-            file_path: file_path,
+            file_path: file_path, // Storage path uses safe ASCII filename
             uploaded_by: {
               id: currentUser?.id || null,
               name: currentUser?.name || "Unknown User",
@@ -1693,110 +1781,57 @@ export default function TaskDetailPage() {
       const sent_by = data?.sent_by;
       const current_stage = data?.current_stage;
 
-      const { data: PMFiles, error: PMError } = await supabase.storage
-        .from("task-files")
-        .list(taskId);
+      // Fetch PM files directly from database instead of storage listing
+      const { data: PMFiles, error: PMError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", "task-files");
 
       if (PMError) {
         console.error("Error fetching PM files:", PMError);
         return;
       }
 
-      // Fetch page counts from files_test table for PM files
-      const pmFilesWithPageCount = await Promise.all(
-        PMFiles.map(async (file) => {
-          try {
-            const { data: fileInfo, error: fileInfoError } = await supabase
-              .from("files_test")
-              .select("page_count")
-              .eq("task_id", taskId)
-              .eq("file_name", file.name)
-              .single();
+      // Map to the expected format using original filename for display
+      const pmFilesWithPageCount = (PMFiles || []).map((file) => ({
+        name: file.file_name, // Use original filename (with Chinese characters)
+        pageCount: file.page_count || null,
+      }));
 
-            if (fileInfoError && fileInfoError.code !== "PGRST116") {
-              console.warn(
-                `Error fetching page count for ${file.name}:`,
-                fileInfoError
-              );
-            }
-
-            console.log(`Fetched page count for ${file.name}:`, fileInfo);
-
-            return {
-              name: file.name,
-              pageCount: fileInfo?.page_count || null,
-            };
-          } catch (error) {
-            console.warn(`Failed to fetch page count for ${file.name}:`, error);
-            return {
-              name: file.name,
-              pageCount: null,
-            };
-          }
-        })
-      );
-      console.log("PM Files with page count:", PMFiles);
+      console.log("PM Files with page count:", pmFilesWithPageCount);
       setPMFiles(pmFilesWithPageCount);
 
-      let folder_path_correction = "";
       let storage_name_correction = "";
 
       if (sent_by !== "PM") {
         if (current_stage === "Processor") {
           if (sent_by === "QC") {
-            folder_path_correction = taskId;
             storage_name_correction = "qc-files";
           } else if (sent_by === "QA") {
-            folder_path_correction = taskId;
             storage_name_correction = "qa-files";
           }
         } else if (current_stage === "QA" && sent_by === "Processor") {
-          folder_path_correction = taskId;
           storage_name_correction = "qc-files";
         }
 
-        const { data: correctionFiles, error: correctionError } =
-          await supabase.storage
-            .from(storage_name_correction)
-            .list(folder_path_correction);
+        // Fetch correction files directly from database instead of storage listing
+        const { data: correctionFiles, error: correctionError } = await supabase
+          .from("files_test")
+          .select("file_name, page_count, file_path")
+          .eq("task_id", taskId)
+          .eq("storage_name", storage_name_correction);
 
         if (correctionError) {
           console.log("Error fetching correction files:", correctionError);
           // return;
         }
 
-        // Fetch page counts from files_test table for correction files
-        const correctionFilesWithPageCount = await Promise.all(
-          (correctionFiles || []).map(async (file) => {
-            try {
-              const { data: fileInfo, error: fileInfoError } = await supabase
-                .from("files_test")
-                .select("page_count")
-                .eq("task_id", taskId)
-                .eq("file_name", file.name)
-                .single();
-
-              if (fileInfoError && fileInfoError.code !== "PGRST116") {
-                console.warn(
-                  `Error fetching page count for ${file.name}:`,
-                  fileInfoError
-                );
-              }
-
-              return {
-                name: file.name,
-                pageCount: fileInfo?.page_count || null,
-              };
-            } catch (error) {
-              console.warn(
-                `Failed to fetch page count for ${file.name}:`,
-                error
-              );
-              return {
-                name: file.name,
-                pageCount: null,
-              };
-            }
+        // Map to the expected format using original filename for display
+        const correctionFilesWithPageCount = (correctionFiles || []).map(
+          (file) => ({
+            name: file.file_name, // Use original filename (with Chinese characters)
+            pageCount: file.page_count || null,
           })
         );
 
@@ -1804,61 +1839,36 @@ export default function TaskDetailPage() {
         // }
       }
 
-      let folder_path = "";
       let storage_name = "";
 
       if (current_stage === "Processor") {
-        folder_path = `${sent_by}_${taskId}`;
         storage_name = "processor-files";
       } else if (current_stage === "QC") {
-        folder_path = taskId;
         storage_name = "qc-files";
       } else if (current_stage === "QA") {
-        folder_path = taskId;
         storage_name = "qa-files";
       }
-      console.log("Folder Path:", folder_path, "Storage Name:", storage_name);
+      console.log("Storage Name:", storage_name);
       console.log("current_stage : ", current_stage);
 
-      const { data: uploadedFiles, error: uploadedError } =
-        await supabase.storage.from(storage_name).list(folder_path);
+      // Fetch uploaded files directly from database instead of storage listing
+      const { data: uploadedFiles, error: uploadedError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", storage_name);
+
       if (uploadedError) {
         console.log("Error fetching uploaded files:", uploadedError);
         return;
       }
       console.log(uploadedFiles);
 
-      // Fetch page counts from files_test table for uploaded files
-      const uploadedFilesWithPageCount = await Promise.all(
-        uploadedFiles.map(async (file) => {
-          try {
-            const { data: fileInfo, error: fileInfoError } = await supabase
-              .from("files_test")
-              .select("page_count")
-              .eq("task_id", taskId)
-              .eq("file_name", file.name)
-              .single();
-
-            if (fileInfoError && fileInfoError.code !== "PGRST116") {
-              console.warn(
-                `Error fetching page count for ${file.name}:`,
-                fileInfoError
-              );
-            }
-
-            return {
-              name: file.name,
-              pageCount: fileInfo?.page_count || null,
-            };
-          } catch (error) {
-            console.warn(`Failed to fetch page count for ${file.name}:`, error);
-            return {
-              name: file.name,
-              pageCount: null,
-            };
-          }
-        })
-      );
+      // Map to the expected format using original filename for display
+      const uploadedFilesWithPageCount = (uploadedFiles || []).map((file) => ({
+        name: file.file_name, // Use original filename (with Chinese characters)
+        pageCount: file.page_count || null,
+      }));
 
       _setUploadedFiles(uploadedFilesWithPageCount);
     } catch (error) {
@@ -1998,9 +2008,9 @@ export default function TaskDetailPage() {
         const fetchCurrentUser = async () => {
           const {
             data: { user },
-          } = await supabase.auth.getUser();
+          } = await createClient().auth.getUser();
           if (user) {
-            const { data: profile, error } = await supabase
+            const { data: profile, error } = await createClient()
               .from("profiles")
               .select("*")
               .eq("id", user.id)

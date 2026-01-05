@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/lib/server';
 
 export async function GET() {
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from("task_iterations")
         .select(
@@ -27,8 +23,6 @@ export async function GET() {
             { status: 400 }
         );
     }
-
-    console.log("data : ", data);
 
     return NextResponse.json(data); 
 }   

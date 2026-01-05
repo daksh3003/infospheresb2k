@@ -27,7 +27,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 
 import { api } from "../utils/api";
-import { supabase } from "../utils/supabase";
+import { createClient } from "@/lib/client";
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -37,9 +37,9 @@ interface TaskModalProps {
 
 interface ProjectFormData {
   project_name: string;
+  client_name: string;
   po_hours: number;
   mail_instruction: string;
-  list_of_files: number;
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
@@ -57,6 +57,7 @@ interface TaskFormData {
   completion_status: boolean;
   project_id: string;
   created_by: string;
+  task_type: string;
 }
 
 interface FileFormData {
@@ -113,9 +114,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
   // Project form data
   const [projectData, setProjectData] = useState<ProjectFormData>({
     project_name: "",
+    client_name: "",
     po_hours: 0,
     mail_instruction: "",
-    list_of_files: 0,
     reference_file: "",
     delivery_date: "",
     delivery_time: "",
@@ -165,10 +166,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser();
+        } = await createClient().auth.getUser();
 
         if (user) {
-          const { data: profile, error } = await supabase
+          const { data: profile, error } = await createClient()
             .from("profiles")
             .select("id, name, email, role")
             .eq("id", user.id)
@@ -278,6 +279,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
@@ -302,6 +304,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: [],
       },
@@ -323,6 +326,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
+          task_type: "",
         },
         filesData: [],
       },
@@ -548,6 +552,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   placeholder="Enter project name"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Client Name
+                  <Tooltip content="Enter the client name for this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  name="client_name"
+                  value={projectData.client_name}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Enter client name"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -653,7 +673,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <div className="space-y-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={`selected-${index}-${file.name}`}
                         className="flex items-center justify-between p-2 bg-gray-50 rounded"
                       >
                         <div className="flex items-center">
@@ -692,7 +712,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <h4 className="font-medium mb-2">Available Files</h4>
                   {selectedFiles.map((file, index) => (
                     <div
-                      key={index}
+                      key={`available-${index}-${file.name}`}
                       className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
                     >
                       <span className="text-sm">{file.name}</span>
@@ -726,7 +746,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       </div>
                       {group.files.map((file, fileIndex) => (
                         <div
-                          key={fileIndex}
+                          key={`group-${groupIndex}-file-${fileIndex}-${file.name}`}
                           className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2"
                         >
                           <span className="text-sm">{file.name}</span>
@@ -789,6 +809,29 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       rows={3}
                       placeholder="Enter client instructions"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Task Type *
+                    </label>
+                    <select
+                      value={group.taskData.task_type}
+                      onChange={(e) =>
+                        updateTaskData(
+                          groupIndex,
+                          "task_type",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="">Select task type</option>
+                      <option value="dtp">DTP</option>
+                      <option value="ocr_review">OCR Review</option>
+                      <option value="prep">Prep</option>
+                      <option value="image_processing">Image Processing</option>
+                      <option value="other">Other</option>
+                    </select>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -868,7 +911,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     <div className="grid gap-4">
                       {group.filesData.map((fileData, fileIndex) => (
                         <Card
-                          key={fileIndex}
+                          key={`group-${groupIndex}-filedata-${fileIndex}-${fileData.file_name}`}
                           className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
                         >
                           {/* File Header */}

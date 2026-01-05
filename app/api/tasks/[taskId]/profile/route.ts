@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from "@/lib/server";
 
 // GET - Fetch user profile by ID
 export async function GET(
@@ -12,6 +7,7 @@ export async function GET(
   { params: _params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 

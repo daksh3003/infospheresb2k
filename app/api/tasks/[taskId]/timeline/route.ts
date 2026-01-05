@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from '@/lib/server';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  try { 
+  try {
+    const supabase = await createClient();
     const { taskId } = await params;
-
-    console.log(taskId);
 
     // Get stages from task_iterations
     const { data: stages, error: timelineError } = await supabase
@@ -23,7 +17,6 @@ export async function GET(
       .single();
 
     if (timelineError) {
-      console.error("Error fetching timeline items:", timelineError);
       return NextResponse.json({ error: 'Failed to fetch timeline' }, { status: 500 });
     }
 
@@ -84,7 +77,6 @@ export async function GET(
         await supabase.storage.from(storage_name).list(folder_path);
 
       if (uploadedFilesError) {
-        console.error("Error fetching uploaded files:", uploadedFilesError);
         return NextResponse.json({ error: 'Failed to fetch uploaded files' }, { status: 500 });
       }
 
@@ -106,7 +98,7 @@ export async function GET(
             uploaderName = fileTestData.uploaded_by.name || "Unknown";
             uploaderRole = fileTestData.uploaded_by.role || "Unknown";
           } else if (fileTestError) {
-            console.error("Error fetching file test data:", fileTestError);
+            // Error fetching file test data - non-critical
           }
 
           // Always return a valid object, never undefined
@@ -139,7 +131,6 @@ export async function GET(
 
     return NextResponse.json({ timelineItems });
   } catch (error) {
-    console.error('Error in getTaskTimeline:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

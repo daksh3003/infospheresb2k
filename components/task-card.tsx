@@ -12,6 +12,7 @@ import {
   Send,
   Loader2,
   Pause,
+  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -37,6 +38,10 @@ interface TaskCardProps {
   onSendToQC?: (taskIterationId: string) => void;
   isActionableByPM?: boolean;
   isLoadingAction?: boolean; // Optional: For individual card action loading state
+  currentWorker?: {
+    name: string;
+    email?: string;
+  } | null; // Optional: Currently working on the task
 }
 
 export function TaskCard({
@@ -51,6 +56,7 @@ export function TaskCard({
   onSendToQC,
   isActionableByPM,
   isLoadingAction, // Optional
+  currentWorker, // Optional
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -155,7 +161,7 @@ export function TaskCard({
   return (
     <div className="w-full border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
       <div className="px-6 py-4">
-        <div className="grid grid-cols-5 gap-4 items-center">
+        <div className="grid grid-cols-6 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-1">
@@ -221,6 +227,29 @@ export function TaskCard({
             >
               {priority.charAt(0).toUpperCase() + priority.slice(1)}
             </Badge>
+          </div>
+
+          {/* Currently Working On */}
+          <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
+            {currentWorker ? (
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                    {currentWorker.name}
+                  </span>
+                  {currentWorker.email && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                      {currentWorker.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                Unassigned
+              </span>
+            )}
           </div>
 
           {/* Actions */}

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from "@/lib/server";
 
 // GET - Get current user
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const authHeader = request.headers.get("authorization");
     
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -42,6 +38,7 @@ export async function GET(request: NextRequest) {
 // POST - Get session
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const authHeader = request.headers.get("authorization");
     
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -51,7 +48,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    authHeader.substring(7);
+    const _token = authHeader.substring(7);
     
     // Get session from token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();

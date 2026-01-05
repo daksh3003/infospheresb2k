@@ -1,5 +1,6 @@
 // app/dashboard/layout.tsx
 "use client";
+
 import { useState, ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -40,12 +41,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await authManager.signOut();
+      if (authManager) {
+        await authManager.signOut();
+      }
       router.push("/auth/login");
+      router.refresh(); // Refresh to clear server session
     } catch (error) {
       console.error("Error during logout:", error);
       // If there's an error, still redirect to login page
       router.push("/auth/login");
+      router.refresh();
     }
   };
 
@@ -62,6 +67,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined' || !authManager) return;
+
     // Check current auth status on mount
     authManager.checkAuthStatus();
 
@@ -69,10 +77,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const fetchUserRole = async (userId: string) => {
       try {
         const response = await fetch(`/api/auth/user/role?userId=${userId}`);
-        
+
         if (!response.ok) {
-          // console.error('Failed to fetch user role:', response.statusText);
-          // toast.error("Invalid login credentials. Please try again.");
           toast("Invalid login credentials", {
             type: "error",
             position: "top-right",
@@ -89,7 +95,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
 
     // Listen for auth state changes
-    const unsubscribe = authManager.onAuthStateChange(async (user) => {
+    const unsubscribe = authManager.onAuthStateChange(async (user: AuthUser | null) => {
       setCurrentUser(user);
 
       if (user?.id) {
@@ -107,13 +113,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return unsubscribe;
   }, [router]);
 
-  const handleMetricsReport = async () => {
-    if (pathname === "/metrics") {
-      router.push("/dashboard/pm");
-    } else {
-      router.push("/metrics");
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -136,10 +136,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <AvatarFallback className="bg-blue-800 text-white">
               {currentUser?.user_metadata?.name
                 ? currentUser.user_metadata.name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")
-                    .toUpperCase()
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
                 : currentUser?.email?.charAt(0).toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
@@ -148,9 +148,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-blue-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-blue-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -210,18 +209,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link
                       key={item.name}
                       href={item.href}
-                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-md group transition-colors ${
-                        isActive
-                          ? "bg-blue-700 text-white"
-                          : "text-blue-100 hover:bg-blue-700 hover:text-white"
-                      }`}
+                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-md group transition-colors ${isActive
+                        ? "bg-blue-700 text-white"
+                        : "text-blue-100 hover:bg-blue-700 hover:text-white"
+                        }`}
                     >
                       <item.icon
-                        className={`mr-3 h-5 w-5 ${
-                          isActive
-                            ? "text-white"
-                            : "text-blue-300 group-hover:text-white"
-                        }`}
+                        className={`mr-3 h-5 w-5 ${isActive
+                          ? "text-white"
+                          : "text-blue-300 group-hover:text-white"
+                          }`}
                       />
                       {item.name}
                     </Link>
@@ -244,10 +241,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <AvatarFallback className="bg-blue-900 text-white">
                         {currentUser?.user_metadata?.name
                           ? currentUser.user_metadata.name
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")
-                              .toUpperCase()
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                            .toUpperCase()
                           : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
@@ -285,18 +282,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <header className="hidden lg:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-6">
           <h1 className="text-2xl font-bold text-blue-800">B2K Dashboard</h1>
           <div className="flex items-center space-x-4">
-            {currentUserRole === "projectManager" && (
-              <Button variant="outline" onClick={handleMetricsReport}>
-                <div className="flex items-center justify-center gap-2">
-                  <p>
-                    {pathname === "/metrics"
-                      ? "Back to PM Dashboard"
-                      : "Metrics Report"}
-                  </p>
-                  <Cpu size={20} className="text-gray-500" />
-                </div>
-              </Button>
-            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -308,10 +294,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <AvatarFallback className="bg-blue-800 text-white">
                       {currentUser?.user_metadata?.name
                         ? currentUser.user_metadata.name
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .toUpperCase()
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase()
                         : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
