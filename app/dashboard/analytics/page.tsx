@@ -20,6 +20,19 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
+import { Tooltip } from "@/components/ui/tooltip"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format, parse } from "date-fns"
 
 const analyticsTables = [
     { id: "attendance", name: "Attendance"},
@@ -65,22 +78,24 @@ export default function AnalyticsPage() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-6rem)]">
-            <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-                <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-sm font-semibold text-gray-900">Analytics</h2>
+        <div className="flex flex-col h-[calc(100vh-6rem)] bg-white">
+            {/* Header with Report Tabs */}
+            <div className="border-b border-gray-200 bg-white shrink-0">
+                <div className="px-6 pt-6 pb-4">
+                    <h1 className="text-2xl font-semibold text-gray-900 mb-1">Analytics</h1>
+                    <p className="text-sm text-gray-600">
+                        View the latest analytics and metrics for your projects and tasks.
+                    </p>
                 </div>
-                <nav className="flex-1 overflow-y-auto p-2">
-                    <div className="px-3 py-2 mb-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Reports</p>
-                    </div>
+                <div className="px-6 pb-4">
+                    <div className="flex flex-wrap gap-2">
                     {analyticsTables.map((table) => {
                         const isActive = selectedTable === table.id;
                         return (
                             <button
                                 key={table.id}
                                 onClick={() => setSelectedTable(table.id)}
-                                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors mb-0.5 ${
+                                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                                     isActive
                                         ? "bg-blue-600 text-white"
                                         : "text-gray-700 hover:bg-gray-100"
@@ -90,19 +105,13 @@ export default function AnalyticsPage() {
                             </button>
                         );
                     })}
-                </nav>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-white">
+            {/* Main Content Area - Full Width */}
+            <div className="flex-1 overflow-y-auto min-w-0">
                 <div className="p-8">
-                    <div className="mb-6">
-                        <h1 className="text-2xl font-semibold text-gray-900">
-                            {analyticsTables.find((table) => table.id === selectedTable)?.name || "Attendance Report"}
-                        </h1>
-                        <p className="mt-1.5 text-sm text-gray-600">
-                            View the latest analytics and metrics for your projects and tasks.
-                        </p>
-                    </div>
                     <div>
                         {renderTable()}
                     </div>
@@ -117,6 +126,9 @@ function AttendanceTable() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [selectedUser, setSelectedUser] = useState<string | null>(null)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
   
     useEffect(() => {
       fetchAttendanceData()
@@ -143,9 +155,26 @@ function AttendanceTable() {
       new Set(attendanceData.map((r) => r.employee_name))
     ).filter(Boolean)
   
-    const filteredData = selectedUser
-      ? attendanceData.filter((r) => r.employee_name === selectedUser)
-      : attendanceData
+    // Filter data based on selected user and search query
+    const filteredData = attendanceData.filter((r) => {
+      const matchesUser = !selectedUser || r.employee_name === selectedUser
+      const matchesSearch = !searchQuery || 
+        r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.department?.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchesUser && matchesSearch
+    })
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginatedData = filteredData.slice(startIndex, endIndex)
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+      setCurrentPage(1)
+    }, [selectedUser, searchQuery])
   
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
@@ -166,55 +195,68 @@ function AttendanceTable() {
     }
   
     return (
-      <div className="flex gap-6">
-        {/* -------------------- SIDEBAR -------------------- */}
-        <Card className="w-64 shrink-0">
-          <CardHeader>
-            <CardTitle className="text-sm">Filter by Employee</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {uniqueUsers.length} employees
-            </p>
-          </CardHeader>
-  
-          <CardContent className="space-y-1">
-            <Button
-              variant={selectedUser === null ? "default" : "ghost"}
-              className={`w-full justify-start ${selectedUser === null ? "bg-blue-600 text-white hover:bg-blue-700" : ""}`}
-              onClick={() => setSelectedUser(null)}
-            >
+      <div className="space-y-4">
+        {/* -------------------- FILTERS BAR -------------------- */}
+        <Card>
+          <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                      {/* Search Bar */}
+                      <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, ID, or department..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Employee Dropdown */}
+              <Select
+                value={selectedUser || "all"}
+                onValueChange={(value) => setSelectedUser(value === "all" ? null : value)}
+              >
+                <SelectTrigger className="w-full sm:w-[250px]">
+                  <SelectValue placeholder="Filter by Employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
               All ({attendanceData.length})
-            </Button>
-  
+                  </SelectItem>
             {uniqueUsers.map((user) => {
               const count = attendanceData.filter(
                 (r) => r.employee_name === user
               ).length
-  
               return (
-                <Button
-                  key={user}
-                  variant={selectedUser === user ? "default" : "ghost"}
-                  className={`w-full justify-start ${selectedUser === user ? "bg-blue-600 text-white hover:bg-blue-700" : ""}`}
-                  onClick={() => setSelectedUser(user)}
-                >
+                      <SelectItem key={user} value={user}>
                   {user} ({count})
-                </Button>
-              )
-            })}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+
+              {/* Refresh Button */}
+              <Button 
+                onClick={fetchAttendanceData} 
+                className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
+              >
+                Refresh
+              </Button>
+            </div>
           </CardContent>
         </Card>
   
         {/* -------------------- TABLE -------------------- */}
-        <Card className="flex-1">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card>
+          <CardHeader>
             <div>
               <CardTitle>Attendance Report</CardTitle>
               <p className="text-sm text-muted-foreground">
                 {selectedUser ?? "All employees"} · {filteredData.length} records
               </p>
             </div>
-  
-            <Button onClick={fetchAttendanceData} className="bg-blue-600 text-white hover:bg-blue-700">Refresh</Button>
           </CardHeader>
   
           <CardContent className="overflow-x-auto">
@@ -236,14 +278,14 @@ function AttendanceTable() {
               </TableHeader>
   
               <TableBody>
-                {filteredData.length === 0 ? (
+                {paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center">
                       No data found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredData.map((r, i) => (
+                  paginatedData.map((r, i) => (
                     <TableRow key={r.id ?? i}>
                       <TableCell className="text-center">{r.department}</TableCell>
                       <TableCell className="text-center">{r.employee_id}</TableCell>
@@ -279,6 +321,84 @@ function AttendanceTable() {
               </TableBody>
             </Table>
           </CardContent>
+
+          {/* -------------------- PAGINATION -------------------- */}
+          {filteredData.length > 0 && (
+            <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Select
+                  value={itemsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value))
+                    setCurrentPage(1)
+                  }}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 per page</SelectItem>
+                    <SelectItem value="25">25 per page</SelectItem>
+                    <SelectItem value="50">50 per page</SelectItem>
+                    <SelectItem value="100">100 per page</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
       </div>
     )
@@ -293,6 +413,11 @@ function UserDailyReport() {
     );
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [userSearchQuery, setUserSearchQuery] = useState("");
+    const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
 
     // Fetch available users
     useEffect(() => {
@@ -363,6 +488,34 @@ function UserDailyReport() {
         }
     };
 
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.name?.toLowerCase().includes(query) ||
+            entry.client_name?.toLowerCase().includes(query) ||
+            entry.file_no?.toLowerCase().includes(query) ||
+            entry.work_type?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedUserId, selectedDate]);
+
+    // Filter users for dropdown search
+    const filteredUsers = availableUsers.filter((user) =>
+        user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -382,69 +535,97 @@ function UserDailyReport() {
     }
 
     return (
+        <div className="space-y-4">
+            {/* Filters Card */}
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>User Daily Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {selectedUserId && reportData.length > 0
-                            ? `${reportData.length} record${reportData.length !== 1 ? 's' : ''} found`
-                            : "Select a user and date to view daily report"}
-                    </p>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, client, file no..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
                 </div>
-            </CardHeader>
 
-            <CardContent>
-                {/* Filters */}
-                <div className="flex items-end gap-4 mb-6">
                     {/* User Selection */}
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select User
-                        </label>
-                        <select
+                        <Select
                             value={selectedUserId || ""}
-                            onChange={(e) => setSelectedUserId(e.target.value || null)}
-                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onValueChange={(value) => setSelectedUserId(value || null)}
                         >
-                            <option value="">Select a user...</option>
-                            {availableUsers.map((user) => (
-                                <option key={user.id} value={user.id}>
+                            <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectValue placeholder="Select user..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                                {availableUsers.length === 0 ? (
+                                    <SelectItem value="no-users" disabled>
+                                        No users available
+                                    </SelectItem>
+                                ) : (
+                                    availableUsers.map((user) => (
+                                        <SelectItem key={user.id} value={user.id}>
                                     {user.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
 
                     {/* Date Selection */}
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Select Date
-                        </label>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full sm:w-[200px] justify-start text-left font-normal"
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {selectedDate ? format(parse(selectedDate, 'yyyy-MM-dd', new Date()), 'PPP') : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedDate ? parse(selectedDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                    onSelect={(date) => {
+                                        if (date) {
+                                            setSelectedDate(format(date, 'yyyy-MM-dd'));
+                                        }
+                                    }}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
-                            Refresh
-                        </label>
+                        {/* Refresh Button */}
                         <Button
                             onClick={fetchDailyReport}
                             disabled={!selectedUserId || isLoading}
-                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
                         >
-                            {isLoading ? "Loading..." : "Refresh"}
+                            Refresh
                         </Button>
                     </div>
-                </div>
+                </CardContent>
+            </Card>
 
-                {/* Table */}
-                <div className="overflow-x-auto">
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
+                    <div>
+                        <CardTitle>User Daily Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {selectedUserId && filteredData.length > 0
+                                ? `${filteredData.length} record${filteredData.length !== 1 ? 's' : ''} found`
+                                : "Select a user and date to view daily report"}
+                        </p>
+                </div>
+                </CardHeader>
+
+                <CardContent className="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -464,7 +645,7 @@ function UserDailyReport() {
                         </TableHeader>
 
                         <TableBody>
-                            {reportData.length === 0 ? (
+                            {paginatedData.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={12} className="text-center">
                                         {selectedUserId
@@ -473,7 +654,7 @@ function UserDailyReport() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                reportData.map((entry, index) => (
+                                paginatedData.map((entry, index) => (
                                     <TableRow key={index}>
                                         <TableCell className="text-center">{entry.s_no}</TableCell>
                                         <TableCell className="text-center">{entry.year}</TableCell>
@@ -494,9 +675,87 @@ function UserDailyReport() {
                             )}
                         </TableBody>
                     </Table>
+                </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                 </div>
             </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -514,6 +773,8 @@ function UserMonthlyReport() {
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [isAllSelected, setIsAllSelected] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Fetch available users with roles
     useEffect(() => {
@@ -660,6 +921,28 @@ function UserMonthlyReport() {
         user.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // Get the data array, handling both empty and populated states
+    const tableData = reportData?.data || [];
+
+    // Pagination calculations
+    const totalPages = Math.ceil(tableData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = tableData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedUserIds, selectedMonth, selectedTeamType]);
+
+    // Month/Year for display
+    const getMonthYearDisplay = () => {
+        if (!selectedMonth) return "Select month";
+        const [year, month] = selectedMonth.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        return format(date, 'MMMM yyyy');
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -678,134 +961,101 @@ function UserMonthlyReport() {
         );
     }
 
-    if (!reportData || !reportData.data || reportData.data.length === 0) {
         return (
+        <div className="space-y-4">
+            {/* Filters Card */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Monthly User Report</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {/* Filters */}
-                    <div className="flex items-end gap-4 mb-4">
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
                             {/* Team Type Filter */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Team Type
                                 </label>
-                                <select
-                                    value={selectedTeamType}
-                                    onChange={(e) => {
-                                        setSelectedTeamType(e.target.value);
+                            <Select
+                                value={selectedTeamType || "all"}
+                                onValueChange={(value) => {
+                                    setSelectedTeamType(value === "all" ? "" : value);
                                         setSelectedUserIds([]);
                                     }}
-                                    className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-                                >
-                                    <option value="">All Teams</option>
-                                    <option value="QA">QA</option>
-                                    <option value="QC">QC</option>
-                                    <option value="Processor">Processor</option>
-                                </select>
+                            >
+                                <SelectTrigger className="w-[150px]">
+                                    <SelectValue placeholder="All Teams" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Teams</SelectItem>
+                                    <SelectItem value="QA">QA</SelectItem>
+                                    <SelectItem value="QC">QC</SelectItem>
+                                    <SelectItem value="Processor">Processor</SelectItem>
+                                </SelectContent>
+                            </Select>
                             </div>
 
-                            {/* User Selection Dropdown */}
-                            <div className="relative">
+                        {/* User Selection - using Popover for multi-select */}
+                        <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Select Users
                                 </label>
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                                        className="w-full min-w-[200px] px-3 py-2 h-[42px] text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
+                            <Popover open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-[200px] justify-between"
                                     >
-                                        <span className="text-sm text-gray-700 truncate">
+                                        <span className="truncate">
                                             {isAllSelected
                                                 ? "All users"
                                                 : selectedUserIds.length === 0
                                                 ? "Select users..."
-                                                : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''} selected`}
+                                                : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''}`}
                                         </span>
-                                        <svg
-                                            className={`h-5 w-5 text-gray-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-
-                                    {isUserDropdownOpen && (
-                                        <>
-                                            <div
-                                                className="fixed inset-0 z-10"
-                                                onClick={() => setIsUserDropdownOpen(false)}
-                                            ></div>
-                                            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-hidden">
-                                                {/* Search Input */}
-                                                <div className="p-2 border-b border-gray-200">
-                                                    <input
-                                                        type="text"
+                                        <ChevronRight className={`ml-2 h-4 w-4 transition-transform ${isUserDropdownOpen ? 'rotate-90' : ''}`} />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[250px] p-0" align="start">
+                                    <div className="p-2 border-b">
+                                        <div className="relative">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
                                                         placeholder="Search users..."
                                                         value={searchQuery}
                                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        onClick={(e) => e.stopPropagation()}
+                                                className="pl-8"
                                                     />
                                                 </div>
-
-                                                {/* All Option */}
-                                                <label
-                                                    className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-200"
-                                                >
+                                    </div>
+                                    <div className="max-h-60 overflow-y-auto">
+                                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer border-b">
                                                     <input
                                                         type="checkbox"
                                                         checked={isAllSelected}
                                                         onChange={handleAllToggle}
-                                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                                        onClick={(e) => e.stopPropagation()}
+                                                className="h-4 w-4 rounded border-gray-300"
                                                     />
-                                                    <span className="text-sm font-medium text-gray-700 flex-1">All</span>
+                                            <span className="text-sm font-medium">Select All</span>
                                                 </label>
-
-                                                {/* Users List */}
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    {filteredUsers.length === 0 ? (
-                                                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                                                            No users found
-                                                        </div>
-                                                    ) : (
-                                                        filteredUsers.map((user) => (
+                                        {filteredUsers.map((user) => (
                                                             <label
                                                                 key={user.id}
-                                                                className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                                className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer"
                                                             >
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={selectedUserIds.includes(user.id)}
-                                                                    onChange={() => {
-                                                                        handleUserToggle(user.id);
-                                                                        if (selectedUserIds.includes(user.id)) {
-                                                                            setIsAllSelected(false);
-                                                                        }
-                                                                    }}
-                                                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                />
-                                                                <span className="text-sm text-gray-700 flex-1">{user.name}</span>
+                                                    onChange={() => handleUserToggle(user.id)}
+                                                    className="h-4 w-4 rounded border-gray-300"
+                                                />
+                                                <span className="text-sm flex-1 truncate">{user.name}</span>
                                                                 {user.role && (
-                                                                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                                    <Badge variant="secondary" className="text-xs">
                                                                         {user.role}
-                                                                    </span>
+                                                    </Badge>
                                                                 )}
                                                             </label>
-                                                        ))
-                                                    )}
+                                        ))}
                                                 </div>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
+                                </PopoverContent>
+                            </Popover>
                             </div>
 
                             {/* Month Selection */}
@@ -813,30 +1063,40 @@ function UserMonthlyReport() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Select Month
                                 </label>
-                                <input
-                                    type="month"
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-[180px] justify-start">
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {getMonthYearDisplay()}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={selectedMonth ? parse(selectedMonth, 'yyyy-MM', new Date()) : undefined}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                setSelectedMonth(format(date, 'yyyy-MM'));
+                                            }
+                                        }}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
                             </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
-                                Refresh
-                            </label>
+                        {/* Refresh Button */}
                             <Button
                                 onClick={fetchMonthlyReport}
                                 disabled={isLoading}
-                                className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="bg-blue-600 text-white hover:bg-blue-700"
                             >
-                                {isLoading ? "Loading..." : "Refresh"}
+                            Refresh
                             </Button>
-                        </div>
                     </div>
 
                     {/* Selected Users Display */}
-                    {selectedUserIds.length > 0 && (
+                    {selectedUserIds.length > 0 && selectedUserIds.length < availableUsers.length && (
                         <div className="mt-4">
                             <div className="flex flex-wrap gap-2">
                                 {getSelectedUserNames().map((name: string) => {
@@ -844,15 +1104,16 @@ function UserMonthlyReport() {
                                     return (
                                         <Badge
                                             key={userId}
-                                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                                            variant="secondary"
+                                            className="inline-flex items-center gap-1 px-3 py-1"
                                         >
                                             {name}
                                             <button
                                                 onClick={() => handleUserToggle(userId!)}
-                                                className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                                className="ml-1 hover:text-destructive focus:outline-none"
                                                 type="button"
                                             >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
                                             </button>
@@ -862,209 +1123,23 @@ function UserMonthlyReport() {
                             </div>
                         </div>
                     )}
-
-                    <p className="text-gray-500 text-center mt-4">
-                        {selectedUserIds.length > 0
-                            ? "No data found for the selected month"
-                            : "Please select users and month"}
-                    </p>
                 </CardContent>
             </Card>
-        );
-    }
 
-    return (
+            {/* Table Card */}
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                 <div>
                     <CardTitle>Monthly User Report</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                        {reportData.data.length} record{reportData.data.length !== 1 ? 's' : ''} found
+                            {tableData.length > 0
+                                ? `${tableData.length} record${tableData.length !== 1 ? 's' : ''} found`
+                                : "Select users and month to view report"}
                     </p>
                 </div>
             </CardHeader>
 
-            <CardContent>
-                {/* Filters */}
-                <div className="flex items-end gap-4 mb-6">
-                        {/* Team Type Filter */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Team Type
-                            </label>
-                            <select
-                                value={selectedTeamType}
-                                onChange={(e) => {
-                                    setSelectedTeamType(e.target.value);
-                                    setSelectedUserIds([]);
-                                }}
-                                className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-                            >
-                                <option value="">All Teams</option>
-                                <option value="QA">QA</option>
-                                <option value="QC">QC</option>
-                                <option value="Processor">Processor</option>
-                            </select>
-                        </div>
-
-                        {/* User Selection Dropdown */}
-                        <div className="relative">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Users
-                            </label>
-                            <div className="relative">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                                    className="w-full min-w-[200px] px-3 py-2 h-[42px] text-left border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between"
-                                >
-                                    <span className="text-sm text-gray-700 truncate">
-                                        {isAllSelected
-                                            ? "All users"
-                                            : selectedUserIds.length === 0
-                                            ? "Select users..."
-                                            : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''} selected`}
-                                    </span>
-                                    <svg
-                                        className={`h-5 w-5 text-gray-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-
-                                {isUserDropdownOpen && (
-                                    <>
-                                        <div
-                                            className="fixed inset-0 z-10"
-                                            onClick={() => setIsUserDropdownOpen(false)}
-                                        ></div>
-                                        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-hidden">
-                                            {/* Search Input */}
-                                            <div className="p-2 border-b border-gray-200">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search users..."
-                                                    value={searchQuery}
-                                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            </div>
-
-                                            {/* All Option */}
-                                            <label
-                                                className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-200"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isAllSelected}
-                                                    onChange={handleAllToggle}
-                                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <span className="text-sm font-medium text-gray-700 flex-1">All</span>
-                                            </label>
-
-                                            {/* Users List */}
-                                            <div className="max-h-48 overflow-y-auto">
-                                                {filteredUsers.length === 0 ? (
-                                                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                                                        No users found
-                                                    </div>
-                                                ) : (
-                                                    filteredUsers.map((user) => (
-                                                        <label
-                                                            key={user.id}
-                                                            className="flex items-center space-x-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedUserIds.includes(user.id)}
-                                                                onChange={() => {
-                                                                    handleUserToggle(user.id);
-                                                                    if (selectedUserIds.includes(user.id)) {
-                                                                        setIsAllSelected(false);
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            />
-                                                            <span className="text-sm text-gray-700 flex-1">{user.name}</span>
-                                                            {user.role && (
-                                                                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                                                    {user.role}
-                                                                </span>
-                                                            )}
-                                                        </label>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Month Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Month
-                            </label>
-                            <input
-                                type="month"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
-                            Refresh
-                        </label>
-                        <Button
-                            onClick={fetchMonthlyReport}
-                            disabled={isLoading}
-                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? "Loading..." : "Refresh"}
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Selected Users Display */}
-                {selectedUserIds.length > 0 && (
-                    <div className="mt-4">
-                        <div className="flex flex-wrap gap-2">
-                            {getSelectedUserNames().map((name: string) => {
-                                const userId = availableUsers.find((u: any) => u.name === name)?.id;
-                                return (
-                                    <Badge
-                                        key={userId}
-                                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-                                    >
-                                        {name}
-                                        <button
-                                            onClick={() => handleUserToggle(userId!)}
-                                            className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
-                                            type="button"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </Badge>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Table */}
-                <div className="overflow-x-auto">
+                <CardContent className="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -1075,19 +1150,107 @@ function UserMonthlyReport() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {reportData.data.map((entry: any) => (
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">
+                                        {selectedUserIds.length > 0
+                                            ? "No data found for the selected month"
+                                            : "Please select users and month"}
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedData.map((entry: any) => (
                                 <TableRow key={entry.user_id}>
                                     <TableCell className="text-center">{entry.s_no}</TableCell>
                                     <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                     <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
                                     <TableCell className="text-center">{parseFloat(entry.total_hours || 0).toFixed(2)}</TableCell>
                                 </TableRow>
-                            ))}
+                                ))
+                            )}
                         </TableBody>
                     </Table>
+                </CardContent>
+
+                {/* Pagination */}
+                {tableData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, tableData.length)} of {tableData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                 </div>
             </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -1097,6 +1260,9 @@ function POReport() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchPOReport();
@@ -1118,13 +1284,11 @@ function POReport() {
             const response = await fetch(url);
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -1143,6 +1307,28 @@ function POReport() {
             setIsLoading(false);
         }
     };
+
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.project_name?.toLowerCase().includes(query) ||
+            entry.status?.toLowerCase().includes(query) ||
+            entry.po_number?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, startDate, endDate]);
 
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
@@ -1163,41 +1349,80 @@ function POReport() {
     }
 
     return (
+        <div className="space-y-4">
+            {/* Filters Card */}
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>PO Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
-                    </p>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by project, status, PO number..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
                 </div>
-                <div className="flex items-end gap-4">
+
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap gap-4 items-end">
+                            {/* Start Date */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                             Start Date
                         </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {startDate ? format(parse(startDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={startDate ? parse(startDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setStartDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                     </div>
+
+                            {/* End Date */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                             End Date
                         </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {endDate ? format(parse(endDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                        mode="single"
+                                        selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                setEndDate(format(date, 'yyyy-MM-dd'));
+                                            }
+                                        }}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
-                            Filter
-                        </label>
+
+                            {/* Filter Button */}
                         <Button
                             onClick={fetchPOReport}
                             className="bg-blue-600 text-white hover:bg-blue-700"
@@ -1205,6 +1430,18 @@ function POReport() {
                             Filter
                         </Button>
                     </div>
+                </div>
+                </CardContent>
+            </Card>
+
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
+                    <div>
+                        <CardTitle>PO Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
+                        </p>
                 </div>
             </CardHeader>
 
@@ -1226,14 +1463,14 @@ function POReport() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.length === 0 ? (
+                            {paginatedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={11} className="text-center">
                                     No PO report data found
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            reportData.map((entry, index) => (
+                                paginatedData.map((entry, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="text-center">{entry.s_no}</TableCell>
                                     <TableCell className="text-center">{entry.received_date}</TableCell>
@@ -1273,7 +1510,86 @@ function POReport() {
                     </TableBody>
                 </Table>
             </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -1283,6 +1599,9 @@ function QAReport() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchQAReport();
@@ -1304,13 +1623,11 @@ function QAReport() {
             const response = await fetch(url);
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -1329,6 +1646,29 @@ function QAReport() {
             setIsLoading(false);
         }
     };
+
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.name?.toLowerCase().includes(query) ||
+            entry.client_name?.toLowerCase().includes(query) ||
+            entry.file_name?.toLowerCase().includes(query) ||
+            entry.work_type?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, startDate, endDate]);
 
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
@@ -1349,48 +1689,99 @@ function QAReport() {
     }
 
     return (
+        <div className="space-y-4">
+            {/* Filters Card */}
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>QA Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
-                    </p>
-                </div>
-                <div className="flex items-end gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, client, file..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap gap-4 items-end">
+                            {/* Start Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Start Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {startDate ? format(parse(startDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={startDate ? parse(startDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setStartDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* End Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    End Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {endDate ? format(parse(endDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setEndDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* Filter Button */}
+                            <Button
+                                onClick={fetchQAReport}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                Filter
+                            </Button>
+                        </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
-                            Filter
-                        </label>
-                        <Button
-                            onClick={fetchQAReport}
-                            className="bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                            Filter
-                        </Button>
-                    </div>
+                        <CardTitle>QA Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
+                        </p>
                 </div>
             </CardHeader>
 
@@ -1411,19 +1802,27 @@ function QAReport() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.length === 0 ? (
+                            {paginatedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={10} className="text-center">
                                     No QA report data found
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            reportData.map((entry, index) => (
+                                paginatedData.map((entry, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="text-center">{entry.working_date}</TableCell>
                                     <TableCell className="text-center font-medium">{entry.name}</TableCell>
-                                    <TableCell className="text-center">{entry.client_name}</TableCell>
-                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                        <TableCell className="text-center max-w-[150px]">
+                                            <Tooltip content={entry.client_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center max-w-[250px]">
+                                            <Tooltip content={entry.file_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
                                     <TableCell className="text-center">{entry.work_type}</TableCell>
                                     <TableCell className="text-center">{entry.page_no}</TableCell>
                                     <TableCell className="text-center">{entry.start_time}</TableCell>
@@ -1436,7 +1835,86 @@ function QAReport() {
                     </TableBody>
                 </Table>
             </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -1448,6 +1926,9 @@ function DTPMonthlyReport() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchDTPMonthlyReport(); 
@@ -1461,13 +1942,11 @@ function DTPMonthlyReport() {
             const response = await fetch(`/api/analytics/dtp-report?month=${selectedMonth}`);
 
             if (!response.ok) {
-                // Try to get error message from response
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
                 } catch {
-                    // If response is not JSON, use status text
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -1488,6 +1967,37 @@ function DTPMonthlyReport() {
         }
     };
 
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.name?.toLowerCase().includes(query) ||
+            entry.client_name?.toLowerCase().includes(query) ||
+            entry.job_no?.toLowerCase().includes(query) ||
+            entry.process?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedMonth]);
+
+    // Month/Year display
+    const getMonthYearDisplay = () => {
+        if (!selectedMonth) return "Select month";
+        const [year, month] = selectedMonth.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        return format(date, 'MMMM yyyy');
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -1506,85 +2016,76 @@ function DTPMonthlyReport() {
         );
     }
 
-    if (!reportData || reportData.length === 0) {
         return (
+        <div className="space-y-4">
+            {/* Filters Card */}
             <Card>
-                <CardHeader>
-                    <CardTitle>DTP Monthly Report</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {/* Filters */}
-                    <div className="flex items-end gap-4 mb-4">
-                        {/* Month Selection */}
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Month
-                            </label>
-                            <input
-                                type="month"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, client, job no..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
-                                Refresh
-                            </label>
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap gap-4 items-end">
+                            {/* Month Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Month
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[180px] justify-start">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {getMonthYearDisplay()}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedMonth ? parse(selectedMonth, 'yyyy-MM', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setSelectedMonth(format(date, 'yyyy-MM'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* Refresh Button */}
                             <Button
                                 onClick={fetchDTPMonthlyReport}
                                 disabled={isLoading}
-                                className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                className="bg-blue-600 text-white hover:bg-blue-700"
                             >
-                                {isLoading ? "Loading..." : "Refresh"}
+                                Refresh
                             </Button>
                         </div>
                     </div>
-
-                    <p className="text-gray-500 text-center mt-4">
-                        No DTP Monthly report data found for the selected month.
-                    </p>
                 </CardContent>
             </Card>
-        );
-    }
 
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>DTP Monthly Report</CardTitle>
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
+                    <div>
+                        <CardTitle>DTP Monthly Report</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
+                            {filteredData.length > 0
+                                ? `${filteredData.length} record${filteredData.length !== 1 ? 's' : ''} found`
+                                : "Select a month to view report"}
                     </p>
-                </div>
-                <div className="flex items-end gap-4">
-                    {/* Month Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Month
-                        </label>
-                        <input
-                            type="month"
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5 invisible">
-                            Refresh
-                        </label>
-                        <Button
-                            onClick={fetchDTPMonthlyReport}
-                            disabled={isLoading}
-                            className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? "Loading..." : "Refresh"}
-                        </Button>
-                    </div>
                 </div>
             </CardHeader>
 
@@ -1607,13 +2108,28 @@ function DTPMonthlyReport() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.map((entry, index) => (
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={12} className="text-center">
+                                        No DTP Monthly report data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedData.map((entry, index) => (
                             <TableRow key={index}>
                                 <TableCell className="text-center">{entry.s_no}</TableCell>
                                 <TableCell className="text-center">{entry.date}</TableCell>
                                 <TableCell className="text-center font-medium">{entry.name}</TableCell>
-                                <TableCell className="text-center">{entry.client_name}</TableCell>
-                                <TableCell className="text-center">{entry.job_no}</TableCell>
+                                        <TableCell className="text-center max-w-[150px]">
+                                            <Tooltip content={entry.client_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center max-w-[150px]">
+                                            <Tooltip content={entry.job_no || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.job_no || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
                                 <TableCell className="text-center">{entry.process}</TableCell>
                                 <TableCell className="text-center">{entry.page_count}</TableCell>
                                 <TableCell className="text-center">{entry.start_time}</TableCell>
@@ -1622,11 +2138,91 @@ function DTPMonthlyReport() {
                                 <TableCell className="text-center">{entry.shift}</TableCell>
                                 <TableCell className="text-center">{entry.po}</TableCell>
                             </TableRow>
-                        ))}
+                                ))
+                            )}
                     </TableBody>
                 </Table>
             </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -1636,6 +2232,9 @@ function DTPTracking() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchDTPTracking();
@@ -1697,6 +2296,35 @@ function DTPTracking() {
         setEndDate("");
     };
 
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.job_no?.toString().toLowerCase().includes(query) ||
+            entry.delivered_by?.toLowerCase().includes(query) ||
+            entry.mail_instruction?.toLowerCase().includes(query) ||
+            entry.task_type?.toLowerCase().includes(query) ||
+            entry.task_name?.toLowerCase().includes(query) ||
+            entry.language?.toLowerCase().includes(query) ||
+            entry.platform?.toLowerCase().includes(query) ||
+            entry.dtp_person?.toLowerCase().includes(query) ||
+            entry.qc_taken_by?.toLowerCase().includes(query) ||
+            entry.qa_taken_by?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to first page when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -1728,33 +2356,75 @@ function DTPTracking() {
                 </div>
 
                 {/* Filter Section */}
-                <div className="flex items-end gap-4 mt-4">
-                    <div className="flex-1">
+                <div className="flex flex-wrap items-end gap-4 mt-4 justify-between">
+                    <div className="flex-1 min-w-[200px]">
                         <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Start Date
+                            Search
                         </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                type="text"
+                                placeholder="Search by job, person, task..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-[42px]"
+                            />
+                        </div>
                     </div>
-                    <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
-                            Filter
-                        </label>
+
+                    {/* Date Filters */}
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                Start Date
+                            </label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-[160px] h-[42px] justify-start text-left font-normal">
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {startDate ? format(parse(startDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={startDate ? parse(startDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                setStartDate(format(date, 'yyyy-MM-dd'));
+                                            }
+                                        }}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                                End Date
+                            </label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-[160px] h-[42px] justify-start text-left font-normal">
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {endDate ? format(parse(endDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                setEndDate(format(date, 'yyyy-MM-dd'));
+                                            }
+                                        }}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                         <div className="flex gap-2">
                             <Button
                                 onClick={handleFilter}
@@ -1777,12 +2447,15 @@ function DTPTracking() {
             </CardHeader>
 
             <CardContent className="overflow-x-auto">
-                {reportData.length === 0 ? (
+                {filteredData.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-gray-500">No DTP Tracking data found.</p>
-                        {(startDate || endDate) && (
+                        {(startDate || endDate || searchQuery) && (
                             <Button
-                                onClick={handleClearFilters}
+                                onClick={() => {
+                                    handleClearFilters();
+                                    setSearchQuery("");
+                                }}
                                 variant="link"
                                 className="mt-2 text-sm text-blue-600 hover:text-blue-700"
                             >
@@ -1791,6 +2464,14 @@ function DTPTracking() {
                         )}
                     </div>
                 ) : (
+                    <>
+                        {/* Results count */}
+                        <div className="flex items-center justify-between mb-4">
+                            <p className="text-sm text-gray-600">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
+                                {searchQuery && ` (filtered from ${reportData.length} total)`}
+                            </p>
+                        </div>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -1798,7 +2479,7 @@ function DTPTracking() {
                                 <TableHead className="text-center">Job No</TableHead>
                                 <TableHead className="text-center">Delivered by</TableHead>
                                 <TableHead className="text-center">PO</TableHead>
-                                <TableHead className="text-center min-w-[500px]">Mail instruction</TableHead>
+                                <TableHead className="text-center">Mail instruction</TableHead>
                                 <TableHead className="text-center">Task type</TableHead>
                                 <TableHead className="text-center">Task Name</TableHead>
                                 <TableHead className="text-center">File Count</TableHead>
@@ -1840,7 +2521,7 @@ function DTPTracking() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {reportData.map((entry, index) => (
+                            {paginatedData.map((entry, index) => (
                                 <TableRow key={entry.job_no || index}>
                                     {/* Job Details Data */}
                                     <TableCell className="text-center">{entry.job_no || "N/A"}</TableCell>
@@ -1848,9 +2529,17 @@ function DTPTracking() {
                                     <TableCell className="text-center">
                                         {typeof entry.po === 'number' ? entry.po.toFixed(2) : entry.po || "N/A"}
                                     </TableCell>
-                                    <TableCell className="text-center min-w-[500px] max-w-[800px] whitespace-normal break-words">{entry.mail_instruction || "N/A"}</TableCell>
+                                    <TableCell className="text-center max-w-[300px]">
+                                        <Tooltip content={entry.mail_instruction || "N/A"}>
+                                            <span className="block truncate cursor-default">{entry.mail_instruction || "N/A"}</span>
+                                        </Tooltip>
+                                    </TableCell>
                                     <TableCell className="text-center">{entry.task_type || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.task_name || "N/A"}</TableCell>
+                                    <TableCell className="text-center max-w-[200px]">
+                                        <Tooltip content={entry.task_name || "N/A"}>
+                                            <span className="block truncate cursor-default">{entry.task_name || "N/A"}</span>
+                                        </Tooltip>
+                                    </TableCell>
                                     <TableCell className="text-center">{entry.file_count || 0}</TableCell>
                                     <TableCell className="text-center">{entry.page_count || 0}</TableCell>
                                     
@@ -2029,6 +2718,77 @@ function DTPTracking() {
                             ))}
                         </TableBody>
                     </Table>
+
+                        {/* Pagination Controls */}
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Rows per page:</span>
+                                <Select
+                                    value={itemsPerPage.toString()}
+                                    onValueChange={(value) => {
+                                        setItemsPerPage(Number(value));
+                                        setCurrentPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[70px] h-8">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-60">
+                                        <SelectItem value="10">10</SelectItem>
+                                        <SelectItem value="25">25</SelectItem>
+                                        <SelectItem value="50">50</SelectItem>
+                                        <SelectItem value="100">100</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                className="w-8 h-8 p-0"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </>
                 )}
             </CardContent>
         </Card>
@@ -2235,6 +2995,9 @@ function QCReport() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchQCReport();
@@ -2280,6 +3043,29 @@ function QCReport() {
         }
     };
 
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.name?.toLowerCase().includes(query) ||
+            entry.client_name?.toLowerCase().includes(query) ||
+            entry.file_name?.toLowerCase().includes(query) ||
+            entry.work_type?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, startDate, endDate]);
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -2299,48 +3085,99 @@ function QCReport() {
     }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>QC Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
-                    </p>
-                </div>
-                <div className="flex items-end gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+        <div className="space-y-4">
+            {/* Filters Card */}
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, client, file..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap gap-4 items-end">
+                            {/* Start Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Start Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {startDate ? format(parse(startDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={startDate ? parse(startDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setStartDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* End Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    End Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {endDate ? format(parse(endDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setEndDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* Filter Button */}
+                            <Button
+                                onClick={fetchQCReport}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                Filter
+                            </Button>
+                        </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
-                            Filter
-                        </label>
-                        <Button
-                            onClick={fetchQCReport}
-                            className="bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                            Filter
-                        </Button>
-                    </div>
+                        <CardTitle>QC Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
+                        </p>
                 </div>
             </CardHeader>
 
@@ -2361,19 +3198,27 @@ function QCReport() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.length === 0 ? (
+                            {paginatedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={10} className="text-center">
                                     No QC report data found
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            reportData.map((entry, index) => (
+                                paginatedData.map((entry, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="text-center">{entry.working_date}</TableCell>
                                     <TableCell className="text-center font-medium">{entry.name}</TableCell>
-                                    <TableCell className="text-center">{entry.client_name}</TableCell>
-                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                        <TableCell className="text-center max-w-[150px]">
+                                            <Tooltip content={entry.client_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center max-w-[250px]">
+                                            <Tooltip content={entry.file_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
                                     <TableCell className="text-center">{entry.work_type}</TableCell>
                                     <TableCell className="text-center">{entry.page_no}</TableCell>
                                     <TableCell className="text-center">{entry.start_time}</TableCell>
@@ -2386,7 +3231,86 @@ function QCReport() {
                     </TableBody>
                 </Table>
             </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
 
@@ -2396,6 +3320,9 @@ function ProcessorReport() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchProcessorReport();
@@ -2441,6 +3368,29 @@ function ProcessorReport() {
         }
     };
 
+    // Filter data based on search query
+    const filteredData = reportData.filter((entry) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            entry.name?.toLowerCase().includes(query) ||
+            entry.client_name?.toLowerCase().includes(query) ||
+            entry.file_name?.toLowerCase().includes(query) ||
+            entry.work_type?.toLowerCase().includes(query)
+        );
+    });
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, startDate, endDate]);
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -2460,48 +3410,99 @@ function ProcessorReport() {
     }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Processor Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {reportData.length} record{reportData.length !== 1 ? 's' : ''} found
-                    </p>
-                </div>
-                <div className="flex items-end gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+        <div className="space-y-4">
+            {/* Filters Card */}
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, client, file..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap gap-4 items-end">
+                            {/* Start Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Start Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {startDate ? format(parse(startDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={startDate ? parse(startDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setStartDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* End Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    End Date
+                                </label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {endDate ? format(parse(endDate, 'yyyy-MM-dd', new Date()), 'PP') : <span className="text-muted-foreground">Pick date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setEndDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* Filter Button */}
+                            <Button
+                                onClick={fetchProcessorReport}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                Filter
+                            </Button>
+                        </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Table Card */}
+            <Card>
+                <CardHeader>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="px-3 py-2 h-[42px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
-                            Filter
-                        </label>
-                        <Button
-                            onClick={fetchProcessorReport}
-                            className="bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                            Filter
-                        </Button>
-                    </div>
+                        <CardTitle>Processor Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
+                        </p>
                 </div>
             </CardHeader>
 
@@ -2522,19 +3523,27 @@ function ProcessorReport() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {reportData.length === 0 ? (
+                            {paginatedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={10} className="text-center">
                                     No Processor report data found
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            reportData.map((entry, index) => (
+                                paginatedData.map((entry, index) => (
                                 <TableRow key={index}>
                                     <TableCell className="text-center">{entry.working_date}</TableCell>
                                     <TableCell className="text-center font-medium">{entry.name}</TableCell>
-                                    <TableCell className="text-center">{entry.client_name}</TableCell>
-                                    <TableCell className="text-center">{entry.file_name}</TableCell>
+                                        <TableCell className="text-center max-w-[150px]">
+                                            <Tooltip content={entry.client_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center max-w-[250px]">
+                                            <Tooltip content={entry.file_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
                                     <TableCell className="text-center">{entry.work_type}</TableCell>
                                     <TableCell className="text-center">{entry.page_no}</TableCell>
                                     <TableCell className="text-center">{entry.start_time}</TableCell>
@@ -2547,6 +3556,85 @@ function ProcessorReport() {
                     </TableBody>
                 </Table>
             </CardContent>
+
+                {/* Pagination */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
         </Card>
+        </div>
     );
 }
