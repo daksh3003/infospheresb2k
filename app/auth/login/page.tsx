@@ -1,8 +1,7 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState } from "react";
+import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
@@ -10,10 +9,10 @@ import { api } from "../../../utils/api";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { toast } from "react-toastify";
 
-function LoginForm() {
+export default function Login() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -36,46 +35,46 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      // Sign in with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      const result = await api.login(formData.email, formData.password);
+      console.log("Login result:", result);
 
-      if (error) {
-        throw new Error(error.message);
+      if (!result.user) {
+        throw new Error("Authentication failed. Please try again.");
       }
 
-      if (!data.user) {
-        throw new Error("Authentication failed");
-      }
-
-      // Check email confirmation
-      if (!data.user.email_confirmed_at) {
+      if (!result.user.email_confirmed_at) {
         router.push("/auth/verify-email");
         return;
       }
 
-      // Track session on server
-      await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: data.user.id }),
-      });
+      const userRole = result.role;
+      console.log("user role", userRole);
+      setTimeout(() => {
+        console.log("User role after timeout:", userRole);
+      }, 10000);
 
-      // Check for redirect parameter from middleware
-      const redirect = searchParams.get("redirect");
+      // Determine redirect path based on role : useful in the case of redirecting to respective dashboards based on the roles.
+      let redirectPath = "/dashboard";
 
-      if (redirect && redirect !== "/") {
-        // Redirect back to the original page
-        router.push(redirect);
-      } else {
-        // Let middleware handle the redirect based on role
-        router.push("/");
+      if (userRole) {
+        switch (userRole) {
+          case "projectManager":
+            redirectPath = "/dashboard/pm";
+            break;
+          case "qcTeam":
+            redirectPath = "/dashboard/qc";
+            break;
+          case "qaTeam":
+            redirectPath = "/dashboard/qa";
+            break;
+          case "processor":
+            redirectPath = "/dashboard/processor";
+            break;
+        }
       }
 
-      // Refresh to trigger middleware and update server-side session
-      router.refresh();
+      // Direct redirect without prefetch for faster response
+      router.push(redirectPath);
     } catch (error: unknown) {
       toast("Invalid login credentials", {
         type: "error",
@@ -87,20 +86,21 @@ function LoginForm() {
   };
 
   useEffect(() => {
-    // Check if redirected due to session timeout
-    const sessionTimeout = searchParams.get("session_timeout");
-    if (sessionTimeout === "true") {
-      toast("Session expired. Please log in again.", {
-        type: "warning",
-        position: "top-right",
-      });
-    }
-  }, [searchParams]);
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return <LoadingScreen message="Initializing..." />;
 
   return (
     <>
       {loading && <LoadingScreen variant="overlay" message="Signing in..." />}
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center">
+        <Head>
+          <title>Login | Bytes 2 Knowledge</title>
+          <meta name="description" content="Login to your B2K account" />
+          <link rel="icon" href="/favicon.ico" />
+        </Head>
+
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-6xl">
             <div className="bg-white overflow-hidden shadow-md sm:rounded-lg flex">
@@ -205,13 +205,26 @@ function LoginForm() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? "opacity-50 cursor-not-allowed" : ""
-                          }`}
+                        className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                          loading ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
                       >
                         {loading ? "Signing in..." : "Sign in"}
                       </button>
                     </div>
                   </form>
+
+                  <div className="mt-6">
+                    <p className="text-center text-sm text-gray-600">
+                      Don&apos;t have an account?{" "}
+                      <Link
+                        href="/auth/signup"
+                        className="font-medium text-blue-600 hover:text-blue-500"
+                      >
+                        Sign up
+                      </Link>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -219,13 +232,5 @@ function LoginForm() {
         </div>
       </div>
     </>
-  );
-}
-
-export default function Login() {
-  return (
-    <Suspense fallback={<LoadingScreen message="Loading..." />}>
-      <LoginForm />
-    </Suspense>
   );
 }
