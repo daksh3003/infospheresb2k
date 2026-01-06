@@ -14,6 +14,7 @@ import {
   ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
+  UserCog,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
     { name: "Analytics", href: "/dashboard/analytics", icon: ChartNoAxesCombined },
+    { name: "User Management", href: "/dashboard/user-management", icon: UserCog },
   ];
 
   const toggleSidebar = () => {
@@ -110,13 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return unsubscribe;
   }, [router]);
 
-  const handleMetricsReport = async () => {
-    if (pathname === "/metrics") {
-      router.push("/dashboard/pm");
-    } else {
-      router.push("/metrics");
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -216,6 +212,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       "/dashboard/qc",
                       "/dashboard/qa",
                       "/dashboard/analytics",
+                      "/dashboard/user-management",
                     ],
                     processor: ["/dashboard/processor"],
                     qcTeam: ["/dashboard/qc"],
@@ -314,18 +311,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <header className="hidden lg:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-6">
           <h1 className="text-2xl font-bold text-blue-800">B2K Dashboard</h1>
           <div className="flex items-center space-x-4">
-            {currentUserRole === "projectManager" && (
-              <Button variant="outline" onClick={handleMetricsReport}>
-                <div className="flex items-center justify-center gap-2">
-                  <p>
-                    {pathname === "/metrics"
-                      ? "Back to PM Dashboard"
-                      : "Metrics Report"}
-                  </p>
-                  <Cpu size={20} className="text-gray-500" />
-                </div>
-              </Button>
-            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
