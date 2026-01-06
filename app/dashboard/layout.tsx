@@ -12,6 +12,8 @@ import {
   X,
   Cpu,
   ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -69,7 +72,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const fetchUserRole = async (userId: string) => {
       try {
         const response = await fetch(`/api/auth/user/role?userId=${userId}`);
-        
+
         if (!response.ok) {
           // console.error('Failed to fetch user role:', response.statusText);
           // toast.error("Invalid login credentials. Please try again.");
@@ -136,10 +139,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <AvatarFallback className="bg-blue-800 text-white">
               {currentUser?.user_metadata?.name
                 ? currentUser.user_metadata.name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")
-                    .toUpperCase()
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
                 : currentUser?.email?.charAt(0).toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
@@ -148,32 +151,52 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-blue-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 bg-blue-800 transform transition-all duration-300 ease-in-out lg:translate-x-0 ${isCollapsed ? "lg:w-20 w-64" : "w-64"
+          } ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center h-16 px-6 border-b border-blue-700">
-            <div className="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center mr-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+          {/* Logo & Toggle Section */}
+          <div className="flex items-center h-16 px-4 border-b border-blue-700 transition-all duration-300">
+            {isCollapsed ? (
+              <button
+                onClick={() => setIsCollapsed(false)}
+                className="w-full flex items-center justify-center h-10 text-blue-300 hover:text-white hover:bg-blue-700 rounded-md transition-colors"
+                title="Expand Sidebar"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-white">
-              Bytes 2 Knowledge
-            </span>
+                <ChevronRight size={20} />
+              </button>
+            ) : (
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center overflow-hidden">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center mr-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-base font-bold text-white truncate">
+                    B2K Dashboard
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="hidden lg:flex items-center justify-center w-8 h-8 text-blue-300 hover:text-white hover:bg-blue-700 rounded-md transition-colors"
+                  title="Collapse Sidebar"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -210,20 +233,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link
                       key={item.name}
                       href={item.href}
-                      className={`flex items-center px-4 py-3 text-sm font-medium rounded-md group transition-colors ${
-                        isActive
+                      className={`flex items-center text-sm font-medium rounded-md group transition-all duration-300 ${isCollapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3'
+                        } ${isActive
                           ? "bg-blue-700 text-white"
                           : "text-blue-100 hover:bg-blue-700 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <item.icon
-                        className={`mr-3 h-5 w-5 ${
-                          isActive
+                        className={`h-5 w-5 flex-shrink-0 ${!isCollapsed && 'mr-3'
+                          } ${isActive
                             ? "text-white"
                             : "text-blue-300 group-hover:text-white"
-                        }`}
+                          }`}
                       />
-                      {item.name}
+                      {!isCollapsed && (
+                        <span className="truncate">{item.name}</span>
+                      )}
                     </Link>
                   );
                 })}
@@ -236,29 +261,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full flex items-center text-left px-4 py-2 text-sm text-blue-100 hover:bg-blue-700 hover:text-white rounded-md"
+                  className={`w-full flex items-center text-left py-2 text-sm text-blue-100 hover:bg-blue-700 hover:text-white rounded-md transition-all duration-300 ${isCollapsed ? 'px-0 justify-center' : 'px-4'
+                    }`}
                 >
-                  <div className="flex items-center">
-                    <Avatar className="h-8 w-8 mr-3">
+                  <div className="flex items-center overflow-hidden">
+                    <Avatar className={`h-8 w-8 flex-shrink-0 ${!isCollapsed && 'mr-3'}`}>
                       {/* <AvatarImage src="/avatars/user.png" /> */}
                       <AvatarFallback className="bg-blue-900 text-white">
                         {currentUser?.user_metadata?.name
                           ? currentUser.user_metadata.name
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")
-                              .toUpperCase()
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                            .toUpperCase()
                           : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-medium">
-                        {currentUser?.user_metadata?.name || "User Name"}
-                      </p>
-                      <p className="text-xs text-blue-300">
-                        {currentUser?.email || "user@example.com"}
-                      </p>
-                    </div>
+                    {!isCollapsed && (
+                      <div className="truncate">
+                        <p className="font-medium truncate">
+                          {currentUser?.user_metadata?.name || "User Name"}
+                        </p>
+                        <p className="text-xs text-blue-300 truncate">
+                          {currentUser?.email || "user@example.com"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -276,11 +304,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
         </div>
       </div>
 
       {/* Main content */}
-      <div className={`transition-all duration-300 lg:ml-64`}>
+      <div className={`transition-all duration-300 ${isCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         {/* Desktop header */}
         <header className="hidden lg:flex h-16 border-b border-gray-200 bg-white items-center justify-between px-6">
           <h1 className="text-2xl font-bold text-blue-800">B2K Dashboard</h1>
@@ -308,10 +337,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <AvatarFallback className="bg-blue-800 text-white">
                       {currentUser?.user_metadata?.name
                         ? currentUser.user_metadata.name
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .toUpperCase()
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase()
                         : currentUser?.email?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>

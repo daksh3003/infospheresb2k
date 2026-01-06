@@ -6,45 +6,47 @@ import { usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
+    Alert,
+    AlertDescription,
+    AlertTitle,
 } from "@/components/ui/alert"
 import { Tooltip } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select"
-import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, ShieldCheck, Cpu, ChartNoAxesCombined, FileText, BarChart3, MessageSquare } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, parse } from "date-fns"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
 const analyticsTables = [
-    { id: "attendance", name: "Attendance"},
-    { id: "daily-user", name: "User Daily Report"},
-    { id: "monthly-user", name: "User Monthly Report"},
-    { id: "po-report", name: "PO Report"},
-    { id: "qc-report", name: "QC Report"},
-    { id: "processor-report", name: "Processor Report"},
-    { id: "qa-report", name: "QA Report"},
-    { id: "dtp-monthly", name: "DTP Monthly Report"},
-    { id: "dtp-tracking", name: "DTP Tracking"},
-    { id: "feedback", name: "Feedback Report"},
+    { id: "attendance", name: "Attendance", icon: Users },
+    { id: "daily-user", name: "User Daily Report", icon: FileText },
+    { id: "monthly-user", name: "User Monthly Report", icon: BarChart3 },
+    { id: "po-report", name: "PO Report", icon: PanelsTopLeft },
+    { id: "qc-report", name: "QC Report", icon: ClipboardCheck },
+    { id: "processor-report", name: "Processor Report", icon: Cpu },
+    { id: "qa-report", name: "QA Report", icon: ShieldCheck },
+    { id: "dtp-monthly", name: "DTP Monthly Report", icon: ChartNoAxesCombined },
+    { id: "dtp-tracking", name: "DTP Tracking", icon: Box },
+    { id: "feedback", name: "Feedback Report", icon: MessageSquare },
 ];
 export default function AnalyticsPage() {
     const [selectedTable, setSelectedTable] = useState("attendance");
@@ -78,44 +80,41 @@ export default function AnalyticsPage() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-6rem)] bg-white">
+        <div className="flex flex-col min-h-screen bg-white">
             {/* Header with Report Tabs */}
             <div className="border-b border-gray-200 bg-white shrink-0">
                 <div className="px-6 pt-6 pb-4">
-                    <h1 className="text-2xl font-semibold text-gray-900 mb-1">Analytics</h1>
+                    <h1 className="text-2xl font-semibold text-gray-900 mb-1 font-outfit">Analytics</h1>
                     <p className="text-sm text-gray-600">
                         View the latest analytics and metrics for your projects and tasks.
                     </p>
                 </div>
+
                 <div className="px-6 pb-4">
-                    <div className="flex flex-wrap gap-2">
-                    {analyticsTables.map((table) => {
-                        const isActive = selectedTable === table.id;
-                        return (
-                            <button
-                                key={table.id}
-                                onClick={() => setSelectedTable(table.id)}
-                                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                                    isActive
-                                        ? "bg-blue-600 text-white"
-                                        : "text-gray-700 hover:bg-gray-100"
-                                 } `}
-                            >
-                                {table.name} 
-                            </button>
-                        );
-                    })}
-                    </div>
+                    <Tabs value={selectedTable} onValueChange={setSelectedTable} className="w-full">
+                        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 h-auto p-1 bg-gray-100/50 rounded-xl gap-1 w-full">
+                            {analyticsTables.map((table) => (
+                                <TabsTrigger
+                                    key={table.id}
+                                    value={table.id}
+                                    className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition-all data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-black/5"
+                                >
+                                    <table.icon
+                                        className="mr-2 opacity-70"
+                                        size={14}
+                                        strokeWidth={2}
+                                    />
+                                    {table.name}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
                 </div>
             </div>
 
             {/* Main Content Area - Full Width */}
-            <div className="flex-1 overflow-y-auto min-w-0">
-                <div className="p-8">
-                    <div>
-                        {renderTable()}
-                    </div>
-                </div>
+            <div className="flex-1 min-w-0 bg-gray-50/30 p-6">
+                {renderTable()}
             </div>
         </div>
     );
@@ -129,40 +128,40 @@ function AttendanceTable() {
     const [searchQuery, setSearchQuery] = useState("")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(10)
-  
+
     useEffect(() => {
-      fetchAttendanceData()
+        fetchAttendanceData()
     }, [])
-  
+
     const fetchAttendanceData = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-  
-        const response = await fetch("/api/analytics/attendance")
-        if (!response.ok) throw new Error("Failed to fetch attendance data")
-  
-        const data = await response.json()
-        setAttendanceData(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong")
-      } finally {
-        setIsLoading(false)
-      }
+        try {
+            setIsLoading(true)
+            setError(null)
+
+            const response = await fetch("/api/analytics/attendance")
+            if (!response.ok) throw new Error("Failed to fetch attendance data")
+
+            const data = await response.json()
+            setAttendanceData(data)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Something went wrong")
+        } finally {
+            setIsLoading(false)
+        }
     }
-  
+
     const uniqueUsers = Array.from(
-      new Set(attendanceData.map((r) => r.employee_name))
+        new Set(attendanceData.map((r) => r.employee_name))
     ).filter(Boolean)
-  
+
     // Filter data based on selected user and search query
     const filteredData = attendanceData.filter((r) => {
-      const matchesUser = !selectedUser || r.employee_name === selectedUser
-      const matchesSearch = !searchQuery || 
-        r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.department?.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesUser && matchesSearch
+        const matchesUser = !selectedUser || r.employee_name === selectedUser
+        const matchesSearch = !searchQuery ||
+            r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.department?.toLowerCase().includes(searchQuery.toLowerCase())
+        return matchesUser && matchesSearch
     })
 
     // Pagination calculations
@@ -173,236 +172,235 @@ function AttendanceTable() {
 
     // Reset to page 1 when filters change
     useEffect(() => {
-      setCurrentPage(1)
+        setCurrentPage(1)
     }, [selectedUser, searchQuery])
-  
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
-      return <Skeleton className="h-[400px] w-full rounded-lg" />
+        return <Skeleton className="h-[400px] w-full rounded-lg" />
     }
-  
+
     /* -------------------- ERROR -------------------- */
     if (error) {
-      return (
-        <Alert variant="destructive">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-          <Button onClick={fetchAttendanceData} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
-            Retry
-          </Button>
-        </Alert>
-      )
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <Button onClick={fetchAttendanceData} className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                    Retry
+                </Button>
+            </Alert>
+        )
     }
-  
+
     return (
-      <div className="space-y-4">
-        {/* -------------------- FILTERS BAR -------------------- */}
-        <Card>
-          <CardContent className="pt-6">
+        <div className="space-y-4">
+            {/* -------------------- FILTERS BAR -------------------- */}
+            <Card>
+                <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                      {/* Search Bar */}
-                      <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search by name, ID, or department..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+                        {/* Search Bar */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search by name, ID, or department..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
 
-              {/* Employee Dropdown */}
-              <Select
-                value={selectedUser || "all"}
-                onValueChange={(value) => setSelectedUser(value === "all" ? null : value)}
-              >
-                <SelectTrigger className="w-full sm:w-[250px]">
-                  <SelectValue placeholder="Filter by Employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-              All ({attendanceData.length})
-                  </SelectItem>
-            {uniqueUsers.map((user) => {
-              const count = attendanceData.filter(
-                (r) => r.employee_name === user
-              ).length
-              return (
-                      <SelectItem key={user} value={user}>
-                  {user} ({count})
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-
-              {/* Refresh Button */}
-              <Button 
-                onClick={fetchAttendanceData} 
-                className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
-              >
-                Refresh
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-  
-        {/* -------------------- TABLE -------------------- */}
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Attendance Report</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {selectedUser ?? "All employees"} · {filteredData.length} records
-              </p>
-            </div>
-          </CardHeader>
-  
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">Department</TableHead>
-                  <TableHead className="text-center">Employee ID</TableHead>
-                  <TableHead className="text-center">Employee Name</TableHead>
-                  <TableHead className="text-center">Role</TableHead>
-                  <TableHead className="text-center">Date</TableHead>
-                  <TableHead className="text-center">In</TableHead>
-                  <TableHead className="text-center">Out</TableHead>
-                  <TableHead className="text-center">Shift</TableHead>
-                  <TableHead className="text-center">Work</TableHead>
-                  <TableHead className="text-center">OT</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-  
-              <TableBody>
-                {paginatedData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center">
-                      No data found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedData.map((r, i) => (
-                    <TableRow key={r.id ?? i}>
-                      <TableCell className="text-center">{r.department}</TableCell>
-                      <TableCell className="text-center">{r.employee_id}</TableCell>
-                      <TableCell className="text-center font-medium">
-                        {r.employee_name}
-                      </TableCell>
-                      <TableCell className="text-center">{r.role}</TableCell>
-                      <TableCell className="text-center">{r.attendance_date}</TableCell>
-                      <TableCell className="text-center">{r.in_time}</TableCell>
-                      <TableCell className="text-center">{r.out_time}</TableCell>
-                      <TableCell className="text-center">{r.shift}</TableCell>
-                      <TableCell className="text-center">{r.work_duration}</TableCell>
-                      <TableCell className="text-center">{r.ot}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          className={
-                            r.status === "Present"
-                              ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                              : "bg-white-100 text-black-700 hover:bg-red-200 border-transparent"
-                          }
+                        {/* Employee Dropdown */}
+                        <Select
+                            value={selectedUser || "all"}
+                            onValueChange={(value) => setSelectedUser(value === "all" ? null : value)}
                         >
-                          <span
-                            className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                              r.status === "Present" ? "bg-green-500" : "bg-red-500"
-                            }`}
-                          />
-                          {r.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
+                            <SelectTrigger className="w-full sm:w-[250px]">
+                                <SelectValue placeholder="Filter by Employee" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All ({attendanceData.length})
+                                </SelectItem>
+                                {uniqueUsers.map((user) => {
+                                    const count = attendanceData.filter(
+                                        (r) => r.employee_name === user
+                                    ).length
+                                    return (
+                                        <SelectItem key={user} value={user}>
+                                            {user} ({count})
+                                        </SelectItem>
+                                    )
+                                })}
+                            </SelectContent>
+                        </Select>
 
-          {/* -------------------- PAGINATION -------------------- */}
-          {filteredData.length > 0 && (
-            <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setItemsPerPage(Number(value))
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10 per page</SelectItem>
-                    <SelectItem value="25">25 per page</SelectItem>
-                    <SelectItem value="50">50 per page</SelectItem>
-                    <SelectItem value="100">100 per page</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      return (
+                        {/* Refresh Button */}
                         <Button
-                          key={pageNum}
-                          variant={currentPage === pageNum ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                            onClick={fetchAttendanceData}
+                            className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
                         >
-                          {pageNum}
+                            Refresh
                         </Button>
-                      );
-                    })}
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* -------------------- TABLE -------------------- */}
+            <Card>
+                <CardHeader>
+                    <div>
+                        <CardTitle>Attendance Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {selectedUser ?? "All employees"} · {filteredData.length} records
+                        </p>
+                    </div>
+                </CardHeader>
+
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">Department</TableHead>
+                                <TableHead className="text-center">Employee ID</TableHead>
+                                <TableHead className="text-center">Employee Name</TableHead>
+                                <TableHead className="text-center">Role</TableHead>
+                                <TableHead className="text-center">Date</TableHead>
+                                <TableHead className="text-center">In</TableHead>
+                                <TableHead className="text-center">Out</TableHead>
+                                <TableHead className="text-center">Shift</TableHead>
+                                <TableHead className="text-center">Work</TableHead>
+                                <TableHead className="text-center">OT</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={11} className="text-center">
+                                        No data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedData.map((r, i) => (
+                                    <TableRow key={r.id ?? i}>
+                                        <TableCell className="text-center">{r.department}</TableCell>
+                                        <TableCell className="text-center">{r.employee_id}</TableCell>
+                                        <TableCell className="text-center font-medium">
+                                            {r.employee_name}
+                                        </TableCell>
+                                        <TableCell className="text-center">{r.role}</TableCell>
+                                        <TableCell className="text-center">{r.attendance_date}</TableCell>
+                                        <TableCell className="text-center">{r.in_time}</TableCell>
+                                        <TableCell className="text-center">{r.out_time}</TableCell>
+                                        <TableCell className="text-center">{r.shift}</TableCell>
+                                        <TableCell className="text-center">{r.work_duration}</TableCell>
+                                        <TableCell className="text-center">{r.ot}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge
+                                                className={
+                                                    r.status === "Present"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-red-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${r.status === "Present" ? "bg-green-500" : "bg-red-500"
+                                                        }`}
+                                                />
+                                                {r.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+
+                {/* -------------------- PAGINATION -------------------- */}
+                {filteredData.length > 0 && (
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                    setItemsPerPage(Number(value))
+                                    setCurrentPage(1)
+                                }}
+                            >
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                    <SelectItem value="100">100 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={currentPage === pageNum ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
+            </Card>
+        </div>
     )
-  }
+}
 
 function UserDailyReport() {
     const [reportData, setReportData] = useState<any[]>([]);
@@ -537,7 +535,7 @@ function UserDailyReport() {
     return (
         <div className="space-y-4">
             {/* Filters Card */}
-        <Card>
+            <Card>
                 <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                         {/* Search Bar */}
@@ -550,9 +548,9 @@ function UserDailyReport() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9"
                             />
-                </div>
+                        </div>
 
-                    {/* User Selection */}
+                        {/* User Selection */}
                         <Select
                             value={selectedUserId || ""}
                             onValueChange={(value) => setSelectedUserId(value || null)}
@@ -568,14 +566,14 @@ function UserDailyReport() {
                                 ) : (
                                     availableUsers.map((user) => (
                                         <SelectItem key={user.id} value={user.id}>
-                                    {user.name}
+                                            {user.name}
                                         </SelectItem>
                                     ))
                                 )}
                             </SelectContent>
                         </Select>
 
-                    {/* Date Selection */}
+                        {/* Date Selection */}
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
@@ -622,7 +620,7 @@ function UserDailyReport() {
                                 ? `${filteredData.length} record${filteredData.length !== 1 ? 's' : ''} found`
                                 : "Select a user and date to view daily report"}
                         </p>
-                </div>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="overflow-x-auto">
@@ -751,10 +749,10 @@ function UserDailyReport() {
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>
-                </div>
-            </CardContent>
+                        </div>
+                    </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -795,7 +793,7 @@ function UserMonthlyReport() {
                         role: record.role
                     }])).values()
                 );
-                
+
                 // Filter by team type if selected
                 let filteredUsers = uniqueUsers;
                 if (selectedTeamType) {
@@ -807,9 +805,9 @@ function UserMonthlyReport() {
                     const targetRole = roleMap[selectedTeamType];
                     filteredUsers = uniqueUsers.filter((user: any) => user.role === targetRole);
                 }
-                
+
                 setAvailableUsers(filteredUsers);
-                
+
                 // If team type is selected, auto-select all users of that team
                 if (selectedTeamType && filteredUsers.length > 0) {
                     setSelectedUserIds(filteredUsers.map((u: any) => u.id));
@@ -834,15 +832,15 @@ function UserMonthlyReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             // Build query parameters
             const params = new URLSearchParams();
             params.append("month", selectedMonth);
-            
+
             if (selectedUserIds.length > 0) {
                 params.append("userIds", selectedUserIds.join(","));
             }
-            
+
             if (selectedTeamType) {
                 params.append("teamType", selectedTeamType);
             }
@@ -961,23 +959,23 @@ function UserMonthlyReport() {
         );
     }
 
-        return (
+    return (
         <div className="space-y-4">
             {/* Filters Card */}
             <Card>
                 <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-                            {/* Team Type Filter */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Team Type
-                                </label>
+                        {/* Team Type Filter */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Team Type
+                            </label>
                             <Select
                                 value={selectedTeamType || "all"}
                                 onValueChange={(value) => {
                                     setSelectedTeamType(value === "all" ? "" : value);
-                                        setSelectedUserIds([]);
-                                    }}
+                                    setSelectedUserIds([]);
+                                }}
                             >
                                 <SelectTrigger className="w-[150px]">
                                     <SelectValue placeholder="All Teams" />
@@ -989,13 +987,13 @@ function UserMonthlyReport() {
                                     <SelectItem value="Processor">Processor</SelectItem>
                                 </SelectContent>
                             </Select>
-                            </div>
+                        </div>
 
                         {/* User Selection - using Popover for multi-select */}
                         <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Select Users
-                                </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Users
+                            </label>
                             <Popover open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -1006,8 +1004,8 @@ function UserMonthlyReport() {
                                             {isAllSelected
                                                 ? "All users"
                                                 : selectedUserIds.length === 0
-                                                ? "Select users..."
-                                                : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''}`}
+                                                    ? "Select users..."
+                                                    : `${selectedUserIds.length} user${selectedUserIds.length > 1 ? 's' : ''}`}
                                         </span>
                                         <ChevronRight className={`ml-2 h-4 w-4 transition-transform ${isUserDropdownOpen ? 'rotate-90' : ''}`} />
                                     </Button>
@@ -1017,52 +1015,52 @@ function UserMonthlyReport() {
                                         <div className="relative">
                                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                             <Input
-                                                        placeholder="Search users..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                placeholder="Search users..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
                                                 className="pl-8"
-                                                    />
-                                                </div>
+                                            />
+                                        </div>
                                     </div>
                                     <div className="max-h-60 overflow-y-auto">
                                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer border-b">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isAllSelected}
-                                                        onChange={handleAllToggle}
+                                            <input
+                                                type="checkbox"
+                                                checked={isAllSelected}
+                                                onChange={handleAllToggle}
                                                 className="h-4 w-4 rounded border-gray-300"
-                                                    />
+                                            />
                                             <span className="text-sm font-medium">Select All</span>
-                                                </label>
+                                        </label>
                                         {filteredUsers.map((user) => (
-                                                            <label
-                                                                key={user.id}
+                                            <label
+                                                key={user.id}
                                                 className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer"
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedUserIds.includes(user.id)}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIds.includes(user.id)}
                                                     onChange={() => handleUserToggle(user.id)}
                                                     className="h-4 w-4 rounded border-gray-300"
                                                 />
                                                 <span className="text-sm flex-1 truncate">{user.name}</span>
-                                                                {user.role && (
+                                                {user.role && (
                                                     <Badge variant="secondary" className="text-xs">
-                                                                        {user.role}
+                                                        {user.role}
                                                     </Badge>
-                                                                )}
-                                                            </label>
+                                                )}
+                                            </label>
                                         ))}
-                                                </div>
+                                    </div>
                                 </PopoverContent>
                             </Popover>
-                            </div>
+                        </div>
 
-                            {/* Month Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Select Month
-                                </label>
+                        {/* Month Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Month
+                            </label>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-[180px] justify-start">
@@ -1083,16 +1081,16 @@ function UserMonthlyReport() {
                                     />
                                 </PopoverContent>
                             </Popover>
-                            </div>
+                        </div>
 
                         {/* Refresh Button */}
-                            <Button
-                                onClick={fetchMonthlyReport}
-                                disabled={isLoading}
+                        <Button
+                            onClick={fetchMonthlyReport}
+                            disabled={isLoading}
                             className="bg-blue-600 text-white hover:bg-blue-700"
-                            >
+                        >
                             Refresh
-                            </Button>
+                        </Button>
                     </div>
 
                     {/* Selected Users Display */}
@@ -1127,17 +1125,17 @@ function UserMonthlyReport() {
             </Card>
 
             {/* Table Card */}
-        <Card>
+            <Card>
                 <CardHeader>
-                <div>
-                    <CardTitle>Monthly User Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
+                    <div>
+                        <CardTitle>Monthly User Report</CardTitle>
+                        <p className="text-sm text-muted-foreground">
                             {tableData.length > 0
                                 ? `${tableData.length} record${tableData.length !== 1 ? 's' : ''} found`
                                 : "Select users and month to view report"}
-                    </p>
-                </div>
-            </CardHeader>
+                        </p>
+                    </div>
+                </CardHeader>
 
                 <CardContent className="overflow-x-auto">
                     <Table>
@@ -1160,12 +1158,12 @@ function UserMonthlyReport() {
                                 </TableRow>
                             ) : (
                                 paginatedData.map((entry: any) => (
-                                <TableRow key={entry.user_id}>
-                                    <TableCell className="text-center">{entry.s_no}</TableCell>
-                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
-                                    <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
-                                    <TableCell className="text-center">{parseFloat(entry.total_hours || 0).toFixed(2)}</TableCell>
-                                </TableRow>
+                                    <TableRow key={entry.user_id}>
+                                        <TableCell className="text-center">{entry.s_no}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                        <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
+                                        <TableCell className="text-center">{parseFloat(entry.total_hours || 0).toFixed(2)}</TableCell>
+                                    </TableRow>
                                 ))
                             )}
                         </TableBody>
@@ -1246,10 +1244,10 @@ function UserMonthlyReport() {
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>
-                </div>
-            </CardContent>
+                        </div>
+                    </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -1272,7 +1270,7 @@ function POReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/po-report";
             const params = new URLSearchParams();
             if (startDate) params.append("startDate", startDate);
@@ -1351,7 +1349,7 @@ function POReport() {
     return (
         <div className="space-y-4">
             {/* Filters Card */}
-        <Card>
+            <Card>
                 <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
                         {/* Search Bar */}
@@ -1364,15 +1362,15 @@ function POReport() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9"
                             />
-                </div>
+                        </div>
 
                         {/* Date Filters */}
                         <div className="flex flex-wrap gap-4 items-end">
                             {/* Start Date */}
-                    <div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Start Date
-                        </label>
+                                    Start Date
+                                </label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
@@ -1393,13 +1391,13 @@ function POReport() {
                                         />
                                     </PopoverContent>
                                 </Popover>
-                    </div>
+                            </div>
 
                             {/* End Date */}
-                    <div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                            End Date
-                        </label>
+                                    End Date
+                                </label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
@@ -1409,28 +1407,28 @@ function POReport() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
                                         <Calendar
-                                        mode="single"
-                                        selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
-                                        onSelect={(date) => {
-                                            if (date) {
-                                                setEndDate(format(date, 'yyyy-MM-dd'));
-                                            }
-                                        }}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                    </div>
+                                            mode="single"
+                                            selected={endDate ? parse(endDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    setEndDate(format(date, 'yyyy-MM-dd'));
+                                                }
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
 
                             {/* Filter Button */}
-                        <Button
-                            onClick={fetchPOReport}
-                            className="bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                            Filter
-                        </Button>
+                            <Button
+                                onClick={fetchPOReport}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                Filter
+                            </Button>
+                        </div>
                     </div>
-                </div>
                 </CardContent>
             </Card>
 
@@ -1442,74 +1440,73 @@ function POReport() {
                         <p className="text-sm text-muted-foreground">
                             {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
                         </p>
-                </div>
-            </CardHeader>
+                    </div>
+                </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="text-center">S. No</TableHead>
-                            <TableHead className="text-center">Received Date</TableHead>
-                            <TableHead className="text-center">Project Name</TableHead>
-                            <TableHead className="text-center">Received Pages</TableHead>
-                            <TableHead className="text-center">Process</TableHead>
-                            <TableHead className="text-center">PO Hours</TableHead>
-                            <TableHead className="text-center">Output Pages</TableHead>
-                            <TableHead className="text-center">Delivery Date</TableHead>
-                            <TableHead className="text-center">Status</TableHead>
-                            <TableHead className="text-center">PO Status</TableHead>
-                            <TableHead className="text-center">PO Number</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                            {paginatedData.length === 0 ? (
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={11} className="text-center">
-                                    No PO report data found
-                                </TableCell>
+                                <TableHead className="text-center">S. No</TableHead>
+                                <TableHead className="text-center">Received Date</TableHead>
+                                <TableHead className="text-center">Project Name</TableHead>
+                                <TableHead className="text-center">Received Pages</TableHead>
+                                <TableHead className="text-center">Process</TableHead>
+                                <TableHead className="text-center">PO Hours</TableHead>
+                                <TableHead className="text-center">Output Pages</TableHead>
+                                <TableHead className="text-center">Delivery Date</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead className="text-center">PO Status</TableHead>
+                                <TableHead className="text-center">PO Number</TableHead>
                             </TableRow>
-                        ) : (
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={11} className="text-center">
+                                        No PO report data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
                                 paginatedData.map((entry, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="text-center">{entry.s_no}</TableCell>
-                                    <TableCell className="text-center">{entry.received_date}</TableCell>
-                                    <TableCell className="text-center font-medium">{entry.project_name}</TableCell>
-                                    <TableCell className="text-center">{entry.received_pages}</TableCell>
-                                    <TableCell className="text-center">{entry.process}</TableCell>
-                                    <TableCell className="text-center">{entry.po_hours}</TableCell>
-                                    <TableCell className="text-center">{entry.output_pages}</TableCell>
-                                    <TableCell className="text-center">{entry.delivery_date}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge
-                                            className={
-                                                entry.status === "Delivered" || entry.status === "Completed"
-                                                    ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                    : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                            }
-                                        >
-                                            <span
-                                                className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.s_no}</TableCell>
+                                        <TableCell className="text-center">{entry.received_date}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.project_name}</TableCell>
+                                        <TableCell className="text-center">{entry.received_pages}</TableCell>
+                                        <TableCell className="text-center">{entry.process}</TableCell>
+                                        <TableCell className="text-center">{entry.po_hours}</TableCell>
+                                        <TableCell className="text-center">{entry.output_pages}</TableCell>
+                                        <TableCell className="text-center">{entry.delivery_date}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge
+                                                className={
                                                     entry.status === "Delivered" || entry.status === "Completed"
+                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                }
+                                            >
+                                                <span
+                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.status === "Delivered" || entry.status === "Completed"
                                                         ? "bg-green-500"
                                                         : "bg-yellow-500"
-                                                }`}
-                                            />
-                                            {entry.status === "Delivered" || entry.status === "Completed"
-                                                ? "Completed"
-                                                : entry.status === "In Progress"
-                                                ? "In Progress"
-                                                : entry.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.po_status}</TableCell>
-                                    <TableCell className="text-center">{entry.po_number}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+                                                        }`}
+                                                />
+                                                {entry.status === "Delivered" || entry.status === "Completed"
+                                                    ? "Completed"
+                                                    : entry.status === "In Progress"
+                                                        ? "In Progress"
+                                                        : entry.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.po_status}</TableCell>
+                                        <TableCell className="text-center">{entry.po_number}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
 
                 {/* Pagination */}
                 {filteredData.length > 0 && (
@@ -1588,7 +1585,7 @@ function POReport() {
                         </div>
                     </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -1611,7 +1608,7 @@ function QAReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/qa-report";
             const params = new URLSearchParams();
             if (startDate) params.append("startDate", startDate);
@@ -1691,7 +1688,7 @@ function QAReport() {
     return (
         <div className="space-y-4">
             {/* Filters Card */}
-        <Card>
+            <Card>
                 <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
                         {/* Search Bar */}
@@ -1782,37 +1779,37 @@ function QAReport() {
                         <p className="text-sm text-muted-foreground">
                             {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
                         </p>
-                </div>
-            </CardHeader>
+                    </div>
+                </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="text-center">Working Date</TableHead>
-                            <TableHead className="text-center">Name</TableHead>
-                            <TableHead className="text-center">Client Name</TableHead>
-                            <TableHead className="text-center">File Name</TableHead>
-                            <TableHead className="text-center">Work Type</TableHead>
-                            <TableHead className="text-center">Page Count</TableHead>
-                            <TableHead className="text-center">Start Time</TableHead>
-                            <TableHead className="text-center">End Time</TableHead>
-                            <TableHead className="text-center">Total Working Hours</TableHead>
-                            <TableHead className="text-center">PO</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                            {paginatedData.length === 0 ? (
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={10} className="text-center">
-                                    No QA report data found
-                                </TableCell>
+                                <TableHead className="text-center">Working Date</TableHead>
+                                <TableHead className="text-center">Name</TableHead>
+                                <TableHead className="text-center">Client Name</TableHead>
+                                <TableHead className="text-center">File Name</TableHead>
+                                <TableHead className="text-center">Work Type</TableHead>
+                                <TableHead className="text-center">Page Count</TableHead>
+                                <TableHead className="text-center">Start Time</TableHead>
+                                <TableHead className="text-center">End Time</TableHead>
+                                <TableHead className="text-center">Total Working Hours</TableHead>
+                                <TableHead className="text-center">PO</TableHead>
                             </TableRow>
-                        ) : (
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={10} className="text-center">
+                                        No QA report data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
                                 paginatedData.map((entry, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="text-center">{entry.working_date}</TableCell>
-                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.working_date}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center max-w-[150px]">
                                             <Tooltip content={entry.client_name || "N/A"}>
                                                 <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
@@ -1823,18 +1820,18 @@ function QAReport() {
                                                 <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
                                             </Tooltip>
                                         </TableCell>
-                                    <TableCell className="text-center">{entry.work_type}</TableCell>
-                                    <TableCell className="text-center">{entry.page_no}</TableCell>
-                                    <TableCell className="text-center">{entry.start_time}</TableCell>
-                                    <TableCell className="text-center">{entry.end_time}</TableCell>
-                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
-                                    <TableCell className="text-center">{entry.po}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+                                        <TableCell className="text-center">{entry.work_type}</TableCell>
+                                        <TableCell className="text-center">{entry.page_no}</TableCell>
+                                        <TableCell className="text-center">{entry.start_time}</TableCell>
+                                        <TableCell className="text-center">{entry.end_time}</TableCell>
+                                        <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                        <TableCell className="text-center">{entry.po}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
 
                 {/* Pagination */}
                 {filteredData.length > 0 && (
@@ -1913,7 +1910,7 @@ function QAReport() {
                         </div>
                     </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -1931,14 +1928,14 @@ function DTPMonthlyReport() {
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
-        fetchDTPMonthlyReport(); 
+        fetchDTPMonthlyReport();
     }, [selectedMonth]);
 
     const fetchDTPMonthlyReport = async () => {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             const response = await fetch(`/api/analytics/dtp-report?month=${selectedMonth}`);
 
             if (!response.ok) {
@@ -1953,11 +1950,11 @@ function DTPMonthlyReport() {
             }
 
             const data = await response.json();
-            
+
             if (data.error) {
                 throw new Error(data.error);
             }
-            
+
             setReportData(data);
         } catch (err) {
             console.error("Error fetching DTP Monthly report:", err);
@@ -2016,7 +2013,7 @@ function DTPMonthlyReport() {
         );
     }
 
-        return (
+    return (
         <div className="space-y-4">
             {/* Filters Card */}
             <Card>
@@ -2081,33 +2078,33 @@ function DTPMonthlyReport() {
                 <CardHeader>
                     <div>
                         <CardTitle>DTP Monthly Report</CardTitle>
-                    <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                             {filteredData.length > 0
                                 ? `${filteredData.length} record${filteredData.length !== 1 ? 's' : ''} found`
                                 : "Select a month to view report"}
-                    </p>
-                </div>
-            </CardHeader>
+                        </p>
+                    </div>
+                </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="text-center">S.No</TableHead>
-                            <TableHead className="text-center">Date</TableHead>
-                            <TableHead className="text-center">Employee Name</TableHead>
-                            <TableHead className="text-center">Client Name</TableHead>
-                            <TableHead className="text-center">Job No.</TableHead>
-                            <TableHead className="text-center">Process</TableHead>
-                            <TableHead className="text-center">Page Count</TableHead>
-                            <TableHead className="text-center">Start Time</TableHead>
-                            <TableHead className="text-center">End Time</TableHead>
-                            <TableHead className="text-center">Total Time Taken</TableHead>
-                            <TableHead className="text-center">Shift</TableHead>
-                            <TableHead className="text-center">PO Hours</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">S.No</TableHead>
+                                <TableHead className="text-center">Date</TableHead>
+                                <TableHead className="text-center">Employee Name</TableHead>
+                                <TableHead className="text-center">Client Name</TableHead>
+                                <TableHead className="text-center">Job No.</TableHead>
+                                <TableHead className="text-center">Process</TableHead>
+                                <TableHead className="text-center">Page Count</TableHead>
+                                <TableHead className="text-center">Start Time</TableHead>
+                                <TableHead className="text-center">End Time</TableHead>
+                                <TableHead className="text-center">Total Time Taken</TableHead>
+                                <TableHead className="text-center">Shift</TableHead>
+                                <TableHead className="text-center">PO Hours</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {paginatedData.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={12} className="text-center">
@@ -2116,10 +2113,10 @@ function DTPMonthlyReport() {
                                 </TableRow>
                             ) : (
                                 paginatedData.map((entry, index) => (
-                            <TableRow key={index}>
-                                <TableCell className="text-center">{entry.s_no}</TableCell>
-                                <TableCell className="text-center">{entry.date}</TableCell>
-                                <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.s_no}</TableCell>
+                                        <TableCell className="text-center">{entry.date}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center max-w-[150px]">
                                             <Tooltip content={entry.client_name || "N/A"}>
                                                 <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
@@ -2130,19 +2127,19 @@ function DTPMonthlyReport() {
                                                 <span className="block truncate cursor-default">{entry.job_no || "N/A"}</span>
                                             </Tooltip>
                                         </TableCell>
-                                <TableCell className="text-center">{entry.process}</TableCell>
-                                <TableCell className="text-center">{entry.page_count}</TableCell>
-                                <TableCell className="text-center">{entry.start_time}</TableCell>
-                                <TableCell className="text-center">{entry.end_time}</TableCell>
-                                <TableCell className="text-center">{entry.total_time_taken}</TableCell>
-                                <TableCell className="text-center">{entry.shift}</TableCell>
-                                <TableCell className="text-center">{entry.po}</TableCell>
-                            </TableRow>
+                                        <TableCell className="text-center">{entry.process}</TableCell>
+                                        <TableCell className="text-center">{entry.page_count}</TableCell>
+                                        <TableCell className="text-center">{entry.start_time}</TableCell>
+                                        <TableCell className="text-center">{entry.end_time}</TableCell>
+                                        <TableCell className="text-center">{entry.total_time_taken}</TableCell>
+                                        <TableCell className="text-center">{entry.shift}</TableCell>
+                                        <TableCell className="text-center">{entry.po}</TableCell>
+                                    </TableRow>
                                 ))
                             )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+                        </TableBody>
+                    </Table>
+                </CardContent>
 
                 {/* Pagination */}
                 {filteredData.length > 0 && (
@@ -2221,7 +2218,7 @@ function DTPMonthlyReport() {
                         </div>
                     </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -2244,7 +2241,7 @@ function DTPTracking() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/dtp-tracking";
             const params = new URLSearchParams();
             if (startDate) {
@@ -2253,7 +2250,7 @@ function DTPTracking() {
             if (endDate) {
                 params.append("endDate", endDate);
             }
-            
+
             if (params.toString()) {
                 url += `?${params.toString()}`;
             }
@@ -2272,7 +2269,7 @@ function DTPTracking() {
             }
 
             const data = await response.json();
-            
+
             if (data.error) {
                 throw new Error(data.error);
             }
@@ -2472,252 +2469,246 @@ function DTPTracking() {
                                 {searchQuery && ` (filtered from ${reportData.length} total)`}
                             </p>
                         </div>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                {/* Job Details Columns */}
-                                <TableHead className="text-center">Job No</TableHead>
-                                <TableHead className="text-center">Delivered by</TableHead>
-                                <TableHead className="text-center">PO</TableHead>
-                                <TableHead className="text-center">Mail instruction</TableHead>
-                                <TableHead className="text-center">Task type</TableHead>
-                                <TableHead className="text-center">Task Name</TableHead>
-                                <TableHead className="text-center">File Count</TableHead>
-                                <TableHead className="text-center">Page count</TableHead>
-                                
-                                {/* DTP Process Tracking Columns */}
-                                <TableHead className="text-center">Language</TableHead>
-                                <TableHead className="text-center">Platform</TableHead>
-                                <TableHead className="text-center">Stage</TableHead>
-                                <TableHead className="text-center">Date</TableHead>
-                                <TableHead className="text-center">Delivery Time</TableHead>
-                                <TableHead className="text-center">DTP Person</TableHead>
-                                <TableHead className="text-center">DTP Start Time</TableHead>
-                                <TableHead className="text-center">DTP End Time</TableHead>
-                                <TableHead className="text-center">DTP Abbyy Compare</TableHead>
-                                <TableHead className="text-center">DTP Status</TableHead>
-                                
-                                {/* QC Tracking Columns */}
-                                <TableHead className="text-center">QC taken by</TableHead>
-                                <TableHead className="text-center">QC Start Time</TableHead>
-                                <TableHead className="text-center">QC End Time</TableHead>
-                                <TableHead className="text-center">QC Abbyy Compare</TableHead>
-                                <TableHead className="text-center">QC Status</TableHead>
-                                <TableHead className="text-center">QC CXN taken</TableHead>
-                                <TableHead className="text-center">QC CXN Start Time</TableHead>
-                                <TableHead className="text-center">QC CXN End Time</TableHead>
-                                <TableHead className="text-center">CXN Status</TableHead>
-                                
-                                {/* QA Tracking & Final Status Columns */}
-                                <TableHead className="text-center">QA taken by</TableHead>
-                                <TableHead className="text-center">QA Start Time</TableHead>
-                                <TableHead className="text-center">QA End Time</TableHead>
-                                <TableHead className="text-center">QA Abbyy Compare</TableHead>
-                                <TableHead className="text-center">QA Status</TableHead>
-                                <TableHead className="text-center">QA CXN taken</TableHead>
-                                <TableHead className="text-center">QA CXN Start Time</TableHead>
-                                <TableHead className="text-center">QA CXN End Time</TableHead>
-                                <TableHead className="text-center">File Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedData.map((entry, index) => (
-                                <TableRow key={entry.job_no || index}>
-                                    {/* Job Details Data */}
-                                    <TableCell className="text-center">{entry.job_no || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.delivered_by || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {typeof entry.po === 'number' ? entry.po.toFixed(2) : entry.po || "N/A"}
-                                    </TableCell>
-                                    <TableCell className="text-center max-w-[300px]">
-                                        <Tooltip content={entry.mail_instruction || "N/A"}>
-                                            <span className="block truncate cursor-default">{entry.mail_instruction || "N/A"}</span>
-                                        </Tooltip>
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.task_type || "N/A"}</TableCell>
-                                    <TableCell className="text-center max-w-[200px]">
-                                        <Tooltip content={entry.task_name || "N/A"}>
-                                            <span className="block truncate cursor-default">{entry.task_name || "N/A"}</span>
-                                        </Tooltip>
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.file_count || 0}</TableCell>
-                                    <TableCell className="text-center">{entry.page_count || 0}</TableCell>
-                                    
-                                    {/* DTP Process Tracking Data */}
-                                    <TableCell className="text-center">{entry.language || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.platform || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.stage && entry.stage !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.stage === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    {/* Job Details Columns */}
+                                    <TableHead className="text-center">Job No</TableHead>
+                                    <TableHead className="text-center">Delivered by</TableHead>
+                                    <TableHead className="text-center">PO</TableHead>
+                                    <TableHead className="text-center">Mail instruction</TableHead>
+                                    <TableHead className="text-center">Task type</TableHead>
+                                    <TableHead className="text-center">Task Name</TableHead>
+                                    <TableHead className="text-center">File Count</TableHead>
+                                    <TableHead className="text-center">Page count</TableHead>
+
+                                    {/* DTP Process Tracking Columns */}
+                                    <TableHead className="text-center">Language</TableHead>
+                                    <TableHead className="text-center">Platform</TableHead>
+                                    <TableHead className="text-center">Stage</TableHead>
+                                    <TableHead className="text-center">Date</TableHead>
+                                    <TableHead className="text-center">Delivery Time</TableHead>
+                                    <TableHead className="text-center">DTP Person</TableHead>
+                                    <TableHead className="text-center">DTP Start Time</TableHead>
+                                    <TableHead className="text-center">DTP End Time</TableHead>
+                                    <TableHead className="text-center">DTP Abbyy Compare</TableHead>
+                                    <TableHead className="text-center">DTP Status</TableHead>
+
+                                    {/* QC Tracking Columns */}
+                                    <TableHead className="text-center">QC taken by</TableHead>
+                                    <TableHead className="text-center">QC Start Time</TableHead>
+                                    <TableHead className="text-center">QC End Time</TableHead>
+                                    <TableHead className="text-center">QC Abbyy Compare</TableHead>
+                                    <TableHead className="text-center">QC Status</TableHead>
+                                    <TableHead className="text-center">QC CXN taken</TableHead>
+                                    <TableHead className="text-center">QC CXN Start Time</TableHead>
+                                    <TableHead className="text-center">QC CXN End Time</TableHead>
+                                    <TableHead className="text-center">CXN Status</TableHead>
+
+                                    {/* QA Tracking & Final Status Columns */}
+                                    <TableHead className="text-center">QA taken by</TableHead>
+                                    <TableHead className="text-center">QA Start Time</TableHead>
+                                    <TableHead className="text-center">QA End Time</TableHead>
+                                    <TableHead className="text-center">QA Abbyy Compare</TableHead>
+                                    <TableHead className="text-center">QA Status</TableHead>
+                                    <TableHead className="text-center">QA CXN taken</TableHead>
+                                    <TableHead className="text-center">QA CXN Start Time</TableHead>
+                                    <TableHead className="text-center">QA CXN End Time</TableHead>
+                                    <TableHead className="text-center">File Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {paginatedData.map((entry, index) => (
+                                    <TableRow key={entry.job_no || index}>
+                                        {/* Job Details Data */}
+                                        <TableCell className="text-center">{entry.job_no || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.delivered_by || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {typeof entry.po === 'number' ? entry.po.toFixed(2) : entry.po || "N/A"}
+                                        </TableCell>
+                                        <TableCell className="text-center max-w-[300px]">
+                                            <Tooltip content={entry.mail_instruction || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.mail_instruction || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.task_type || "N/A"}</TableCell>
+                                        <TableCell className="text-center max-w-[200px]">
+                                            <Tooltip content={entry.task_name || "N/A"}>
+                                                <span className="block truncate cursor-default">{entry.task_name || "N/A"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.file_count || 0}</TableCell>
+                                        <TableCell className="text-center">{entry.page_count || 0}</TableCell>
+
+                                        {/* DTP Process Tracking Data */}
+                                        <TableCell className="text-center">{entry.language || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.platform || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.stage && entry.stage !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.stage === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.stage === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.stage === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.stage === "Completed" ? "Completed" : entry.stage === "Pending" ? "Pending" : entry.stage}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.date || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.delivery_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.dtp_person || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.dtp_start_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.dtp_end_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.abbyy_compare_dtp || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.dtp_status && entry.dtp_status !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.dtp_status === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.stage === "Completed" ? "Completed" : entry.stage === "Pending" ? "Pending" : entry.stage}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.date || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.delivery_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.dtp_person || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.dtp_start_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.dtp_end_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.abbyy_compare_dtp || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.dtp_status && entry.dtp_status !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.dtp_status === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.dtp_status === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.dtp_status === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.dtp_status === "Completed" ? "Completed" : entry.dtp_status === "Pending" ? "Pending" : entry.dtp_status}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* QC Tracking Data */}
-                                    <TableCell className="text-center">{entry.qc_taken_by || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qc_start_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qc_end_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.abbyy_compare_qc || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.qc_status && entry.qc_status !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.qc_status === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.dtp_status === "Completed" ? "Completed" : entry.dtp_status === "Pending" ? "Pending" : entry.dtp_status}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+
+                                        {/* QC Tracking Data */}
+                                        <TableCell className="text-center">{entry.qc_taken_by || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qc_start_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qc_end_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.abbyy_compare_qc || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.qc_status && entry.qc_status !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.qc_status === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.qc_status === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.qc_status === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.qc_status === "Completed" ? "Completed" : entry.qc_status === "Pending" ? "Pending" : entry.qc_status}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.qc_cxn_taken || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qc_cxn_start_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qc_cxn_end_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.cxn_status && entry.cxn_status !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.cxn_status === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.qc_status === "Completed" ? "Completed" : entry.qc_status === "Pending" ? "Pending" : entry.qc_status}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.qc_cxn_taken || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qc_cxn_start_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qc_cxn_end_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.cxn_status && entry.cxn_status !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.cxn_status === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.cxn_status === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.cxn_status === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.cxn_status === "Completed" ? "Completed" : entry.cxn_status === "Pending" ? "Pending" : entry.cxn_status}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                    
-                                    {/* QA Tracking & Final Status Data */}
-                                    <TableCell className="text-center">{entry.qa_taken_by || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qa_start_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qa_end_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.abbyy_compare_qa || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.qa_status && entry.qa_status !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.qa_status === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.cxn_status === "Completed" ? "Completed" : entry.cxn_status === "Pending" ? "Pending" : entry.cxn_status}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+
+                                        {/* QA Tracking & Final Status Data */}
+                                        <TableCell className="text-center">{entry.qa_taken_by || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qa_start_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qa_end_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.abbyy_compare_qa || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.qa_status && entry.qa_status !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.qa_status === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.qa_status === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.qa_status === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.qa_status === "Completed" ? "Completed" : entry.qa_status === "Pending" ? "Pending" : entry.qa_status}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-center">{entry.qa_cxn_taken || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qa_cxn_start_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">{entry.qa_cxn_end_time || "N/A"}</TableCell>
-                                    <TableCell className="text-center">
-                                        {entry.file_status && entry.file_status !== "N/A" ? (
-                                            <Badge
-                                                className={
-                                                    entry.file_status === "Completed"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
-                                                }
-                                            >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.qa_status === "Completed" ? "Completed" : entry.qa_status === "Pending" ? "Pending" : entry.qa_status}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center">{entry.qa_cxn_taken || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qa_cxn_start_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">{entry.qa_cxn_end_time || "N/A"}</TableCell>
+                                        <TableCell className="text-center">
+                                            {entry.file_status && entry.file_status !== "N/A" ? (
+                                                <Badge
+                                                    className={
                                                         entry.file_status === "Completed"
+                                                            ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
+                                                            : "bg-white-100 text-black-700 hover:bg-yellow-200 border-transparent"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`inline-block w-2 h-2 rounded-full mr-1.5 ${entry.file_status === "Completed"
                                                             ? "bg-green-500"
                                                             : entry.file_status === "Pending"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-yellow-500"
-                                                    }`}
-                                                />
-                                                {entry.file_status === "Completed" ? "Completed" : entry.file_status === "Pending" ? "Pending" : entry.file_status}
-                                            </Badge>
-                                        ) : (
-                                            "N/A"
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                                                                ? "bg-yellow-500"
+                                                                : "bg-yellow-500"
+                                                            }`}
+                                                    />
+                                                    {entry.file_status === "Completed" ? "Completed" : entry.file_status === "Pending" ? "Pending" : entry.file_status}
+                                                </Badge>
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
 
                         {/* Pagination Controls */}
                         <div className="flex items-center justify-between mt-4 pt-4 border-t">
@@ -2810,7 +2801,7 @@ function FeedbackReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/feedback-report";
             const params = new URLSearchParams();
             if (startDate) params.append("startDate", startDate);
@@ -2836,7 +2827,7 @@ function FeedbackReport() {
             const data = await response.json();
             console.log("Feedback Report API Response:", data);
             console.log("Feedback Report Data Length:", Array.isArray(data) ? data.length : "Not an array");
-            
+
             if (data.error) {
                 throw new Error(data.error);
             }
@@ -2929,7 +2920,7 @@ function FeedbackReport() {
                             <TableHead className="text-center">Task Type</TableHead>
                             <TableHead className="text-center">Process</TableHead>
                             <TableHead className="text-center">QC</TableHead>
-                            
+
                             {/* Section 2: Quality Assurance */}
                             <TableHead className="text-center">QA</TableHead>
                             <TableHead className="text-center">Delivery</TableHead>
@@ -2938,7 +2929,7 @@ function FeedbackReport() {
                             <TableHead className="text-center">External Comments</TableHead>
                             <TableHead className="text-center">Total No. Errors</TableHead>
                             <TableHead className="text-center">Remarks</TableHead>
-                            
+
                             {/* Section 3: Impact and RCA */}
                             <TableHead className="text-center">Impact</TableHead>
                             <TableHead className="text-center">Action</TableHead>
@@ -3007,7 +2998,7 @@ function QCReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/qc-report";
             const params = new URLSearchParams();
             if (startDate) params.append("startDate", startDate);
@@ -3178,37 +3169,37 @@ function QCReport() {
                         <p className="text-sm text-muted-foreground">
                             {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
                         </p>
-                </div>
-            </CardHeader>
+                    </div>
+                </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="text-center">Working Date</TableHead>
-                            <TableHead className="text-center">Name</TableHead>
-                            <TableHead className="text-center">Client Name</TableHead>
-                            <TableHead className="text-center">File Name</TableHead>
-                            <TableHead className="text-center">Work Type</TableHead>
-                            <TableHead className="text-center">Page Count</TableHead>
-                            <TableHead className="text-center">Start Time</TableHead>
-                            <TableHead className="text-center">End Time</TableHead>
-                            <TableHead className="text-center">Total Working Hours</TableHead>
-                            <TableHead className="text-center">PO</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                            {paginatedData.length === 0 ? (
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={10} className="text-center">
-                                    No QC report data found
-                                </TableCell>
+                                <TableHead className="text-center">Working Date</TableHead>
+                                <TableHead className="text-center">Name</TableHead>
+                                <TableHead className="text-center">Client Name</TableHead>
+                                <TableHead className="text-center">File Name</TableHead>
+                                <TableHead className="text-center">Work Type</TableHead>
+                                <TableHead className="text-center">Page Count</TableHead>
+                                <TableHead className="text-center">Start Time</TableHead>
+                                <TableHead className="text-center">End Time</TableHead>
+                                <TableHead className="text-center">Total Working Hours</TableHead>
+                                <TableHead className="text-center">PO</TableHead>
                             </TableRow>
-                        ) : (
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={10} className="text-center">
+                                        No QC report data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
                                 paginatedData.map((entry, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="text-center">{entry.working_date}</TableCell>
-                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.working_date}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center max-w-[150px]">
                                             <Tooltip content={entry.client_name || "N/A"}>
                                                 <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
@@ -3219,18 +3210,18 @@ function QCReport() {
                                                 <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
                                             </Tooltip>
                                         </TableCell>
-                                    <TableCell className="text-center">{entry.work_type}</TableCell>
-                                    <TableCell className="text-center">{entry.page_no}</TableCell>
-                                    <TableCell className="text-center">{entry.start_time}</TableCell>
-                                    <TableCell className="text-center">{entry.end_time}</TableCell>
-                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
-                                    <TableCell className="text-center">{entry.po}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+                                        <TableCell className="text-center">{entry.work_type}</TableCell>
+                                        <TableCell className="text-center">{entry.page_no}</TableCell>
+                                        <TableCell className="text-center">{entry.start_time}</TableCell>
+                                        <TableCell className="text-center">{entry.end_time}</TableCell>
+                                        <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                        <TableCell className="text-center">{entry.po}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
 
                 {/* Pagination */}
                 {filteredData.length > 0 && (
@@ -3309,7 +3300,7 @@ function QCReport() {
                         </div>
                     </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
@@ -3332,7 +3323,7 @@ function ProcessorReport() {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             let url = "/api/analytics/processor-report";
             const params = new URLSearchParams();
             if (startDate) params.append("startDate", startDate);
@@ -3503,37 +3494,37 @@ function ProcessorReport() {
                         <p className="text-sm text-muted-foreground">
                             {filteredData.length} record{filteredData.length !== 1 ? 's' : ''} found
                         </p>
-                </div>
-            </CardHeader>
+                    </div>
+                </CardHeader>
 
-            <CardContent className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="text-center">Working Date</TableHead>
-                            <TableHead className="text-center">Name</TableHead>
-                            <TableHead className="text-center">Client Name</TableHead>
-                            <TableHead className="text-center">File Name</TableHead>
-                            <TableHead className="text-center">Work Type</TableHead>
-                            <TableHead className="text-center">Page Count</TableHead>
-                            <TableHead className="text-center">Start Time</TableHead>
-                            <TableHead className="text-center">End Time</TableHead>
-                            <TableHead className="text-center">Total Working Hours</TableHead>
-                            <TableHead className="text-center">PO</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                            {paginatedData.length === 0 ? (
+                <CardContent className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={10} className="text-center">
-                                    No Processor report data found
-                                </TableCell>
+                                <TableHead className="text-center">Working Date</TableHead>
+                                <TableHead className="text-center">Name</TableHead>
+                                <TableHead className="text-center">Client Name</TableHead>
+                                <TableHead className="text-center">File Name</TableHead>
+                                <TableHead className="text-center">Work Type</TableHead>
+                                <TableHead className="text-center">Page Count</TableHead>
+                                <TableHead className="text-center">Start Time</TableHead>
+                                <TableHead className="text-center">End Time</TableHead>
+                                <TableHead className="text-center">Total Working Hours</TableHead>
+                                <TableHead className="text-center">PO</TableHead>
                             </TableRow>
-                        ) : (
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={10} className="text-center">
+                                        No Processor report data found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
                                 paginatedData.map((entry, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="text-center">{entry.working_date}</TableCell>
-                                    <TableCell className="text-center font-medium">{entry.name}</TableCell>
+                                    <TableRow key={index}>
+                                        <TableCell className="text-center">{entry.working_date}</TableCell>
+                                        <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center max-w-[150px]">
                                             <Tooltip content={entry.client_name || "N/A"}>
                                                 <span className="block truncate cursor-default">{entry.client_name || "N/A"}</span>
@@ -3544,18 +3535,18 @@ function ProcessorReport() {
                                                 <span className="block truncate cursor-default">{entry.file_name || "N/A"}</span>
                                             </Tooltip>
                                         </TableCell>
-                                    <TableCell className="text-center">{entry.work_type}</TableCell>
-                                    <TableCell className="text-center">{entry.page_no}</TableCell>
-                                    <TableCell className="text-center">{entry.start_time}</TableCell>
-                                    <TableCell className="text-center">{entry.end_time}</TableCell>
-                                    <TableCell className="text-center">{entry.total_working_hours}</TableCell>
-                                    <TableCell className="text-center">{entry.po}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
+                                        <TableCell className="text-center">{entry.work_type}</TableCell>
+                                        <TableCell className="text-center">{entry.page_no}</TableCell>
+                                        <TableCell className="text-center">{entry.start_time}</TableCell>
+                                        <TableCell className="text-center">{entry.end_time}</TableCell>
+                                        <TableCell className="text-center">{entry.total_working_hours}</TableCell>
+                                        <TableCell className="text-center">{entry.po}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
 
                 {/* Pagination */}
                 {filteredData.length > 0 && (
@@ -3634,7 +3625,7 @@ function ProcessorReport() {
                         </div>
                     </CardContent>
                 )}
-        </Card>
+            </Card>
         </div>
     );
 }
