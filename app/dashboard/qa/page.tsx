@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
 import {
   Select,
   SelectContent,
@@ -49,7 +50,7 @@ export default function QADashboard() {
     [key: string]: {
       name: string;
       email?: string;
-    } | null;
+    }[];
   }>({});
 
   useEffect(() => {
@@ -100,33 +101,19 @@ export default function QADashboard() {
 
   const fetchCurrentWorkers = async (taskIds: string[]) => {
     try {
-      const workerPromises = taskIds.map(async (taskId) => {
-        try {
-          const response = await fetch(`/api/tasks/${taskId}/current-worker`);
-          const data = await response.json();
-          return { taskId, worker: data.data || null };
-        } catch (error) {
-          console.error(`Error fetching worker for task ${taskId}:`, error);
-          return { taskId, worker: null };
-        }
-      });
+      // Use the new utility function instead of individual API calls
+      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
+      const result = await fetchBatchTaskAssignments(taskIds);
 
-      const results = await Promise.all(workerPromises);
-      const workerMap = results.reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              email?: string;
-            } | null;
-          },
-          result
-        ) => {
-          acc[result.taskId] = result.worker;
-          return acc;
-        },
-        {}
-      );
+      // Convert to the format expected by the component
+      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
+
+      for (const [taskId, assignments] of Object.entries(result)) {
+        workerMap[taskId] = assignments.map(user => ({
+          name: user.name,
+          email: user.email || undefined,
+        }));
+      }
 
       setCurrentWorkers(workerMap);
     } catch (error) {
@@ -156,8 +143,8 @@ export default function QADashboard() {
               project_id: string;
             } | null;
           }) => ({
-            taskId: item.tasks_test?.task_id,
-            id: item.id,
+            taskId: item.tasks_test?.task_id || item.task_id || "unknown",
+            id: item.id.toString(),
             title: item.tasks_test?.task_name || "No Project Name",
             description: `Status: ${item.status || "N/A"}`,
             status: "pending",
@@ -310,7 +297,7 @@ export default function QADashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.status}
                   priority={task.priority}
-                  currentWorker={currentWorkers[task.taskId] || null}
+                  currentWorkers={currentWorkers[task.taskId] || []}
                 />
               ))
             )}

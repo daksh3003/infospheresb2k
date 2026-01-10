@@ -15,6 +15,7 @@ import {
 import { Search } from "lucide-react";
 
 import LoadingScreen from "@/components/ui/loading-screen";
+import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
 
 interface PMDashboardTask {
   taskId: string;
@@ -41,11 +42,11 @@ interface PMDashboardTask {
   currentFileName: string | null;
 
   calculatedStatus:
-    | "pending"
-    | "in-progress"
-    | "completed"
-    | "overdue"
-    | "returned";
+  | "pending"
+  | "in-progress"
+  | "completed"
+  | "overdue"
+  | "returned";
   calculatedPriority: "low" | "medium" | "high" | "critical";
 
   displayId: string;
@@ -73,7 +74,7 @@ export default function ProcessorDashboard() {
     [key: string]: {
       name: string;
       email?: string;
-    } | null;
+    }[];
   }>({});
 
   useEffect(() => {
@@ -125,33 +126,19 @@ export default function ProcessorDashboard() {
 
   const fetchCurrentWorkers = async (taskIds: string[]) => {
     try {
-      const workerPromises = taskIds.map(async (taskId) => {
-        try {
-          const response = await fetch(`/api/tasks/${taskId}/current-worker`);
-          const data = await response.json();
-          return { taskId, worker: data.data || null };
-        } catch (error) {
-          console.error(`Error fetching worker for task ${taskId}:`, error);
-          return { taskId, worker: null };
-        }
-      });
+      // Use the new utility function instead of individual API calls
+      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
+      const result = await fetchBatchTaskAssignments(taskIds);
 
-      const results = await Promise.all(workerPromises);
-      const workerMap = results.reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              email?: string;
-            } | null;
-          },
-          result
-        ) => {
-          acc[result.taskId] = result.worker;
-          return acc;
-        },
-        {}
-      );
+      // Convert to the format expected by the component
+      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
+
+      for (const [taskId, assignments] of Object.entries(result)) {
+        workerMap[taskId] = assignments.map(user => ({
+          name: user.name,
+          email: user.email || undefined,
+        }));
+      }
 
       setCurrentWorkers(workerMap);
     } catch (error) {
@@ -199,7 +186,7 @@ export default function ProcessorDashboard() {
             currentFileName: null,
             calculatedStatus: "pending",
             calculatedPriority: "medium",
-            displayId: item.id,
+            displayId: item.id.toString(),
             displayTitle: item.tasks_test?.task_name || "No Project Name",
             displayDescription: `Status: ${item.status || "N/A"}`,
             displayDueDate: null,
@@ -218,7 +205,6 @@ export default function ProcessorDashboard() {
         // Fetch current workers for all tasks
         await fetchCurrentWorkers(processedTasks.map((task) => task.taskId));
       } else {
-        console.log("No tasks found");
         setTasks([]);
       }
     } catch (error) {
@@ -360,7 +346,7 @@ export default function ProcessorDashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.calculatedStatus}
                   priority={task.calculatedPriority}
-                  currentWorker={currentWorkers[task.taskId] || null}
+                  currentWorkers={currentWorkers[task.taskId] || []}
                 />
               ))
             )}

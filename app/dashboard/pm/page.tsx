@@ -6,6 +6,8 @@ import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+// import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
 import {
   Select,
   SelectContent,
@@ -84,7 +86,7 @@ export default function DashboardPage() {
     [key: string]: {
       name: string;
       email?: string;
-    } | null;
+    }[];
   }>({});
 
   const _router = useRouter();
@@ -137,22 +139,22 @@ export default function DashboardPage() {
 
   const fetchCurrentWorkers = async (taskIds: string[]) => {
     try {
-      // Use batch endpoint to fetch all workers in a single API call
-      const response = await fetch("/api/tasks/current-workers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ taskIds }),
-      });
+      // Use the new utility function instead of API call
+      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
+      const result = await fetchBatchTaskAssignments(taskIds);
 
-      const result = await response.json();
+      // Convert to the format expected by the component
+      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
 
-      if (response.ok && result.data) {
-        setCurrentWorkers(result.data);
-      } else {
-        console.error("Error fetching current workers:", result.error);
+      for (const [taskId, assignments] of Object.entries(result)) {
+        workerMap[taskId] = assignments.map(user => ({
+          name: user.name,
+          email: user.email || undefined,
+        }));
       }
+
+
+      setCurrentWorkers(workerMap);
     } catch (error) {
       console.error("Error fetching current workers:", error);
     }
@@ -185,7 +187,7 @@ export default function DashboardPage() {
         {}
       );
 
-      console.log("stageMap", stageMap);
+
 
       if (projectsData) {
         const processedTasks = projectsData.map(
@@ -196,12 +198,14 @@ export default function DashboardPage() {
             po_hours: number;
             process_type: string;
             project_id: string;
+            id: number;
             task_name?: string;
             client_instruction?: string;
             created_at?: string;
           }) => {
             return {
               ...task,
+              id: (task.id || task.task_id).toString(),
               status: calculateStatus(
                 task.delivery_date,
                 task.completion_status
@@ -212,7 +216,7 @@ export default function DashboardPage() {
             };
           }
         );
-        console.log("processedTasks : ", processedTasks);
+
         setTasks(processedTasks);
 
         // Get unique project IDs and fetch their names
@@ -302,7 +306,7 @@ export default function DashboardPage() {
     );
   });
 
-  // console.log("filteredTasks", filteredTasks);
+
 
   const _openModal = () => setIsModalOpen(true);
   const _closeModal = () => setIsModalOpen(false);
@@ -444,7 +448,7 @@ export default function DashboardPage() {
                   dueTime={projectNames[task.project_id]?.delivery_time || ""}
                   status={task.status || "pending"}
                   priority={task.priority || "medium"}
-                  currentWorker={currentWorkers[task.task_id] || null}
+                  currentWorkers={currentWorkers[task.task_id] || []}
                 />
               ))}
             </div>

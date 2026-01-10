@@ -12,9 +12,9 @@ export class AuthorizationService {
       .select(`
         task_id,
         task_iterations (
-          assigned_processor,
-          assigned_qc,
-          assigned_qa
+          assigned_to_processor_user_id,
+          assigned_to_qc_user_id,
+          assigned_to_qa_user_id
         )
       `)
       .eq('task_id', taskId)
@@ -40,9 +40,9 @@ export class AuthorizationService {
     const iteration = iterations[0];
 
     const assignedUsers = [
-      iteration.assigned_processor,
-      iteration.assigned_qc,
-      iteration.assigned_qa
+      iteration.assigned_to_processor_user_id,
+      iteration.assigned_to_qc_user_id,
+      iteration.assigned_to_qa_user_id
     ].filter(Boolean); // Filter out null/undefined values
 
     return assignedUsers.includes(userId);
@@ -54,46 +54,70 @@ export class AuthorizationService {
   static async canModifyTask(userId: string, taskId: string): Promise<boolean> {
     const supabase = await createClient();
 
-    const { data: task } = await supabase
+
+
+    const { data: task, error: taskError } = await supabase
       .from('tasks_test')
       .select(`
         task_id,
         task_iterations (
           current_stage,
-          assigned_processor,
-          assigned_qc,
-          assigned_qa
+          assigned_to_processor_user_id,
+          assigned_to_qc_user_id,
+          assigned_to_qa_user_id
         )
       `)
       .eq('task_id', taskId)
       .single();
 
-    if (!task) return false;
+    if (taskError || !task) {
 
-    const { data: profile } = await supabase
+      return false;
+    }
+
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', userId)
       .single();
 
+    if (profileError || !profile) {
+
+      return false;
+    }
+
+
+
     // PMs can always modify
-    if (profile?.role === 'projectManager') return true;
+    if (profile?.role === 'projectManager') {
+
+      return true;
+    }
 
     const iterations = task.task_iterations;
-    if (!iterations || !Array.isArray(iterations) || iterations.length === 0) return false;
+    if (!iterations || !Array.isArray(iterations) || iterations.length === 0) {
+
+      // Allow modification if no iterations exist yet (task is being set up)
+      return true;
+    }
 
     // Get the latest iteration (or first if only one)
     const iteration = iterations[0];
 
-    // Check if user is assigned to current stage
-    const stageAssignments: Record<string, string> = {
-      'processor': iteration.assigned_processor,
-      'qc': iteration.assigned_qc,
-      'qa': iteration.assigned_qa
-    };
 
-    const currentStageAssignment = stageAssignments[iteration.current_stage?.toLowerCase() || ''];
-    return currentStageAssignment === userId;
+    // Check if user is assigned to ANY stage (not just current stage)
+    // This allows assigned users to modify task details
+    const assignedUsers = [
+      iteration.assigned_to_processor_user_id,
+      iteration.assigned_to_qc_user_id,
+      iteration.assigned_to_qa_user_id
+    ].filter(Boolean);
+
+    const isAssignedToTask = assignedUsers.includes(userId);
+
+
+
+    return isAssignedToTask;
   }
 
   /**
@@ -105,7 +129,7 @@ export class AuthorizationService {
     const { data: file } = await supabase
       .from('files_test')
       .select('task_id')
-      .eq('id', fileId)
+      .eq('file_id', fileId)
       .single();
 
     if (!file) return false;
@@ -133,9 +157,9 @@ export class AuthorizationService {
       .select(`
         task_iterations (
           current_stage,
-          assigned_processor,
-          assigned_qc,
-          assigned_qa
+          assigned_to_processor_user_id,
+          assigned_to_qc_user_id,
+          assigned_to_qa_user_id
         )
       `)
       .eq('task_id', taskId)
@@ -151,9 +175,9 @@ export class AuthorizationService {
 
     // Check if user is assigned to the stage they're uploading to
     const stageAssignments: Record<string, string> = {
-      'processor': iteration.assigned_processor,
-      'qc': iteration.assigned_qc,
-      'qa': iteration.assigned_qa
+      'processor': iteration.assigned_to_processor_user_id,
+      'qc': iteration.assigned_to_qc_user_id,
+      'qa': iteration.assigned_to_qa_user_id
     };
 
     return stageAssignments[stage.toLowerCase()] === userId;
