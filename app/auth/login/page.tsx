@@ -36,7 +36,7 @@ export default function Login() {
 
     try {
       const result = await api.login(formData.email, formData.password);
-      console.log("Login result:", result);
+
 
       if (!result.user) {
         throw new Error("Authentication failed. Please try again.");
@@ -48,10 +48,7 @@ export default function Login() {
       }
 
       const userRole = result.role;
-      console.log("user role", userRole);
-      setTimeout(() => {
-        console.log("User role after timeout:", userRole);
-      }, 10000);
+
 
       // Determine redirect path based on role : useful in the case of redirecting to respective dashboards based on the roles.
       let redirectPath = "/dashboard";

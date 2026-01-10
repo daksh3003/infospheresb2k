@@ -65,67 +65,71 @@ export async function POST(request: NextRequest) {
             actionsByTask[action.task_id].push(action);
         });
 
-        // Process each task to find current worker
-        const results: Record<string, { name: string; email?: string } | null> = {};
+        // Process each task to find assigned workers for current stage only
+        const results: Record<string, { name: string; email?: string }[]> = {};
 
         for (const taskId of taskIds) {
             const currentStage = stageMap[taskId];
             const taskActions = actionsByTask[taskId] || [];
 
             if (taskActions.length === 0) {
-                results[taskId] = null;
+                results[taskId] = [];
                 continue;
             }
 
             // Filter actions by current stage
-            const stageActions = taskActions.filter((action) => {
+            const stageFilteredActions = taskActions.filter((action) => {
+                const metadata = action.metadata || {};
+
                 if (action.action_type === "assigned_to") {
-                    const assignmentStage = action.metadata?.assignment_stage;
+                    // For assigned_to, check assignment_stage in metadata
+                    const assignmentStage = metadata.assignment_stage;
                     return assignmentStage === currentStage;
                 } else if (action.action_type === "taken_by") {
-                    const takenStage = action.metadata?.stage;
+                    // For taken_by, check stage in metadata
+                    const takenStage = metadata.stage;
                     return takenStage === currentStage;
                 }
                 return false;
             });
 
-            // Use stage-specific action or fall back to most recent
-            const actionToUse =
-                stageActions.length > 0 ? stageActions[0] : taskActions[0];
+            // Collect all unique assigned users from stage-filtered actions
+            const assignedUsers = new Map<string, { name: string; email?: string }>();
 
-            if (!actionToUse) {
-                results[taskId] = null;
-                continue;
+            for (const action of stageFilteredActions) {
+                const metadata = action.metadata || {};
+                let userName: string;
+                let userEmail: string | null;
+                let userId: string;
+
+                if (action.action_type === "assigned_to") {
+                    userName =
+                        metadata.assigned_to_user_name ||
+                        metadata.user_name ||
+                        metadata.assigned_to_user_email ||
+                        "Unknown";
+                    userEmail =
+                        metadata.assigned_to_user_email || metadata.user_email || null;
+                    userId = action.user_id || userEmail || userName;
+                } else if (action.action_type === "taken_by") {
+                    userName =
+                        metadata.user_name || metadata.user_email || "Unknown";
+                    userEmail = metadata.user_email || null;
+                    userId = action.user_id || userEmail || userName;
+                } else {
+                    continue;
+                }
+
+                // Add to map if not already present (deduplication by userId)
+                if (!assignedUsers.has(userId)) {
+                    assignedUsers.set(userId, {
+                        name: userName,
+                        email: userEmail || undefined,
+                    });
+                }
             }
 
-            // Extract user information from metadata
-            const metadata = actionToUse.metadata || {};
-
-            if (actionToUse.action_type === "assigned_to") {
-                const userName =
-                    metadata.assigned_to_user_name ||
-                    metadata.user_name ||
-                    metadata.assigned_to_user_email ||
-                    "Unknown";
-                const userEmail =
-                    metadata.assigned_to_user_email || metadata.user_email || null;
-
-                results[taskId] = {
-                    name: userName,
-                    email: userEmail,
-                };
-            } else if (actionToUse.action_type === "taken_by") {
-                const userName =
-                    metadata.user_name || metadata.user_email || "Unknown";
-                const userEmail = metadata.user_email || null;
-
-                results[taskId] = {
-                    name: userName,
-                    email: userEmail,
-                };
-            } else {
-                results[taskId] = null;
-            }
+            results[taskId] = Array.from(assignedUsers.values());
         }
 
         return NextResponse.json({ data: results });

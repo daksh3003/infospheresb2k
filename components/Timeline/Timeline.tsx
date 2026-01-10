@@ -34,9 +34,7 @@ export const Timeline: React.FC<TimelineProps> = ({
     }));
   };
 
-  useEffect(() => {
-    console.log("Items :", items);
-  }, [items]);
+
 
   const TimelineContent = () => (
     <div className="timeline">

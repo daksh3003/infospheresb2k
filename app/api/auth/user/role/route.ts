@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .eq('id', userId)
       .single();
 
-    console.log("Fetched role data:", data, "for userId:", userId);
+
 
     if (error) {
       console.error('Error fetching user role:', error);

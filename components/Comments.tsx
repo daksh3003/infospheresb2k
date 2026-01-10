@@ -85,7 +85,6 @@ export const Comments = ({ taskId }: { taskId: string }) => {
       }
 
       setCurrentUser(user);
-      console.log("Setting current user:", user);
       return user;
     } catch (error) {
       console.error("Error getting current user:", error);
@@ -102,7 +101,7 @@ export const Comments = ({ taskId }: { taskId: string }) => {
     } | null
   ) => {
     try {
-      console.log("fetchComments called with user:", user);
+
       const response = await fetch(`/api/comments?task_id=${taskId}`);
       const result = await response.json();
 
@@ -206,8 +205,7 @@ export const Comments = ({ taskId }: { taskId: string }) => {
 
       // Map user data to comments
       comments.forEach((comment) => {
-        console.log("Mapping user data for comment:", comment);
-        console.log("Current user:", user);
+
         if (comment.user_id === user?.id) {
           comment.user_name = user?.name || "You";
           // comment.user_email = user?.email || "";

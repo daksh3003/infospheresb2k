@@ -61,15 +61,7 @@ export const TaskAttachments = ({
 }) => {
   const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
 
-  console.log("Task Attachments Props:", {
-    PMFiles,
-    processorFiles,
-    correctionFiles,
-    version,
-    taskId,
-    storage_name,
-    folder_path,
-  });
+
 
   // Fetch file edit history
   useEffect(() => {

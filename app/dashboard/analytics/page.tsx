@@ -2810,7 +2810,7 @@ function FeedbackReport() {
                 url += `?${params.toString()}`;
             }
 
-            console.log("Feedback Report: Fetching from URL:", url);
+
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -2825,8 +2825,7 @@ function FeedbackReport() {
             }
 
             const data = await response.json();
-            console.log("Feedback Report API Response:", data);
-            console.log("Feedback Report Data Length:", Array.isArray(data) ? data.length : "Not an array");
+
 
             if (data.error) {
                 throw new Error(data.error);

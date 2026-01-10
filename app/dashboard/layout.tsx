@@ -100,13 +100,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (user?.id) {
         // Fetch role from API
         const role = await fetchUserRole(user.id);
-        console.log("user role from API", role);
         setCurrentUserRole(role);
       } else {
         setCurrentUserRole(null);
       }
 
-      console.log("user", user);
+
     });
 
     return unsubscribe;

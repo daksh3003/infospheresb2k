@@ -42,34 +42,17 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: commentsError.message }, { status: 500 });
         }
 
-        console.log(`Feedback Report: Found ${comments?.length || 0} comments`);
-        
-        if (!comments || comments.length === 0) {
-            console.log("Feedback Report: No comments found in database");
-            console.log("Feedback Report: Query was:", {
-                startDate,
-                endDate,
-                hasFilters: !!(startDate || endDate)
-            });
-            return NextResponse.json([]);
-        }
-        
-        // Log first few comments for debugging
-        console.log("Feedback Report: Sample comments:", comments.slice(0, 3).map((c: any) => ({
-            comment_id: c.comment_id,
-            task_id: c.task_id,
-            created_at: c.created_at,
-            has_comment: !!c.comment
-        })));
+
+
+
 
         // Get unique task IDs
         const taskIds = [...new Set(comments.map((c: any) => c.task_id).filter(Boolean))];
-        
+
         if (taskIds.length === 0) {
-            console.log("Feedback Report: No valid task IDs found in comments");
             return NextResponse.json([]);
         }
-        
+
         // Fetch tasks
         const { data: tasks, error: tasksError } = await supabase
             .from("tasks_test")
@@ -80,13 +63,13 @@ export async function GET(request: NextRequest) {
             console.error("Error fetching tasks:", tasksError);
         }
 
-        console.log(`Feedback Report: Found ${tasks?.length || 0} tasks for ${taskIds.length} unique task IDs`);
+
 
         // Get unique project IDs
         const projectIds = [...new Set(tasks?.map((t: any) => t.project_id) || [])];
-        
-        console.log(`Feedback Report: Found ${projectIds.length} unique project IDs`);
-        
+
+
+
         // Fetch projects
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
@@ -136,7 +119,7 @@ export async function GET(request: NextRequest) {
             ...(iterations?.map((i: any) => i.assigned_to_qc_user_id).filter(Boolean) || []),
             ...(iterations?.map((i: any) => i.assigned_to_qa_user_id).filter(Boolean) || [])
         ])];
-        
+
         const { data: profiles, error: profilesError } = await supabase
             .from("profiles")
             .select("id, name")
@@ -192,7 +175,7 @@ export async function GET(request: NextRequest) {
 
         comments.forEach((comment: any) => {
             const task = taskToProjectMap.get(comment.task_id);
-            
+
             // Still create entry even if task is not found - use comment data
             const project = task ? projectMap.get(task.project_id) : null;
             const taskFiles = taskToFilesMap.get(comment.task_id) || [];
@@ -201,15 +184,15 @@ export async function GET(request: NextRequest) {
             const taskIterations = taskToIterationsMap.get(comment.task_id) || [];
             const actions = taskToActionsMap.get(comment.task_id) || [];
             const commentDate = comment.created_at ? new Date(comment.created_at).getTime() : null;
-            
+
             // Find QC person - first from task_actions (who actually performed QC), then fallback to task_iterations
             const qcActions = actions.filter((a: any) => {
                 const metadata = a.metadata || {};
                 const currentStage = metadata.current_stage || metadata.upload_stage;
-                return currentStage === "QC" && 
-                       (a.action_type === 'start' || a.action_type === 'complete');
+                return currentStage === "QC" &&
+                    (a.action_type === 'start' || a.action_type === 'complete');
             });
-            
+
             // If comment has a date, find QC action closest to comment date, otherwise use first
             let qcPersonId = null;
             if (qcActions.length > 0) {
@@ -223,7 +206,7 @@ export async function GET(request: NextRequest) {
                     qcPersonId = qcActions[0].user_id;
                 }
             }
-            
+
             // Fallback to task_iterations if no actions found
             if (!qcPersonId) {
                 const qcIteration = taskIterations
@@ -231,17 +214,17 @@ export async function GET(request: NextRequest) {
                     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
                 qcPersonId = qcIteration?.assigned_to_qc_user_id || null;
             }
-            
+
             const qcPerson = qcPersonId ? userIdToNameMap.get(qcPersonId) : "-";
-            
+
             // Find QA person - first from task_actions (who actually performed QA), then fallback to task_iterations
             const qaActions = actions.filter((a: any) => {
                 const metadata = a.metadata || {};
                 const currentStage = metadata.current_stage || metadata.upload_stage;
-                return currentStage === "QA" && 
-                       (a.action_type === 'start' || a.action_type === 'complete');
+                return currentStage === "QA" &&
+                    (a.action_type === 'start' || a.action_type === 'complete');
             });
-            
+
             // If comment has a date, find QA action closest to comment date, otherwise use first
             let qaPersonId = null;
             if (qaActions.length > 0) {
@@ -255,7 +238,7 @@ export async function GET(request: NextRequest) {
                     qaPersonId = qaActions[0].user_id;
                 }
             }
-            
+
             // Fallback to task_iterations if no actions found
             if (!qaPersonId) {
                 const qaIteration = taskIterations
@@ -263,11 +246,11 @@ export async function GET(request: NextRequest) {
                     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
                 qaPersonId = qaIteration?.assigned_to_qa_user_id || null;
             }
-            
+
             const qaPerson = qaPersonId ? userIdToNameMap.get(qaPersonId) : "-";
 
             // Format date as DD-MM-YYYY
-            const date = comment.created_at 
+            const date = comment.created_at
                 ? new Date(comment.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
                 : "N/A";
 
@@ -308,8 +291,8 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        console.log(`Feedback Report: Created ${reportEntries.length} report entries from ${comments.length} comments`);
-        
+
+
         if (reportEntries.length === 0 && comments.length > 0) {
             console.warn("Feedback Report: No report entries created even though comments exist. Check if tasks are found for comment task_ids.");
         }

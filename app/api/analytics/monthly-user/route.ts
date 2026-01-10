@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
         const userIdsParam = searchParams.get('userIds');
         const teamType = searchParams.get('teamType');
 
-        if(!selectedMonth) {
+        if (!selectedMonth) {
             return NextResponse.json({ error: 'Month is required' }, { status: 400 });
         }
 
@@ -35,13 +35,13 @@ export async function GET(request: NextRequest) {
                 "Processor": "processor"
             };
             const targetRole = roleMap[teamType];
-            
+
             if (targetRole) {
                 const { data: profiles, error: profilesError } = await supabase
                     .from("profiles")
                     .select("id")
                     .eq("role", targetRole);
-                
+
                 if (!profilesError && profiles) {
                     targetUserIds = profiles.map((p: any) => p.id);
                 }
@@ -62,12 +62,12 @@ export async function GET(request: NextRequest) {
 
         const { data: taskActions, error: actionsError } = await query;
 
-        if(actionsError) {
+        if (actionsError) {
             console.error("Error fetching task actions:", actionsError);
             return NextResponse.json({ error: actionsError.message }, { status: 500 });
         }
 
-        if(!taskActions || taskActions.length === 0) {
+        if (!taskActions || taskActions.length === 0) {
             return NextResponse.json({
                 month: selectedMonth,
                 dates: [],
@@ -83,27 +83,27 @@ export async function GET(request: NextRequest) {
             .from("tasks_test")  // Changed from "task_test" to "tasks_test"
             .select("task_id, project_id")
             .in("task_id", taskIds);
-            
-        if(tasksError) {
+
+        if (tasksError) {
             console.error("Error fetching tasks:", tasksError);
             return NextResponse.json({ error: `Error fetching tasks: ${tasksError.message}` }, { status: 500 });
         }
 
         // Create task_id to project_id map
         const taskToProjectMap = new Map();
-        if(tasks && tasks.length > 0) {
+        if (tasks && tasks.length > 0) {
             tasks.forEach((task: any) => {
                 taskToProjectMap.set(task.task_id, task.project_id);
             });
         } else {
-            console.log("No tasks found for task IDs:", taskIds);
+
         }
 
         // Get unique project IDs
         const projectIds = [...new Set(Array.from(taskToProjectMap.values()))].filter(Boolean);
 
         if (projectIds.length === 0) {
-            console.log("No project IDs found for tasks");
+
             // Return empty data instead of continuing
             return NextResponse.json({
                 month: selectedMonth,
@@ -118,13 +118,13 @@ export async function GET(request: NextRequest) {
             .select("*")
             .in("project_id", projectIds);
 
-        if(projectsError) {
+        if (projectsError) {
             console.error("Error fetching projects:", projectsError);
             return NextResponse.json({ error: `Error fetching projects: ${projectsError.message}` }, { status: 500 });
         }
 
         if (!projects || projects.length === 0) {
-            console.log("No projects found for project IDs:", projectIds);
+
             return NextResponse.json({
                 month: selectedMonth,
                 dates: [],
@@ -135,14 +135,14 @@ export async function GET(request: NextRequest) {
         // Create project_id to po_hours map (and store all project data if needed)
         const projectToPOHoursMap = new Map();
         const projectDataMap = new Map();
-        if(projects) {
+        if (projects) {
             projects.forEach((project: any) => {
                 // Try different possible column names for PO hours
                 const pohours = parseFloat(project.po_hours || project.pohours || project.poHours || 0);
-                
+
                 // Debug logging
-                console.log(`Project ${project.project_id}: PO Hours = ${pohours} (raw: ${project.po_hours || project.pohours || project.poHours || 'N/A'})`);
-                
+
+
                 projectToPOHoursMap.set(project.project_id, pohours);
                 projectDataMap.set(project.project_id, project);
             });
@@ -154,15 +154,8 @@ export async function GET(request: NextRequest) {
             if (projectId) {
                 const pohours = projectToPOHoursMap.get(projectId) || 0;
                 taskToPOHoursMap.set(taskId, pohours);
-                
-                // Debug logging
-                if (pohours > 0) {
-                    console.log(`Task ${taskId} -> Project ${projectId}: PO Hours = ${pohours}`);
-                } else {
-                    console.log(`Task ${taskId} -> Project ${projectId}: PO Hours = 0 (not found in project map)`);
-                }
-            } else {
-                console.log(`Task ${taskId}: No project_id found`);
+
+
             }
         });
 
@@ -171,12 +164,12 @@ export async function GET(request: NextRequest) {
             .select("id, name")
             .in("id", userIds);
 
-        if(profilesError) {
+        if (profilesError) {
             console.error("Error fetching profiles:", profilesError);
         }
 
         const userIdToNameMap = new Map();
-        if(profiles) {
+        if (profiles) {
             profiles.forEach((profile: any) => {
                 userIdToNameMap.set(profile.id, profile.name);
             });
@@ -185,7 +178,7 @@ export async function GET(request: NextRequest) {
         const userDateDataMap = new Map<string, Map<string, { pages: number, hours: number }>>();
         // Track which tasks have been counted per day to avoid double counting
         const taskDateCounted = new Set<string>(); // Format: "taskId_dateKey"
-        
+
         taskActions.forEach((action: any) => {
             const metadata = action.metadata || {};
             const userId = action.user_id;
@@ -194,38 +187,35 @@ export async function GET(request: NextRequest) {
             const dateKey = `${String(actionDate.getDate()).padStart(2, '0')}-${String(actionDate.getMonth() + 1).padStart(2, '0')}-${actionDate.getFullYear()}`;
             const taskDateKey = `${taskId}_${dateKey}`;
 
-            if(['start', 'complete', 'pause', 'resume', 'upload'].includes(action.action_type)) {
-                if(!userDateDataMap.has(userId)) {
+            if (['start', 'complete', 'pause', 'resume', 'upload'].includes(action.action_type)) {
+                if (!userDateDataMap.has(userId)) {
                     userDateDataMap.set(userId, new Map());
                 }
 
                 const userDateMap = userDateDataMap.get(userId)!;
 
-                if(!userDateMap.has(dateKey)) {
+                if (!userDateMap.has(dateKey)) {
                     userDateMap.set(dateKey, { pages: 0, hours: 0 });
                 }
 
                 const dateEntry = userDateMap.get(dateKey)!;
 
                 // Add page count from files_info
-                if(metadata.files_info && Array.isArray(metadata.files_info)) {
+                if (metadata.files_info && Array.isArray(metadata.files_info)) {
                     const pageCount = metadata.files_info.reduce((sum: number, file: any) => {
                         return sum + (file.page_count || 0);
                     }, 0);
                     dateEntry.pages += pageCount;
                 }
-                
+
                 // Use PO hours from projects_test - count once per task per day for any work action
                 if (!taskDateCounted.has(taskDateKey)) {
                     const pohours = taskToPOHoursMap.get(taskId) || 0;
                     if (pohours > 0) {
                         dateEntry.hours += pohours;
                         taskDateCounted.add(taskDateKey);
-                        
-                        // Debug logging
-                        console.log(`Added ${pohours} PO hours for task ${taskId} on ${dateKey} (action: ${action.action_type})`);
-                    } else {
-                        console.log(`No PO hours found for task ${taskId} on ${dateKey}`);
+
+
                     }
                 }
             }

@@ -38,10 +38,10 @@ interface TaskCardProps {
   onSendToQC?: (taskIterationId: string) => void;
   isActionableByPM?: boolean;
   isLoadingAction?: boolean; // Optional: For individual card action loading state
-  currentWorker?: {
+  currentWorkers?: {
     name: string;
     email?: string;
-  } | null; // Optional: Currently working on the task
+  }[]; // Optional: All users currently working on the task
 }
 
 export function TaskCard({
@@ -56,7 +56,7 @@ export function TaskCard({
   onSendToQC,
   isActionableByPM,
   isLoadingAction, // Optional
-  currentWorker, // Optional
+  currentWorkers, // Optional
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -64,6 +64,8 @@ export function TaskCard({
 
   // Fetch real status from tasks_test table
   useEffect(() => {
+
+
     const fetchRealStatus = async () => {
       try {
         setStatusLoading(true);
@@ -72,7 +74,7 @@ export function TaskCard({
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data?.status) {
-            console.log("Fetched real status:", result.data.status);
+
             setRealStatus(result.data.status as TaskStatus);
           }
         }
@@ -92,9 +94,7 @@ export function TaskCard({
   // Sync realStatus with propStatus when it changes
   useEffect(() => {
     if (propStatus && propStatus !== realStatus) {
-      console.log(
-        `TaskCard: Status updated from ${realStatus} to ${propStatus}`
-      );
+
       setRealStatus(propStatus);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,20 +179,20 @@ export function TaskCard({
               <span className="text-xs">
                 {dueDate && dueDate !== "null" && dueDate !== "undefined"
                   ? (() => {
-                      try {
-                        const date = new Date(dueDate);
-                        if (isNaN(date.getTime())) {
-                          return "No due date";
-                        }
-                        return date.toLocaleDateString(undefined, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        });
-                      } catch {
+                    try {
+                      const date = new Date(dueDate);
+                      if (isNaN(date.getTime())) {
                         return "No due date";
                       }
-                    })()
+                      return date.toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      });
+                    } catch {
+                      return "No due date";
+                    }
+                  })()
                   : "No due date"}
               </span>
               {dueTime && dueTime !== "null" && dueTime !== "undefined" && (
@@ -206,9 +206,8 @@ export function TaskCard({
           {/* Status Badge */}
           <div className="flex items-center justify-center">
             <Badge
-              className={`${
-                statusColor[status] || statusColor["pending"]
-              } px-2 py-1 text-xs font-medium`}
+              className={`${statusColor[status] || statusColor["pending"]
+                } px-2 py-1 text-xs font-medium`}
               variant="outline"
             >
               <span className="flex items-center">
@@ -221,9 +220,8 @@ export function TaskCard({
           {/* Priority Badge */}
           <div className="flex items-center justify-center">
             <Badge
-              className={`${
-                priorityColor[priority] || priorityColor["medium"]
-              } px-2 py-1 text-xs font-medium`}
+              className={`${priorityColor[priority] || priorityColor["medium"]
+                } px-2 py-1 text-xs font-medium`}
             >
               {priority.charAt(0).toUpperCase() + priority.slice(1)}
             </Badge>
@@ -231,16 +229,34 @@ export function TaskCard({
 
           {/* Currently Working On */}
           <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
-            {currentWorker ? (
-              <div className="flex items-center">
-                <User className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
-                <div className="flex flex-col items-center">
-                  <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                    {currentWorker.name}
-                  </span>
-                  {currentWorker.email && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
-                      {currentWorker.email}
+            {currentWorkers && currentWorkers.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <div className="flex items-center gap-1">
+                  {/* Show avatar circles for up to 3 members */}
+                  <div className="flex -space-x-2">
+                    {currentWorkers.slice(0, 3).map((worker, index) => (
+                      <div
+                        key={index}
+                        className="w-6 h-6 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center ring-2 ring-white dark:ring-gray-800"
+                        title={worker.email || worker.name}
+                      >
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-200">
+                          {worker.name?.charAt(0).toUpperCase() || "?"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Show count if more than 3 members */}
+                  {currentWorkers.length > 3 && (
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 ml-1">
+                      +{currentWorkers.length - 3}
+                    </span>
+                  )}
+                  {/* Show first name for single member, or count for multiple */}
+                  {currentWorkers.length === 1 && (
+                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100 ml-1">
+                      {currentWorkers[0].name}
                     </span>
                   )}
                 </div>

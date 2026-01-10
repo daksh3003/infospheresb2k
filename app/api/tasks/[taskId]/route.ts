@@ -143,6 +143,7 @@ export async function POST(
     // Check if user can modify this task
     const canModify = await AuthorizationService.canModifyTask(authenticatedUser.id, taskId);
     if (!canModify) {
+
       return NextResponse.json(
         { error: 'You do not have permission to modify this task' },
         { status: 403 }
@@ -172,6 +173,9 @@ export async function POST(
 async function handleTaskAssignment(taskId: string, selectedUserData: { id: string; name: string; email: string }) {
   try {
     const supabase = await createClient();
+
+
+
     if (!selectedUserData) {
       return NextResponse.json(
         { error: 'User data is required' },
@@ -181,44 +185,46 @@ async function handleTaskAssignment(taskId: string, selectedUserData: { id: stri
 
     const assignedToArray = Array.isArray(selectedUserData) ? selectedUserData : [selectedUserData];
 
-    const logData = {
-      task_id: taskId,
-      assigned_to: assignedToArray,
-    };
 
-    // Check if record exists
-    const { data: existingLog, error: checkError } = await supabase
+
+    // Check if any file records exist for this task
+    const { data: existingFiles, error: checkError } = await supabase
       .from("files_test")
-      .select("assigned_to")
-      .eq("task_id", taskId)
-      .single();
+      .select("file_id, assigned_to")
+      .eq("task_id", taskId);
 
-    if (checkError && checkError.code !== "PGRST116") {
+    if (checkError) {
+      console.error('❌ Error checking existing files:', checkError);
       throw checkError;
     }
 
-    if (existingLog) {
-      const { error: updateError } = await supabase
-        .from("files_test")
-        .update({ assigned_to: logData.assigned_to })
-        .eq("task_id", taskId);
 
-      if (updateError) {
-        throw updateError;
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from("files_test")
-        .insert(logData);
 
-      if (insertError) {
-        throw insertError;
-      }
+    if (!existingFiles || existingFiles.length === 0) {
+      console.warn('⚠️ No file records found for this task. Cannot assign without files.');
+      return NextResponse.json(
+        { error: 'No files found for this task. Please upload files first.' },
+        { status: 400 }
+      );
     }
+
+    // Update all file records for this task with the new assignment
+    const { error: updateError } = await supabase
+      .from("files_test")
+      .update({ assigned_to: assignedToArray })
+      .eq("task_id", taskId);
+
+    if (updateError) {
+      console.error('❌ Error updating assignments:', updateError);
+      throw updateError;
+    }
+
+
 
     return NextResponse.json({ message: 'Task assigned successfully' });
 
   } catch (error: unknown) {
+    console.error('❌ handleTaskAssignment error:', error);
     return NextResponse.json(
       { error: 'Failed to assign task' },
       { status: 500 }
@@ -227,7 +233,7 @@ async function handleTaskAssignment(taskId: string, selectedUserData: { id: stri
 }
 
 async function handleTaskPickup(taskId: string, authenticatedUser: {
-  role: string; id: string; email: string 
+  role: string; id: string; email: string
 }) {
   try {
     const supabase = await createClient();

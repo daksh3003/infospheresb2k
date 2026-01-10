@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
 
         projects.forEach((project: any) => {
             const projectTasks = projectToTasksMap.get(project.project_id) || [];
-            
+
             // If no tasks for this project, still create an entry
             if (projectTasks.length === 0) {
                 // Format date as "DD-MM-YYYY"
@@ -180,17 +180,17 @@ export async function GET(request: NextRequest) {
                     const year = dateObj.getFullYear();
                     date = `${day}-${month}-${year}`;
                 }
-                
+
                 // Format delivery time
                 let deliveryTime = "N/A";
                 if (project.delivery_time) {
                     try {
                         const timeObj = new Date(project.delivery_time);
                         if (!isNaN(timeObj.getTime())) {
-                            deliveryTime = timeObj.toLocaleTimeString('en-US', { 
-                                hour12: false, 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
+                            deliveryTime = timeObj.toLocaleTimeString('en-US', {
+                                hour12: false,
+                                hour: '2-digit',
+                                minute: '2-digit'
                             });
                         } else {
                             const timeStr = String(project.delivery_time);
@@ -211,10 +211,10 @@ export async function GET(request: NextRequest) {
                         }
                     }
                 }
-                
+
                 const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
                 const poHours = project.po_hours || project.pohours || project.poHours || 0;
-                
+
                 reportEntries.push({
                     job_no: jobNo++,
                     delivered_by: deliveredBy,
@@ -255,21 +255,21 @@ export async function GET(request: NextRequest) {
                 });
                 return; // Skip to next project
             }
-            
+
             projectTasks.forEach((task: any) => {
                 const taskFiles = taskToFilesMap.get(task.task_id) || [];
                 const fileCount = taskFiles.length;
                 const pageCount = taskFiles.reduce((sum: number, f: any) => sum + (f.page_count || 0), 0);
                 const fileId = taskFiles[0]?.file_id || "N/A";
-                
+
                 const iterations = taskToIterationsMap.get(task.task_id) || [];
                 const actions = taskToActionsMap.get(task.task_id) || [];
-                
+
                 // Sort iterations by created_at to get the most recent one
-                const sortedIterations = [...iterations].sort((a: any, b: any) => 
+                const sortedIterations = [...iterations].sort((a: any, b: any) =>
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
-                
+
                 // Get stages array from the most recent iteration (it contains the full history)
                 // The 'stages' column is a JSON array with the complete stage history
                 let stages: string[] = [];
@@ -283,38 +283,25 @@ export async function GET(request: NextRequest) {
                         stages = sortedIterations.map((it: any) => it.current_stage);
                     }
                 }
-                
-                // Debug logging - show detailed stage information
-                if (stages.length > 0) {
-                    console.log(`\n=== Task ${task.task_id} ===`);
-                    console.log(`Iterations count: ${iterations.length}`);
-                    console.log(`Stages array (from stages column):`, JSON.stringify(stages));
-                    console.log(`Stages array length: ${stages.length}`);
-                    console.log(`Sorted iterations details:`, sortedIterations.map((it: any, idx: number) => ({
-                        index: idx,
-                        current_stage: it.current_stage,
-                        stages: it.stages,
-                        created_at: it.created_at,
-                        processor_user_id: it.assigned_to_processor_user_id
-                    })));
-                }
-                
+
+
+
                 // Check for QC CXN: Find actions where sent_by is QC and current_stage is Processor
                 let hasQCCXN = false;
                 let qcCXNPersonId: string | null = null;
                 let qcCXNStartTime = "N/A";
                 let qcCXNEndTime = "N/A";
-                
+
                 // Find all actions where metadata.sent_by === "QC" and metadata.current_stage === "Processor"
                 const qcCXNActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
                     const sentBy = metadata.sent_by || "";
                     const currentStage = metadata.current_stage || metadata.upload_stage || "";
                     return (sentBy === "QC" || sentBy.toUpperCase() === "QC") &&
-                           (currentStage === "Processor" || currentStage.toUpperCase() === "PROCESSOR") &&
-                           (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
+                        (currentStage === "Processor" || currentStage.toUpperCase() === "PROCESSOR") &&
+                        (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
                 }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                
+
                 if (qcCXNActions.length > 0) {
                     hasQCCXN = true;
                     // Get the person who took it up (first action's user_id)
@@ -324,23 +311,23 @@ export async function GET(request: NextRequest) {
                     // End time: last action
                     qcCXNEndTime = new Date(qcCXNActions[qcCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 }
-                
+
                 // Check for QA CXN: Find actions where sent_by is QA and current_stage is Processor
                 let hasQACXN = false;
                 let qaCXNPersonId: string | null = null;
                 let qaCXNStartTime = "N/A";
                 let qaCXNEndTime = "N/A";
-                
+
                 // Find all actions where metadata.sent_by === "QA" and metadata.current_stage === "Processor"
                 const qaCXNActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
                     const sentBy = metadata.sent_by || "";
                     const currentStage = metadata.current_stage || metadata.upload_stage || "";
                     return (sentBy === "QA" || sentBy.toUpperCase() === "QA") &&
-                           (currentStage === "Processor" || currentStage.toUpperCase() === "PROCESSOR") &&
-                           (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
+                        (currentStage === "Processor" || currentStage.toUpperCase() === "PROCESSOR") &&
+                        (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
                 }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                
+
                 if (qaCXNActions.length > 0) {
                     hasQACXN = true;
                     // Get the person who took it up (first action's user_id)
@@ -350,33 +337,26 @@ export async function GET(request: NextRequest) {
                     // End time: last action
                     qaCXNEndTime = new Date(qaCXNActions[qaCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 }
-                
-                console.log(`Task ${task.task_id} - Final result: hasQCCXN=${hasQCCXN}, hasQACXN=${hasQACXN}`);
-                if (hasQCCXN) {
-                    console.log(`  QC CXN - Person ID: ${qcCXNPersonId}, Start: ${qcCXNStartTime}, End: ${qcCXNEndTime}`);
-                }
-                if (hasQACXN) {
-                    console.log(`  QA CXN - Person ID: ${qaCXNPersonId}, Start: ${qaCXNStartTime}, End: ${qaCXNEndTime}`);
-                }
-                console.log(`=== End Task ${task.task_id} ===\n`);
-                
+
+
+
                 // Get DTP person (processor) - only for tasks where task_type is "DTP"
                 // Find the person who took up the Processor stage for DTP tasks
                 let dtpPersonId: string | null = null;
                 let dtpPerson = "N/A";
                 let dtpStartTime = "N/A";
                 let dtpEndTime = "N/A";
-                
+
                 // Only process DTP tasks
                 if (task.task_type === "DTP" || task.task_type?.toUpperCase() === "DTP") {
                     // Find actions in Processor stage for this DTP task
                     const dtpActions = actions.filter((a: any) => {
                         const metadata = a.metadata || {};
                         const currentStage = metadata.current_stage || metadata.upload_stage;
-                        return currentStage === "Processor" && 
-                               (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
+                        return currentStage === "Processor" &&
+                            (a.action_type === 'start' || a.action_type === 'complete' || a.action_type === 'upload' || a.action_type === 'taken_by');
                     }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                    
+
                     if (dtpActions.length > 0) {
                         // Get the person who took it up (first action's user_id)
                         dtpPersonId = dtpActions[0].user_id;
@@ -384,7 +364,7 @@ export async function GET(request: NextRequest) {
                         dtpEndTime = new Date(dtpActions[dtpActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
                     } else {
                         // Fallback: check iterations for assigned processor
-                        const processorIteration = iterations.find((it: any) => 
+                        const processorIteration = iterations.find((it: any) =>
                             (it.current_stage === "Processor" || it.current_stage?.toUpperCase() === "PROCESSOR") &&
                             it.assigned_to_processor_user_id
                         );
@@ -392,45 +372,45 @@ export async function GET(request: NextRequest) {
                             dtpPersonId = processorIteration.assigned_to_processor_user_id;
                         }
                     }
-                    
+
                     dtpPerson = dtpPersonId ? userIdToNameMap.get(dtpPersonId) || "N/A" : "N/A";
                 }
-                
+
                 // Get QC person - find from actions where current_stage is "QC"
                 const qcActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
                     const currentStage = metadata.current_stage || metadata.upload_stage;
-                    return currentStage === "QC" && 
-                           (a.action_type === 'start' || a.action_type === 'complete');
+                    return currentStage === "QC" &&
+                        (a.action_type === 'start' || a.action_type === 'complete');
                 });
-                const qcPersonId = qcActions.length > 0 ? qcActions[0].user_id : 
+                const qcPersonId = qcActions.length > 0 ? qcActions[0].user_id :
                     (iterations.find((it: any) => it.current_stage === "QC" || it.assigned_to_qc_user_id)?.assigned_to_qc_user_id || null);
                 const qcPerson = qcPersonId ? userIdToNameMap.get(qcPersonId) : "N/A";
-                
-                const qcStartTime = qcActions[0]?.created_at ? 
+
+                const qcStartTime = qcActions[0]?.created_at ?
                     new Date(qcActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
-                const qcEndTime = qcActions[qcActions.length - 1]?.created_at ? 
+                const qcEndTime = qcActions[qcActions.length - 1]?.created_at ?
                     new Date(qcActions[qcActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
-                
+
                 // Get QA person - find from actions where current_stage is "QA"
                 const qaActions = actions.filter((a: any) => {
                     const metadata = a.metadata || {};
                     const currentStage = metadata.current_stage || metadata.upload_stage;
-                    return currentStage === "QA" && 
-                           (a.action_type === 'start' || a.action_type === 'complete');
+                    return currentStage === "QA" &&
+                        (a.action_type === 'start' || a.action_type === 'complete');
                 });
-                const qaPersonId = qaActions.length > 0 ? qaActions[0].user_id : 
+                const qaPersonId = qaActions.length > 0 ? qaActions[0].user_id :
                     (iterations.find((it: any) => it.current_stage === "QA" || it.assigned_to_qa_user_id)?.assigned_to_qa_user_id || null);
                 const qaPerson = qaPersonId ? userIdToNameMap.get(qaPersonId) : "N/A";
-                
-                const qaStartTime = qaActions[0]?.created_at ? 
+
+                const qaStartTime = qaActions[0]?.created_at ?
                     new Date(qaActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
-                const qaEndTime = qaActions[qaActions.length - 1]?.created_at ? 
+                const qaEndTime = qaActions[qaActions.length - 1]?.created_at ?
                     new Date(qaActions[qaActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
-                
+
                 // Format PO hours - use same format as other tables (raw decimal)
                 const poHours = project.po_hours || project.pohours || project.poHours || 0;
-                
+
                 // Format delivery time - ensure only hours and minutes (HH:MM)
                 let deliveryTime = "N/A";
                 if (project.delivery_time) {
@@ -438,10 +418,10 @@ export async function GET(request: NextRequest) {
                         // If it's a timestamp or ISO string, parse it
                         const timeObj = new Date(project.delivery_time);
                         if (!isNaN(timeObj.getTime())) {
-                            deliveryTime = timeObj.toLocaleTimeString('en-US', { 
-                                hour12: false, 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
+                            deliveryTime = timeObj.toLocaleTimeString('en-US', {
+                                hour12: false,
+                                hour: '2-digit',
+                                minute: '2-digit'
                             });
                         } else {
                             // If it's already a time string (e.g., "14:30:45"), extract HH:MM
@@ -468,7 +448,7 @@ export async function GET(request: NextRequest) {
                         }
                     }
                 }
-                
+
                 // Format date as "DD-MM-YYYY" (manually format to ensure hyphens)
                 let date = "N/A";
                 if (project.created_at) {
@@ -478,9 +458,9 @@ export async function GET(request: NextRequest) {
                     const year = dateObj.getFullYear();
                     date = `${day}-${month}-${year}`;
                 }
-                
+
                 const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
-                
+
                 reportEntries.push({
                     // Job Details
                     job_no: jobNo++,
@@ -491,7 +471,7 @@ export async function GET(request: NextRequest) {
                     task_name: task.task_name || "N/A",
                     file_count: fileCount,
                     page_count: pageCount,
-                    
+
                     // DTP Process
                     language: project.language || "N/A", // This might need to come from metadata or another source
                     platform: project.platform || "N/A", // Default or from metadata
@@ -503,7 +483,7 @@ export async function GET(request: NextRequest) {
                     dtp_end_time: dtpEndTime,
                     abbyy_compare_dtp: iterations.length === 0 ? "N/A" : (hasQCCXN ? "Yes" : "No"),
                     dtp_status: dtpPersonId ? "Completed" : "Pending",
-                    
+
                     // QC Tracking
                     qc_taken_by: qcPerson,
                     qc_start_time: qcStartTime,
@@ -514,7 +494,7 @@ export async function GET(request: NextRequest) {
                     qc_cxn_start_time: qcCXNStartTime,
                     qc_cxn_end_time: qcCXNEndTime,
                     cxn_status: hasQCCXN ? "Yes" : "N/A",
-                    
+
                     // QA Tracking
                     qa_taken_by: qaPerson,
                     qa_start_time: qaStartTime,
@@ -529,10 +509,7 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        console.log(`DTP Tracking: Found ${reportEntries.length} entries`);
-        if (reportEntries.length === 0) {
-            console.log("No report entries created. Projects:", projects?.length || 0, "Tasks:", tasks?.length || 0);
-        }
+
 
         return NextResponse.json(reportEntries);
     } catch (error) {

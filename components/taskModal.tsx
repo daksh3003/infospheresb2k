@@ -241,15 +241,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
         return;
       }
 
+      // Auto-group files (1 file per group) and skip to task details
       if (selectedFiles.length === 1) {
-        // Single file - go directly to task creation
         initializeSingleFileGroup();
-        setCurrentStep(4);
       } else {
-        // Multiple files - show splitting option
         initializeFileGroups();
-        setCurrentStep(3);
       }
+      setCurrentStep(4); // Skip step 3, go directly to step 4
     } else if (currentStep === 3) {
       if (fileGroups.length === 0) {
         toast.error("Please organize files into groups");
@@ -291,24 +289,30 @@ const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const initializeFileGroups = () => {
-    setFileGroups([
-      {
-        files: [],
-        taskData: {
-          task_name: "",
-          client_instruction: "",
-          processor_type: [],
-          estimated_hours_ocr: 0,
-          estimated_hours_qc: 0,
-          estimated_hours_qa: 0,
-          completion_status: false,
-          project_id: "",
-          created_by: currentUser?.id || "",
-          task_type: "",
-        },
-        filesData: [],
+    // Auto-group: 1 file per group
+    const groups = selectedFiles.map((file) => ({
+      files: [file],
+      taskData: {
+        task_name: "",
+        client_instruction: "",
+        processor_type: [],
+        estimated_hours_ocr: 0,
+        estimated_hours_qc: 0,
+        estimated_hours_qa: 0,
+        completion_status: false,
+        project_id: "",
+        created_by: currentUser?.id || "",
+        task_type: "",
       },
-    ]);
+      filesData: [
+        {
+          file_name: file.name,
+          page_count: "",
+          assigned_to: [],
+        },
+      ],
+    }));
+    setFileGroups(groups);
   };
 
   const addFileGroup = () => {
@@ -401,12 +405,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     field: keyof FileFormData,
     value: string | string[]
   ) => {
-    console.log("📥 updateFileData called with", {
-      groupIndex,
-      fileIndex,
-      field,
-      value,
-    });
+
 
     // Simple update for non-assignment fields (like page_count)
     setFileGroups((prev) => {
@@ -421,9 +420,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    console.log("fileGroups", fileGroups);
-    console.log("projectData", projectData);
-    console.log("selectedFiles", selectedFiles);
+
 
     try {
       if (!currentUser) {
@@ -442,7 +439,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         });
       });
 
-      console.log("filesObject", filesObject);
+
 
       await api.createProject(
         projectData,
@@ -469,9 +466,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center z-50 ${
-        isOpen ? "" : "hidden"
-      }`}
+      className={`fixed inset-0 flex items-center justify-center z-50 ${isOpen ? "" : "hidden"
+        }`}
     >
       <div className="fixed inset-0 bg-black opacity-50"></div>
       <div className="bg-white rounded-lg w-full max-w-4xl max-h-[100vh] overflow-hidden relative z-10">
@@ -933,7 +929,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <Badge
                               variant={
                                 group.filesData[fileIndex].assigned_to.length >
-                                0
+                                  0
                                   ? "default"
                                   : "secondary"
                               }
@@ -996,7 +992,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                               {/* Selected Processors Display */}
                               <div className="min-h-[48px] p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 {group.filesData[fileIndex].assigned_to.length >
-                                0 ? (
+                                  0 ? (
                                   <div className="flex flex-wrap gap-2">
                                     {group.filesData[fileIndex].assigned_to.map(
                                       (assignee, index) => (
@@ -1054,14 +1050,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                               e.stopPropagation();
                                               const isChecked =
                                                 e.target.checked;
-                                              console.log(
-                                                `${
-                                                  isChecked
-                                                    ? "✅ Assigning"
-                                                    : "❌ Removing"
-                                                } processor:`,
-                                                processor.name
-                                              );
+
 
                                               setFileGroups((prev) => {
                                                 const newGroups = [...prev];
@@ -1084,16 +1073,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                                     ].filesData[
                                                       fileIndex
                                                     ].assigned_to = [
-                                                      ...currentAssignees,
-                                                      {
-                                                        user_id: processor.id,
-                                                        name: processor.name,
-                                                        email: processor.email,
-                                                        role: processor.role,
-                                                        assigned_at:
-                                                          new Date().toISOString(),
-                                                      },
-                                                    ];
+                                                        ...currentAssignees,
+                                                        {
+                                                          user_id: processor.id,
+                                                          name: processor.name,
+                                                          email: processor.email,
+                                                          role: processor.role,
+                                                          assigned_at:
+                                                            new Date().toISOString(),
+                                                        },
+                                                      ];
                                                   }
                                                 } else {
                                                   // Remove processor
@@ -1170,9 +1159,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
         <div className="border-t p-4 flex justify-between">
           <button
             onClick={handlePrevStep}
-            className={`flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors ${
-              currentStep === 1 ? "invisible" : ""
-            }`}
+            className={`flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors ${currentStep === 1 ? "invisible" : ""
+              }`}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous

@@ -77,10 +77,10 @@ export default function TimelineModal({
   const fetchTimelineItems = async () => {
     try {
       const result = await api.getTaskTimeline(taskId);
-      console.log("Fetched timeline items:", result);
+
       setTimelineItems(result.timelineItems || []);
     } catch (error) {
-      console.log("Error fetching timeline items:", error);
+      console.error("Error fetching timeline items:", error);
     }
   };
 

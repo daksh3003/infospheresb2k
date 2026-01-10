@@ -71,12 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // console.log('Creating project with data:', {
-    //   // projectData,
-    //   fileGroups: fileGroups[1].filesData,
-    //   // selectedFiles,
-    //   // currentUser
-    // });
+
 
     // 1. Create project in projects_test table
     const { data: projectResult, error: projectError } = await supabase
@@ -109,8 +104,8 @@ export async function POST(request: NextRequest) {
         ...taskDataWithoutProcessorType,
         project_id: projectId,
         // Convert empty string to null for task_type
-        task_type: group.taskData.task_type && group.taskData.task_type.trim() !== '' 
-          ? group.taskData.task_type 
+        task_type: group.taskData.task_type && group.taskData.task_type.trim() !== ''
+          ? group.taskData.task_type
           : null,
       };
 
@@ -173,29 +168,29 @@ export async function POST(request: NextRequest) {
       for (const fileData of group.filesData) {
         const fileName = fileData.file_name;
         const filePath = `${taskId}/${fileName}`;
-        
+
         // Get the actual file from FormData using group and file indices
         let actualFile: File | null = null;
         if (formData) {
           // Find the file index within this group's filesData array
           const fileIndex = group.filesData.findIndex((f: FileFormData) => f.file_name === fileName);
-          
+
           // Try the new format first: file_group_X_file_Y
           const newFormatKey = `file_group_${groupIndex}_file_${fileIndex}`;
           actualFile = formData.get(newFormatKey) as File;
-          
+
           // Fallback to old format for backward compatibility
           if (!actualFile) {
             actualFile = formData.get(`file_${taskId}_${fileName}`) as File;
           }
         }
-        
+
         if (!actualFile) {
           // Skip this file if not found in FormData - for backward compatibility
           // In the future, all files should be provided in FormData
           continue;
         }
-        
+
         // Get file extension and determine file type
         const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
         // Define supported file types (same as in files API)
@@ -229,7 +224,7 @@ export async function POST(request: NextRequest) {
           'txt': 'text/plain',
           'rtf': 'application/rtf',
           'odt': 'application/vnd.oasis.opendocument.text',
-          
+
           // Images
           'jpg': 'image/jpeg',
           'jpeg': 'image/jpeg',
@@ -239,18 +234,18 @@ export async function POST(request: NextRequest) {
           'tiff': 'image/tiff',
           'svg': 'image/svg+xml',
           'webp': 'image/webp',
-          
+
           // Spreadsheets
           'xls': 'application/vnd.ms-excel',
           'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'csv': 'text/csv',
           'ods': 'application/vnd.oasis.opendocument.spreadsheet',
-          
+
           // Presentations
           'ppt': 'application/vnd.ms-powerpoint',
           'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           'odp': 'application/vnd.oasis.opendocument.presentation',
-          
+
           // Archives
           'zip': 'application/x-zip-compressed',
           'rar': 'application/x-rar-compressed',
@@ -258,14 +253,14 @@ export async function POST(request: NextRequest) {
           'tar': 'application/x-tar',
           'gz': 'application/gzip',
           'bz2': 'application/x-bzip2',
-          
+
           // Audio
           'mp3': 'audio/mpeg',
           'wav': 'audio/wav',
           'flac': 'audio/flac',
           'aac': 'audio/aac',
           'ogg': 'audio/ogg',
-          
+
           // Video
           'mp4': 'video/mp4',
           'avi': 'video/x-msvideo',
@@ -274,7 +269,7 @@ export async function POST(request: NextRequest) {
           'wmv': 'video/x-ms-wmv',
           'flv': 'video/x-flv',
           'webm': 'video/webm',
-          
+
           // Code files
           'js': 'application/javascript',
           'ts': 'application/typescript',
@@ -321,11 +316,11 @@ export async function POST(request: NextRequest) {
               // file_category: fileCategory,
               // mime_type: mimeType,
               // file_size: actualFile.size,
-              uploaded_by: { 
-                id: authenticatedUser.id, 
+              uploaded_by: {
+                id: authenticatedUser.id,
                 name: authenticatedUser.email, // Using email as name fallback
-                email: authenticatedUser.email, 
-                role: authenticatedUser.role 
+                email: authenticatedUser.email,
+                role: authenticatedUser.role
               },
               uploaded_at: new Date().toISOString(),
             },
