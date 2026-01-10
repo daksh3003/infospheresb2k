@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { ArrowBigUpDashIcon } from "lucide-react";
 import { api } from "@/utils/api";
-import { logTaskAction, getTaskActions } from "@/utils/taskActions";
+import { logTaskAction, getTaskActions as _getTaskActions } from "@/utils/taskActions";
+import { fetchTaskAssignments } from "@/utils/taskAssignments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ export const FooterButtons = ({
   SubmitTo,
   onAssignTask,
   onStatusUpdate,
+  assignmentRefreshTrigger,
 }: {
   currentUser: { id: string; name: string; email: string; role: string };
   currentStage: string;
@@ -59,6 +61,7 @@ export const FooterButtons = ({
     role: string;
   }) => void;
   onStatusUpdate?: () => void;
+  assignmentRefreshTrigger?: number;
 }) => {
   const [availableUsers, setAvailableUsers] = useState<
     { id: string; name: string; email: string; role: string }[]
@@ -117,7 +120,7 @@ export const FooterButtons = ({
   //     if (response.ok) {
   //       const result = await response.json();
   //       if (result.success && result.data?.status) {
-  //         console.log("Fetched real status:", result.data.status);
+
   //         setRealStatus(result.data.status);
   //       }
   //     }
@@ -145,91 +148,9 @@ export const FooterButtons = ({
   };
 
   const fetchAssignedTo = async () => {
-    try {
-      // Get task actions with filter for 'taken_by' and 'assigned_to' actions
-      const actionsResult = await getTaskActions({
-        task_id: taskId,
-        action_type: ["taken_by", "assigned_to"],
-      });
-
-      if (!actionsResult.success || !actionsResult.data) {
-        console.error("Failed to fetch task actions:", actionsResult.error);
-        _setAssignedTo([]);
-        setHasAssignedUsers(false);
-        return;
-      }
-
-      // Process the task actions to get assigned users
-      const assignedUsers = actionsResult.data.map(
-        (action: {
-          user_id: string;
-          action_type: string;
-          created_at: string;
-          metadata?: {
-            user_name?: string;
-            user_email?: string;
-            user_role?: string;
-            stage?: string;
-          };
-        }) => ({
-          user_id: action.user_id,
-          name: action.metadata?.user_name || action.user_id,
-          email: action.metadata?.user_email || "",
-          role: action.metadata?.user_role || "",
-          action_type: action.action_type,
-          assigned_at: action.created_at,
-          stage: action.metadata?.stage || currentStage,
-        })
-      );
-
-      // Remove duplicates based on user_id and keep the latest action
-      const uniqueAssignedUsers = assignedUsers.reduce(
-        (
-          acc: {
-            user_id: string;
-            name: string;
-            email: string;
-            role: string;
-            action_type: string;
-            assigned_at: string;
-            stage: string;
-          }[],
-          current: {
-            user_id: string;
-            name: string;
-            email: string;
-            role: string;
-            action_type: string;
-            assigned_at: string;
-            stage: string;
-          }
-        ) => {
-          const existingIndex = acc.findIndex(
-            (user) => user.user_id === current.user_id
-          );
-          if (existingIndex === -1) {
-            acc.push(current);
-          } else {
-            // Keep the latest assignment
-            if (
-              new Date(current.assigned_at) >
-              new Date(acc[existingIndex].assigned_at)
-            ) {
-              acc[existingIndex] = current;
-            }
-          }
-          return acc;
-        },
-        []
-      );
-
-      _setAssignedTo(uniqueAssignedUsers);
-      setHasAssignedUsers(uniqueAssignedUsers.length > 0);
-    } catch (error) {
-      console.error("Error fetching assigned to:", error);
-      _setAssignedTo([]);
-      setHasAssignedUsers(false);
-    }
+    const assignments = await fetchTaskAssignments(taskId);
+    _setAssignedTo(assignments);
+    setHasAssignedUsers(assignments.length > 0);
   };
 
   // const handleAssignUser = async (user: any) => {
@@ -240,7 +161,7 @@ export const FooterButtons = ({
   //     );
 
   //     if (isAlreadyAssigned) {
-  //       console.log("User already assigned");
+
   //       return;
   //     }
 
@@ -330,14 +251,12 @@ export const FooterButtons = ({
     fetchAssignedTo();
     // fetchRealStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStage, taskId]);
+  }, [currentStage, taskId, assignmentRefreshTrigger]);
 
   // Sync realStatus with status prop when it changes
   useEffect(() => {
     if (status && status !== realStatus) {
-      console.log(
-        `FooterButtons: Status updated from ${realStatus} to ${status}`
-      );
+
       setRealStatus(status);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -445,9 +364,8 @@ export const FooterButtons = ({
         isOpen={showPickupDialog}
         onClose={() => setShowPickupDialog(false)}
         title="Pick up this task?"
-        description={`Are you sure you want to pick up this task? This will assign the task to you (${
-          currentUser?.name || currentUser?.email
-        }) and you'll be responsible for completing it.`}
+        description={`Are you sure you want to pick up this task? This will assign the task to you (${currentUser?.name || currentUser?.email
+          }) and you'll be responsible for completing it.`}
         confirmText="Pick Up Task"
         onConfirm={handlePickupTask}
       />

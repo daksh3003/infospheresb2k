@@ -204,8 +204,9 @@ export default function TaskDetailPage() {
   const [_isAssigning, _setIsAssigning] = useState(false);
   const [_isTaskPickedUp, _setIsTaskPickedUp] = useState(false);
 
-  // Download history refresh trigger
+  // Refresh triggers
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
+  const [assignmentRefreshTrigger, setAssignmentRefreshTrigger] = useState(0);
 
   // File edits state
 
@@ -332,7 +333,7 @@ export default function TaskDetailPage() {
 
   // Function to check and show submit button based on task status
   const checkAndShowSubmitButton = async () => {
-    console.log("Called checkAndShowSubmitButton");
+
     try {
       // Check if task is completed
       const { data: taskData, error: taskError } = await supabase
@@ -359,7 +360,7 @@ export default function TaskDetailPage() {
           return;
         }
 
-        console.log("Task Iteration Data:", data);
+
 
         // Show submit button logic based on workflow
         if (data.sent_by === "PM") {
@@ -406,7 +407,7 @@ export default function TaskDetailPage() {
           setSubmitTo("Send to Processor Team");
           setShowSubmitToButton(true);
         } else {
-          console.log("Show Submit To Button:", showSubmitToButton);
+
           setShowSubmitToButton(false);
         }
       }
@@ -447,12 +448,12 @@ export default function TaskDetailPage() {
         setRealStatus(taskData.status);
         _setStatus(
           taskData.status as
-            | "pending"
-            | "in-progress"
-            | "paused"
-            | "completed"
-            | "overdue"
-            | "returned"
+          | "pending"
+          | "in-progress"
+          | "paused"
+          | "completed"
+          | "overdue"
+          | "returned"
         );
       }
     } catch (error) {
@@ -695,9 +696,7 @@ export default function TaskDetailPage() {
     }
 
     let overall_completion_status = false;
-    console.log("Current Stage:", currentStage);
-    console.log("Sent By:", sentBy);
-    console.log("Completion Status:", completionStatus);
+
     if (
       (currentStage === "Processor" && sentBy === "QA") ||
       (currentStage === "QA" && sentBy === "QC") ||
@@ -931,12 +930,7 @@ export default function TaskDetailPage() {
 
       const file_path = fileData.file_path;
 
-      console.log("Deleting file with params:", {
-        storage_name,
-        file_path,
-        file_name: fileName,
-        taskId,
-      });
+
 
       const response = await fetch(`/api/tasks/${taskId}/storage/delete`, {
         method: "DELETE",
@@ -953,7 +947,7 @@ export default function TaskDetailPage() {
       });
 
       const result = await response.json();
-      console.log("Delete response:", result);
+
 
       if (response.ok) {
         toast.success("File deleted successfully", {
@@ -1034,14 +1028,7 @@ export default function TaskDetailPage() {
       if (!file) return;
 
       try {
-        console.log("Replacing file with params:", {
-          fileName,
-          storage_name,
-          folder_path,
-          pageCount,
-          newFileName: file.name,
-          taskId,
-        });
+
 
         const formData = new FormData();
         formData.append("file", file);
@@ -1060,7 +1047,7 @@ export default function TaskDetailPage() {
         });
 
         const result = await response.json();
-        console.log("Replace response:", result);
+
 
         if (response.ok) {
           toast.success("File replaced successfully", {
@@ -1184,12 +1171,7 @@ export default function TaskDetailPage() {
         return;
       }
 
-      console.log("Downloading file:", {
-        fileName,
-        storage_name: filesData.storage_name,
-        folder_path: filesData.file_path,
-        index,
-      });
+
 
       const { data, error } = await createClient()
         .storage.from(filesData.storage_name)
@@ -1208,18 +1190,10 @@ export default function TaskDetailPage() {
       URL.revokeObjectURL(url);
 
       // Log the download to database
-      // console.log("task_id:", taskId);
-      // console.log("fileName:", fileName);
-      // console.log("folder_path:", folder_path);
+
       if (currentUser) {
         try {
-          // console.log("hello");
-          // // Get file_id from files_test table based on task_id, file_name and file_path
-          // console.log("Fetching file_id for:", {
-          //   taskId,
-          //   fileName,
-          //   folder_path: `${folder_path}/${fileName}`,
-          // });
+
           const { data: fileData, error: fileError } = await supabase
             .from("files_test")
             .select("file_id")
@@ -1228,9 +1202,7 @@ export default function TaskDetailPage() {
             .eq("file_path", `${filesData.file_path}`)
             .single();
 
-          // console.log("task_id:", taskId);
-          // console.log("fileName:", fileName);
-          // console.log("folder_path:", folder_path);
+
 
           if (fileError) {
             console.error("Error fetching file_id from files_test:", fileError);
@@ -1312,12 +1284,7 @@ export default function TaskDetailPage() {
     folder_path: string,
     index: number
   ) => {
-    console.log("Downloading file:", {
-      fileName,
-      storage_name,
-      folder_path,
-      index,
-    });
+
     try {
       // Look up the actual storage file_path from database
       // fileName is now the original display name, we need the safe storage path
@@ -1464,7 +1431,7 @@ export default function TaskDetailPage() {
   };
 
   const fetchProcessorFiles = async () => {
-    console.log("Fetching processor files for task:", taskId);
+
     const { data: current_stage, error: current_stageError } = await supabase
       .from("task_iterations")
       .select("current_stage, sent_by, stages")
@@ -1490,7 +1457,6 @@ export default function TaskDetailPage() {
       .eq("storage_name", "qc-files");
 
     if (qcData && qcData.length === 0) {
-      console.log("Error fetching QC data:", qcError);
       isQcInLoop = false;
     }
 
@@ -1567,7 +1533,7 @@ export default function TaskDetailPage() {
       //   setVersion(2);
       // }
     }
-    console.log("Determined storage:", storage_name, "folder:", folder_path);
+
     if (current_stage.sent_by !== "PM") {
       // Fetch processor files directly from database instead of storage listing
       const { data: processorFiles, error: processorError } = await supabase
@@ -1592,10 +1558,7 @@ export default function TaskDetailPage() {
         pageCount: file.page_count || null,
       }));
 
-      console.log(
-        "Processor files with page count:",
-        processorFilesWithPageCount
-      );
+
       setProcessorFiles(processorFilesWithPageCount);
     }
 
@@ -1609,12 +1572,12 @@ export default function TaskDetailPage() {
         setRealStatus(completeTask.status);
         _setStatus(
           completeTask.status as
-            | "pending"
-            | "in-progress"
-            | "paused"
-            | "completed"
-            | "overdue"
-            | "returned"
+          | "pending"
+          | "in-progress"
+          | "paused"
+          | "completed"
+          | "overdue"
+          | "returned"
         );
       }
     }
@@ -1685,9 +1648,7 @@ export default function TaskDetailPage() {
         // Keep the original filename for database and display purposes
         const originalFileName = file.name;
 
-        console.log(
-          `File upload: "${originalFileName}" -> Storage: "${safeStorageFileName}"`
-        );
+
 
         let file_path = "";
         let storage_name = "";
@@ -1799,7 +1760,7 @@ export default function TaskDetailPage() {
         pageCount: file.page_count || null,
       }));
 
-      console.log("PM Files with page count:", pmFilesWithPageCount);
+
       setPMFiles(pmFilesWithPageCount);
 
       let storage_name_correction = "";
@@ -1823,7 +1784,7 @@ export default function TaskDetailPage() {
           .eq("storage_name", storage_name_correction);
 
         if (correctionError) {
-          console.log("Error fetching correction files:", correctionError);
+          console.error("Error fetching correction files:", correctionError);
           // return;
         }
 
@@ -1848,8 +1809,7 @@ export default function TaskDetailPage() {
       } else if (current_stage === "QA") {
         storage_name = "qa-files";
       }
-      console.log("Storage Name:", storage_name);
-      console.log("current_stage : ", current_stage);
+
 
       // Fetch uploaded files directly from database instead of storage listing
       const { data: uploadedFiles, error: uploadedError } = await supabase
@@ -1859,10 +1819,10 @@ export default function TaskDetailPage() {
         .eq("storage_name", storage_name);
 
       if (uploadedError) {
-        console.log("Error fetching uploaded files:", uploadedError);
+        console.error("Error fetching uploaded files:", uploadedError);
         return;
       }
-      console.log(uploadedFiles);
+
 
       // Map to the expected format using original filename for display
       const uploadedFilesWithPageCount = (uploadedFiles || []).map((file) => ({
@@ -1968,6 +1928,7 @@ export default function TaskDetailPage() {
 
       await api.assignTask(taskId, assignedToArray);
       toast.success("Task assigned successfully!");
+      setAssignmentRefreshTrigger(prev => prev + 1); // Trigger refresh in sub-components
       await fetchData(); // Refresh the data
     } catch (error) {
       console.error("Error assigning task:", error);
@@ -2075,13 +2036,12 @@ export default function TaskDetailPage() {
               return (
                 <div key={stage} className="flex items-center">
                   <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                      isCurrent
-                        ? "bg-blue-500 border-blue-500 text-white shadow-lg"
-                        : isPast
+                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${isCurrent
+                      ? "bg-blue-500 border-blue-500 text-white shadow-lg"
+                      : isPast
                         ? "bg-green-500 border-green-500 text-white"
                         : "bg-gray-100 border-gray-300 text-gray-500"
-                    }`}
+                      }`}
                   >
                     {isPast ? (
                       <svg
@@ -2101,13 +2061,12 @@ export default function TaskDetailPage() {
                   </div>
                   <div className="ml-2">
                     <div
-                      className={`text-sm font-medium ${
-                        isCurrent
-                          ? "text-blue-600"
-                          : isPast
+                      className={`text-sm font-medium ${isCurrent
+                        ? "text-blue-600"
+                        : isPast
                           ? "text-green-600"
                           : "text-gray-500"
-                      }`}
+                        }`}
                     >
                       {stage}
                     </div>
@@ -2117,9 +2076,8 @@ export default function TaskDetailPage() {
                   </div>
                   {index < 4 && (
                     <div
-                      className={`w-8 h-0.5 mx-2 ${
-                        isPast ? "bg-green-300" : "bg-gray-300"
-                      }`}
+                      className={`w-8 h-0.5 mx-2 ${isPast ? "bg-green-300" : "bg-gray-300"
+                        }`}
                     />
                   )}
                 </div>
@@ -2130,15 +2088,14 @@ export default function TaskDetailPage() {
           {/* Status Badge */}
           <div className="flex items-center space-x-3">
             <div
-              className={`px-3 py-2 rounded-full text-sm font-medium ${
-                realStatus === "completed"
-                  ? "bg-green-100 text-green-800"
-                  : realStatus === "in-progress"
+              className={`px-3 py-2 rounded-full text-sm font-medium ${realStatus === "completed"
+                ? "bg-green-100 text-green-800"
+                : realStatus === "in-progress"
                   ? "bg-blue-100 text-blue-800"
                   : realStatus === "paused"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-gray-100 text-gray-800"
-              }`}
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-gray-100 text-gray-800"
+                }`}
             >
               {realStatus?.toUpperCase() || "PENDING"}
             </div>
@@ -2174,6 +2131,7 @@ export default function TaskDetailPage() {
           status={realStatus}
           progress={progress}
           onAssignTask={handleAssignTask}
+          assignmentRefreshTrigger={assignmentRefreshTrigger}
         />
 
         {/* Footer with buttons */}
@@ -2191,6 +2149,7 @@ export default function TaskDetailPage() {
           SubmitTo={SubmitTo}
           onAssignTask={handleAssignTask}
           onStatusUpdate={fetchRealStatus}
+          assignmentRefreshTrigger={assignmentRefreshTrigger}
         />
       </div>
 
@@ -2204,21 +2163,19 @@ export default function TaskDetailPage() {
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex -mb-px">
           <button
-            className={`py-4 px-6 font-medium text-sm ${
-              activeTab === "files"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`py-4 px-6 font-medium text-sm ${activeTab === "files"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
             onClick={() => setActiveTab("files")}
           >
             Files & Attachments
           </button>
           <button
-            className={`py-4 px-6 font-medium text-sm ${
-              activeTab === "comments"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`py-4 px-6 font-medium text-sm ${activeTab === "comments"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
             onClick={() => setActiveTab("comments")}
           >
             Comments
@@ -2227,42 +2184,44 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === "files" && (
-        <div className="space-y-6">
-          {/* Downloadable task files */}
-          <TaskAttachments
-            PMFiles={PMFiles}
-            processorFiles={processorFiles}
-            fetchProcessorFiles={fetchProcessorFiles}
-            correctionFiles={correctionFiles}
-            version={version}
-            taskId={taskId}
-            handleDownload={handleDownload}
-            storage_name={storage_name}
-            folder_path={folder_path}
-            currentUser={currentUser}
-            onDeleteFile={handleDeleteUploadedFile}
-            onReplaceFile={handleReplaceUploadedFile}
-          />
+      {
+        activeTab === "files" && (
+          <div className="space-y-6">
+            {/* Downloadable task files */}
+            <TaskAttachments
+              PMFiles={PMFiles}
+              processorFiles={processorFiles}
+              fetchProcessorFiles={fetchProcessorFiles}
+              correctionFiles={correctionFiles}
+              version={version}
+              taskId={taskId}
+              handleDownload={handleDownload}
+              storage_name={storage_name}
+              folder_path={folder_path}
+              currentUser={currentUser}
+              onDeleteFile={handleDeleteUploadedFile}
+              onReplaceFile={handleReplaceUploadedFile}
+            />
 
-          {/* File upload section */}
-          <FileUpload
-            handleFileUpload={handleFileUpload}
-            uploadedFiles={uploadedFiles}
-            filesToBeUploaded={filesToBeUploaded}
-            handleDownloadOffilesToBeUploaded={
-              handleDownloadOffilesToBeUploaded
-            }
-            handleRemoveFile={handleRemoveFile}
-            handleSubmitFileUpload={handleSubmitFileUpload}
-            updateFilePageCount={handleUpdateFilePageCount}
-            currentUser={currentUser}
-            onDeleteUploadedFile={handleDeleteFileFromUploadedSection}
-            onReplaceUploadedFile={handleReplaceFileFromUploadedSection}
-            fileEdits={fileEdits}
-          />
-        </div>
-      )}
+            {/* File upload section */}
+            <FileUpload
+              handleFileUpload={handleFileUpload}
+              uploadedFiles={uploadedFiles}
+              filesToBeUploaded={filesToBeUploaded}
+              handleDownloadOffilesToBeUploaded={
+                handleDownloadOffilesToBeUploaded
+              }
+              handleRemoveFile={handleRemoveFile}
+              handleSubmitFileUpload={handleSubmitFileUpload}
+              updateFilePageCount={handleUpdateFilePageCount}
+              currentUser={currentUser}
+              onDeleteUploadedFile={handleDeleteFileFromUploadedSection}
+              onReplaceUploadedFile={handleReplaceFileFromUploadedSection}
+              fileEdits={fileEdits}
+            />
+          </div>
+        )
+      }
 
       {activeTab === "comments" && <Comments taskId={taskId} />}
 
@@ -2273,7 +2232,7 @@ export default function TaskDetailPage() {
         title="Hand over this task?"
         description="This will transfer ownership of the task to another team member."
         confirmText="Continue"
-        onConfirm={() => console.log("Handover task")}
+        onConfirm={() => { }}
       />
 
       {/* Complete Task Dialog */}
@@ -2285,6 +2244,6 @@ export default function TaskDetailPage() {
         confirmText="Complete Task"
         onConfirm={handleCompleteTask}
       />
-    </div>
+    </div >
   );
 }

@@ -5,7 +5,7 @@ import { getStatusBadge } from "./task/status";
 import { useState } from "react";
 import { createClient } from "@/lib/client";
 import { useEffect } from "react";
-import { getTaskActions } from "@/utils/taskActions";
+import { fetchTaskAssignments } from "@/utils/taskAssignments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +61,7 @@ export const MainTaskCard = ({
   status,
   progress,
   onAssignTask: _onAssignTask,
+  assignmentRefreshTrigger,
 }: {
   task: Task;
   status: string;
@@ -71,6 +72,7 @@ export const MainTaskCard = ({
     email: string;
     role: string;
   }) => void;
+  assignmentRefreshTrigger?: number;
 }) => {
   const [assignedTo, setAssignedTo] = useState<
     {
@@ -87,217 +89,14 @@ export const MainTaskCard = ({
   const supabase = createClient();
 
   const fetchAssignedTo = async () => {
-    try {
-      // Fetch from task_actions table for 'taken_by' and 'assigned_to' actions
-      const actionsResult = await getTaskActions({
-        task_id: task.task_id,
-        action_type: ["taken_by", "assigned_to"],
-      });
-
-      let taskActionsUsers: {
-        user_id: string;
-        name: string;
-        email: string;
-        role: string;
-        action_type: string;
-        assigned_at: string;
-        stage: string;
-        source: string;
-      }[] = [];
-
-      if (actionsResult.success && actionsResult.data) {
-        // Process task actions to get assigned users
-        taskActionsUsers = actionsResult.data.map(
-          (action: {
-            user_id: string;
-            action_type: string;
-            created_at: string;
-            metadata?: {
-              user_name?: string;
-              user_email?: string;
-              user_role?: string;
-              stage?: string;
-            };
-          }) => ({
-            user_id: action.user_id,
-            name: action.metadata?.user_name || action.user_id,
-            email: action.metadata?.user_email || "",
-            role: action.metadata?.user_role || "",
-            action_type: action.action_type,
-            assigned_at: action.created_at,
-            stage: action.metadata?.stage || "",
-            source: "task_actions",
-          })
-        );
-      }
-
-      // Fetch from files_test table
-      const { data: filesData, error: filesError } = await supabase
-        .from("files_test")
-        .select("taken_by, assigned_to, created_at")
-        .eq("task_id", task.task_id);
-
-      const filesUsers: {
-        user_id: string;
-        name: string;
-        email: string;
-        role: string;
-        action_type: string;
-        assigned_at: string;
-        stage: string;
-        source: string;
-      }[] = [];
-
-      if (!filesError && filesData) {
-        // Process files_test data
-        filesData.forEach(
-          (file: {
-            taken_by?: string;
-            assigned_to?: {
-              user_id?: string;
-              id?: string;
-              name?: string;
-              email?: string;
-              role?: string;
-              assigned_at?: string;
-            }[];
-            created_at: string;
-          }) => {
-            // Process taken_by field
-            if (file.taken_by) {
-              filesUsers.push({
-                user_id: file.taken_by,
-                name: file.taken_by, // This might need to be resolved to actual name
-                email: "",
-                role: "",
-                action_type: "taken_by",
-                assigned_at: file.created_at,
-                stage: "",
-                source: "files_test",
-              });
-            }
-
-            // Process assigned_to array
-            if (file.assigned_to && Array.isArray(file.assigned_to)) {
-              file.assigned_to.forEach(
-                (assignment: {
-                  user_id?: string;
-                  id?: string;
-                  name?: string;
-                  email?: string;
-                  role?: string;
-                  assigned_at?: string;
-                }) => {
-                  if (assignment && typeof assignment === "object") {
-                    filesUsers.push({
-                      user_id: assignment.user_id || assignment.id || "unknown",
-                      name:
-                        assignment.name ||
-                        assignment.user_id ||
-                        assignment.id ||
-                        "unknown",
-                      email: assignment.email || "",
-                      role: assignment.role || "",
-                      action_type: "assigned_to",
-                      assigned_at: assignment.assigned_at || file.created_at,
-                      stage: "",
-                      source: "files_test",
-                    });
-                  }
-                }
-              );
-            }
-          }
-        );
-      }
-
-      // Combine both sources
-      const allUsers = [...taskActionsUsers, ...filesUsers];
-
-      // Remove duplicates based on user_id and keep the latest action
-      const uniqueAssignedUsers = allUsers.reduce(
-        (
-          acc: {
-            user_id: string;
-            name: string;
-            email: string;
-            role: string;
-            action_type: string;
-            assigned_at: string;
-            stage: string;
-            source: string;
-          }[],
-          current: {
-            user_id: string;
-            name: string;
-            email: string;
-            role: string;
-            action_type: string;
-            assigned_at: string;
-            stage: string;
-            source: string;
-          }
-        ) => {
-          const existingIndex = acc.findIndex(
-            (user) => user.user_id === current.user_id
-          );
-          if (existingIndex === -1) {
-            acc.push(current);
-          } else {
-            // Keep the latest assignment
-            if (
-              new Date(current.assigned_at) >
-              new Date(acc[existingIndex].assigned_at)
-            ) {
-              acc[existingIndex] = current;
-            }
-          }
-          return acc;
-        },
-        []
-      );
-
-      // Resolve user names for user_ids that don't have names
-      const usersWithResolvedNames = await Promise.all(
-        uniqueAssignedUsers.map(async (user) => {
-          if (!user.name || user.name === user.user_id) {
-            try {
-              const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
-                .select("name, email, role")
-                .eq("id", user.user_id)
-                .single();
-
-              if (!profileError && profileData) {
-                return {
-                  ...user,
-                  name: profileData.name || user.name,
-                  email: profileData.email || user.email,
-                  role: profileData.role || user.role,
-                };
-              }
-            } catch (error) {
-              console.warn(
-                `Failed to fetch profile for user ${user.user_id}:`,
-                error
-              );
-            }
-          }
-          return user;
-        })
-      );
-
-      setAssignedTo(usersWithResolvedNames);
-    } catch (error) {
-      console.error("Error fetching assigned to:", error);
-      setAssignedTo([]);
-    }
+    const assignments = await fetchTaskAssignments(task.task_id, task.created_by?.id);
+    setAssignedTo(assignments);
   };
 
   useEffect(() => {
     fetchAssignedTo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.task_id]);
+  }, [task.task_id, assignmentRefreshTrigger]);
 
   // Sync realStatus with status prop when it changes
   useEffect(() => {
@@ -568,8 +367,8 @@ export const MainTaskCard = ({
                   <span className="text-gray-900">
                     {task.estimatedHours ||
                       (task.estimated_hours_ocr || 0) +
-                        (task.estimated_hours_qc || 0) +
-                        (task.estimated_hours_qa || 0)}
+                      (task.estimated_hours_qc || 0) +
+                      (task.estimated_hours_qa || 0)}
                     h
                   </span>
                 </div>
