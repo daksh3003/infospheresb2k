@@ -29,7 +29,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, ShieldCheck, Cpu, ChartNoAxesCombined, FileText, BarChart3, MessageSquare } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, ShieldCheck, Cpu, ChartNoAxesCombined, FileText, BarChart3, MessageSquare, Download } from "lucide-react"
+import * as XLSX from "xlsx"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, parse } from "date-fns"
@@ -175,6 +176,28 @@ function AttendanceTable() {
         setCurrentPage(1)
     }, [selectedUser, searchQuery])
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((r) => ({
+            "Department": r.department,
+            "Employee ID": r.employee_id,
+            "Employee Name": r.employee_name,
+            "Role": r.role,
+            "Date": r.attendance_date,
+            "In": r.in_time,
+            "Out": r.out_time,
+            "Shift": r.shift,
+            "Work": r.work_duration,
+            "OT": r.ot,
+            "Status": r.status,
+        }))
+
+        const ws = XLSX.utils.json_to_sheet(exportData)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, "Attendance Report")
+        XLSX.writeFile(wb, `Attendance_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`)
+    }
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />
@@ -242,6 +265,16 @@ function AttendanceTable() {
                             className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
                         >
                             Refresh
+                        </Button>
+
+                        {/* Download Excel Button */}
+                        <Button
+                            onClick={exportToExcel}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Export Excel
                         </Button>
                     </div>
                 </CardContent>
@@ -509,6 +542,29 @@ function UserDailyReport() {
         setCurrentPage(1);
     }, [searchQuery, selectedUserId, selectedDate]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "S.No": entry.s_no,
+            "Year": entry.year,
+            "Month": entry.month,
+            "Working Date": entry.working_date,
+            "Name": entry.name,
+            "Client Name": entry.client_name,
+            "File No": entry.file_no,
+            "Work Type": entry.work_type,
+            "No of Pages": entry.no_of_pages,
+            "Start Time": entry.start_time,
+            "End Time": entry.end_time,
+            "Total Working Time": entry.total_working_time,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "User Daily Report");
+        XLSX.writeFile(wb, `User_Daily_Report_${selectedDate}.xlsx`);
+    };
+
     // Filter users for dropdown search
     const filteredUsers = availableUsers.filter((user) =>
         user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
@@ -605,6 +661,17 @@ function UserDailyReport() {
                             className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
                         >
                             Refresh
+                        </Button>
+
+                        {/* Download Excel Button */}
+                        <Button
+                            onClick={exportToExcel}
+                            variant="outline"
+                            disabled={filteredData.length === 0}
+                            className="w-full sm:w-auto"
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Export Excel
                         </Button>
                     </div>
                 </CardContent>
@@ -941,6 +1008,21 @@ function UserMonthlyReport() {
         return format(date, 'MMMM yyyy');
     };
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = tableData.map((entry: any) => ({
+            "S.No": entry.s_no,
+            "Name Of The User": entry.name,
+            "Page Count": entry.total_pages || 0,
+            "PO Hours": parseFloat(entry.total_hours || 0).toFixed(2),
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "User Monthly Report");
+        XLSX.writeFile(wb, `User_Monthly_Report_${selectedMonth}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -1090,6 +1172,16 @@ function UserMonthlyReport() {
                             className="bg-blue-600 text-white hover:bg-blue-700"
                         >
                             Refresh
+                        </Button>
+
+                        {/* Download Excel Button */}
+                        <Button
+                            onClick={exportToExcel}
+                            variant="outline"
+                            disabled={tableData.length === 0}
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Export Excel
                         </Button>
                     </div>
 
@@ -1328,6 +1420,28 @@ function POReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "S. No": entry.s_no,
+            "Received Date": entry.received_date,
+            "Project Name": entry.project_name,
+            "Received Pages": entry.received_pages,
+            "Process": entry.process,
+            "PO Hours": entry.po_hours,
+            "Output Pages": entry.output_pages,
+            "Delivery Date": entry.delivery_date,
+            "Status": entry.status,
+            "PO Status": entry.po_status,
+            "PO Number": entry.po_number,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "PO Report");
+        XLSX.writeFile(wb, `PO_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -1426,6 +1540,16 @@ function POReport() {
                                 className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                                 Filter
+                            </Button>
+
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
                             </Button>
                         </div>
                     </div>
@@ -1667,6 +1791,27 @@ function QAReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "Working Date": entry.working_date,
+            "Name": entry.name,
+            "Client Name": entry.client_name,
+            "File Name": entry.file_name,
+            "Work Type": entry.work_type,
+            "Page Count": entry.page_no,
+            "Start Time": entry.start_time,
+            "End Time": entry.end_time,
+            "Total Working Hours": entry.total_working_hours,
+            "PO": entry.po,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "QA Report");
+        XLSX.writeFile(wb, `QA_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -1765,6 +1910,16 @@ function QAReport() {
                                 className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                                 Filter
+                            </Button>
+
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
                             </Button>
                         </div>
                     </div>
@@ -1995,6 +2150,29 @@ function DTPMonthlyReport() {
         return format(date, 'MMMM yyyy');
     };
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "S.No": entry.s_no,
+            "Date": entry.date,
+            "Employee Name": entry.name,
+            "Client Name": entry.client_name,
+            "Job No.": entry.job_no,
+            "Process": entry.process,
+            "Page Count": entry.page_count,
+            "Start Time": entry.start_time,
+            "End Time": entry.end_time,
+            "Total Time Taken": entry.total_time,
+            "Shift": entry.shift,
+            "PO Hours": entry.po_hours,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "DTP Monthly Report");
+        XLSX.writeFile(wb, `DTP_Monthly_Report_${selectedMonth}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -2067,6 +2245,16 @@ function DTPMonthlyReport() {
                                 className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                                 Refresh
+                            </Button>
+
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
                             </Button>
                         </div>
                     </div>
@@ -2322,6 +2510,53 @@ function DTPTracking() {
         setCurrentPage(1);
     }, [searchQuery]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "Job No": entry.job_no,
+            "Delivered by": entry.delivered_by,
+            "PO": entry.po,
+            "Mail instruction": entry.mail_instruction,
+            "Task type": entry.task_type,
+            "Task Name": entry.task_name,
+            "File Count": entry.file_count,
+            "Page count": entry.page_count,
+            "Language": entry.language,
+            "Platform": entry.platform,
+            "Stage": entry.stage,
+            "Date": entry.date,
+            "Delivery Time": entry.delivery_time,
+            "DTP Person": entry.dtp_person,
+            "DTP Start Time": entry.dtp_start_time,
+            "DTP End Time": entry.dtp_end_time,
+            "DTP Abbyy Compare": entry.abbyy_compare_dtp,
+            "DTP Status": entry.dtp_status,
+            "QC taken by": entry.qc_taken_by,
+            "QC Start Time": entry.qc_start_time,
+            "QC End Time": entry.qc_end_time,
+            "QC Abbyy Compare": entry.abbyy_compare_qc,
+            "QC Status": entry.qc_status,
+            "QC CXN taken": entry.qc_cxn_taken,
+            "QC CXN Start Time": entry.qc_cxn_start_time,
+            "QC CXN End Time": entry.qc_cxn_end_time,
+            "CXN Status": entry.cxn_status,
+            "QA taken by": entry.qa_taken_by,
+            "QA Start Time": entry.qa_start_time,
+            "QA End Time": entry.qa_end_time,
+            "QA Abbyy Compare": entry.abbyy_compare_qa,
+            "QA Status": entry.qa_status,
+            "QA CXN taken": entry.qa_cxn_taken,
+            "QA CXN Start Time": entry.qa_cxn_start_time,
+            "QA CXN End Time": entry.qa_cxn_end_time,
+            "File Status": entry.file_status,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "DTP Tracking");
+        XLSX.writeFile(wb, `DTP_Tracking_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -2438,6 +2673,15 @@ function DTPTracking() {
                                     Clear
                                 </Button>
                             )}
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -2840,6 +3084,39 @@ function FeedbackReport() {
         }
     };
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = reportData.map((entry) => ({
+            "S.No": entry.s_no,
+            "Date": entry.date,
+            "Client": entry.client,
+            "Task": entry.task,
+            "Filename": entry.filename,
+            "Pages": entry.pages,
+            "Language": entry.language,
+            "Task Type": entry.task_type,
+            "Process": entry.process,
+            "QC": entry.qc,
+            "QA": entry.qa,
+            "Delivery": entry.delivery,
+            "Internal Auditor": entry.internal_auditor,
+            "Internal Comments": entry.internal_comments,
+            "External Comments": entry.external_comments,
+            "Total No. Errors": entry.total_errors,
+            "Remarks": entry.remarks,
+            "Impact": entry.impact,
+            "Action (Impact)": entry.action_impact,
+            "RCA (Impact)": entry.rca_impact,
+            "Action (RCA)": entry.action_rca,
+            "RCA": entry.rca,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Feedback Report");
+        XLSX.writeFile(wb, `Feedback_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -2899,6 +3176,19 @@ function FeedbackReport() {
                             className="bg-blue-600 text-white hover:bg-blue-700"
                         >
                             Filter
+                        </Button>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
+                            Export
+                        </label>
+                        <Button
+                            onClick={exportToExcel}
+                            variant="outline"
+                            disabled={reportData.length === 0}
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Export Excel
                         </Button>
                     </div>
                 </div>
@@ -3056,6 +3346,27 @@ function QCReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "Working Date": entry.working_date,
+            "Name": entry.name,
+            "Client Name": entry.client_name,
+            "File Name": entry.file_name,
+            "Work Type": entry.work_type,
+            "Page Count": entry.page_no,
+            "Start Time": entry.start_time,
+            "End Time": entry.end_time,
+            "Total Working Hours": entry.total_working_hours,
+            "PO": entry.po,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "QC Report");
+        XLSX.writeFile(wb, `QC_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -3154,6 +3465,16 @@ function QCReport() {
                                 className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                                 Filter
+                            </Button>
+
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
                             </Button>
                         </div>
                     </div>
@@ -3381,6 +3702,27 @@ function ProcessorReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
+    // Export to Excel function
+    const exportToExcel = () => {
+        const exportData = filteredData.map((entry) => ({
+            "Working Date": entry.working_date,
+            "Name": entry.name,
+            "Client Name": entry.client_name,
+            "File Name": entry.file_name,
+            "Work Type": entry.work_type,
+            "Page Count": entry.page_no,
+            "Start Time": entry.start_time,
+            "End Time": entry.end_time,
+            "Total Working Hours": entry.total_working_hours,
+            "PO": entry.po,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Processor Report");
+        XLSX.writeFile(wb, `Processor_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />;
@@ -3479,6 +3821,16 @@ function ProcessorReport() {
                                 className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                                 Filter
+                            </Button>
+
+                            {/* Download Excel Button */}
+                            <Button
+                                onClick={exportToExcel}
+                                variant="outline"
+                                disabled={filteredData.length === 0}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
                             </Button>
                         </div>
                     </div>
