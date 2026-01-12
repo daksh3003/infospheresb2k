@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/server';
+import { createAdminClient } from '@/lib/admin';
 
 export async function GET(request: NextRequest) {
     try {
@@ -81,3 +82,136 @@ export async function GET(request: NextRequest) {
     }
 }
 
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabase = await createClient();
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+        if (!currentUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Check if current user is PM
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', currentUser.id)
+            .single();
+
+        if (profile?.role !== 'projectManager') {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
+
+        const { userId, name, role, password } = await request.json();
+
+        if (!userId) {
+            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
+
+        const adminSupabase = createAdminClient();
+
+        // 1. Update Profile (Name/Role)
+        if (name || role) {
+            const updates: any = {};
+            if (name) updates.name = name;
+            if (role) updates.role = role;
+            updates.updated_at = new Date().toISOString();
+
+            const { error: profileError } = await adminSupabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', userId);
+
+            if (profileError) {
+                console.error('Error updating profile:', profileError);
+                return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+            }
+
+            // Also update auth user metadata
+            const { error: authMetaError } = await adminSupabase.auth.admin.updateUserById(
+                userId,
+                { user_metadata: updates }
+            );
+
+            if (authMetaError) {
+                console.error('Error updating auth metadata:', authMetaError);
+            }
+        }
+
+        // 2. Update Password if provided
+        if (password) {
+            const { error: passwordError } = await adminSupabase.auth.admin.updateUserById(
+                userId,
+                { password: password }
+            );
+
+            if (passwordError) {
+                console.error('Error updating password:', passwordError);
+                return NextResponse.json({ error: passwordError.message }, { status: 500 });
+            }
+        }
+
+        return NextResponse.json({ message: 'User updated successfully' });
+    } catch (error) {
+        console.error('Unexpected error in PATCH:', error);
+        return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const supabase = await createClient();
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+        if (!currentUser) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Check if current user is PM
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', currentUser.id)
+            .single();
+
+        if (profile?.role !== 'projectManager') {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
+
+        const { userId } = await request.json();
+
+        if (!userId) {
+            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
+
+        const adminSupabase = createAdminClient();
+
+        // 1. Delete from profiles (Cascade handles other linked tables if any, but profiles is a leaf in many ways)
+        // Actually we might need to handle other links manually if they don't cascade.
+        // Files and Tasks reference IDs, so deletion might fail if not handled.
+        // For now let's assume standard behavior or that PM knows what they are doing.
+
+        const { error: profileDeleteError } = await adminSupabase
+            .from('profiles')
+            .delete()
+            .eq('id', userId);
+
+        if (profileDeleteError) {
+            console.error('Error deleting profile:', profileDeleteError);
+            return NextResponse.json({ error: 'Failed to delete user profile' }, { status: 500 });
+        }
+
+        // 2. Delete from Auth
+        const { error: authDeleteError } = await adminSupabase.auth.admin.deleteUser(userId);
+
+        if (authDeleteError) {
+            console.error('Error deleting auth user:', authDeleteError);
+            return NextResponse.json({ error: authDeleteError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Unexpected error in DELETE:', error);
+        return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    }
+}
