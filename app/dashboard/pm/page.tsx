@@ -24,6 +24,9 @@ import {
   ChevronUp,
   CheckCircle2,
   Clock,
+  Calendar,
+  AlertCircle,
+  CircleDashed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
@@ -327,6 +330,38 @@ export default function DashboardPage() {
     });
   };
 
+  // Helper function to check if a date is today
+  const isDateToday = (dateString: string) => {
+    if (!dateString || dateString === "null" || dateString === "undefined") return false;
+    try {
+      const today = new Date();
+      const checkDate = new Date(dateString);
+
+      today.setHours(0, 0, 0, 0);
+      checkDate.setHours(0, 0, 0, 0);
+
+      return today.getTime() === checkDate.getTime();
+    } catch {
+      return false;
+    }
+  };
+
+  // Helper function to check if a date is overdue
+  const isDateOverdue = (dateString: string) => {
+    if (!dateString || dateString === "null" || dateString === "undefined") return false;
+    try {
+      const today = new Date();
+      const checkDate = new Date(dateString);
+
+      today.setHours(0, 0, 0, 0);
+      checkDate.setHours(0, 0, 0, 0);
+
+      return checkDate.getTime() < today.getTime();
+    } catch {
+      return false;
+    }
+  };
+
   // Group tasks by project and calculate completion metrics
   const projectGroups = filteredTasks.reduce(
     (groups: { [key: string]: ProjectGroup }, task) => {
@@ -368,6 +403,7 @@ export default function DashboardPage() {
           onClick={() => toggleProjectExpansion(group.projectId)}
         >
           <div className="flex items-center justify-between">
+            {/* Left Side: Info & Meta */}
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                 {expandedProjects.has(group.projectId) ? (
@@ -380,13 +416,50 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {group.projectName}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {group.completedCount} of {group.totalCount} tasks completed
-                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5 focus-within:ring-0">
+                  <Badge
+                    variant="outline"
+                    className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />
+                    {group.completedCount}/{group.totalCount} Tasks
+                  </Badge>
+
+                  {(() => {
+                    const deliveryDate = projectNames[group.projectId]?.delivery_date;
+                    const deliveryTime = projectNames[group.projectId]?.delivery_time;
+
+                    if (!deliveryDate || deliveryDate === "null" || deliveryDate === "undefined") return null;
+
+                    return (
+                      <div className="flex flex-col gap-0.5 px-2 border-l border-gray-200 dark:border-gray-700 ml-1">
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                          Due Date
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
+                            {new Date(deliveryDate).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                          {deliveryTime && deliveryTime !== "null" && deliveryTime !== "undefined" && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium leading-none">
+                              {deliveryTime}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
+
+            {/* Right Side: Progress & Status */}
             <div className="flex items-center gap-6">
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-col items-end gap-2 text-right">
                 <div className="w-48">
                   <Progress
                     value={group.completionPercentage}
@@ -400,7 +473,7 @@ export default function DashboardPage() {
               <Badge
                 className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
                   ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
-                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-600"
                   }`}
               >
                 {group.completionPercentage === 100 ? (
@@ -424,9 +497,8 @@ export default function DashboardPage() {
           <div>
             {/* Table Header */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-6 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 <div className="col-span-2">Task Details</div>
-                <div className="text-center">Due Date</div>
                 <div className="text-center">Status</div>
                 <div className="text-center">Priority</div>
                 <div className="text-center">Working On</div>
@@ -439,7 +511,6 @@ export default function DashboardPage() {
                 <TaskCard
                   taskId={task.task_id}
                   key={index}
-                  // id={task.task_id}
                   title={task.task_name || "Untitled Task"}
                   description={
                     task.client_instruction || "No description available"
@@ -474,49 +545,64 @@ export default function DashboardPage() {
         <Button onClick={() => setIsModalOpen(true)}>Create New Task</Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {Object.keys(projectGroups).length}
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tasks.length}</div>
+            <div className="text-2xl font-bold">{filteredTasks.length}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {tasks.filter((task) => task.status === "in-progress").length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {tasks.filter((task) => task.completion_status).length}
+              {filteredTasks.filter((task) => task.completion_status).length}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Tasks Pending</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {tasks.filter((task) => task.status === "overdue").length}
+              {filteredTasks.filter((task) => !task.completion_status).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {filteredTasks.length > 0
+                ? `${Math.round((filteredTasks.filter((task) => task.completion_status).length / filteredTasks.length) * 100)}%`
+                : "0%"
+              }
             </div>
           </CardContent>
         </Card>

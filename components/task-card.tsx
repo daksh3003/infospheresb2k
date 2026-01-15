@@ -62,6 +62,25 @@ export function TaskCard({
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
   const [_statusLoading, setStatusLoading] = useState(false);
 
+  // Check if task is due today
+  const isDueToday = () => {
+    if (!dueDate || dueDate === "null" || dueDate === "undefined") return false;
+    try {
+      const today = new Date();
+      const taskDue = new Date(dueDate);
+
+      // Set both dates to start of day for comparison
+      today.setHours(0, 0, 0, 0);
+      taskDue.setHours(0, 0, 0, 0);
+
+      return today.getTime() === taskDue.getTime();
+    } catch {
+      return false;
+    }
+  };
+
+  const isTaskDueToday = isDueToday();
+
   // Fetch real status from tasks_test table
   useEffect(() => {
 
@@ -161,7 +180,7 @@ export function TaskCard({
   return (
     <div className="w-full border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
       <div className="px-6 py-4">
-        <div className="grid grid-cols-6 gap-4 items-center">
+        <div className="grid grid-cols-5 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-1">
@@ -170,37 +189,6 @@ export function TaskCard({
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {description}
             </p>
-          </div>
-
-          {/* Due Date */}
-          <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
-            <Calendar className="h-4 w-4 mr-2 text-blue-500 flex-shrink-0" />
-            <div className="flex flex-col items-center">
-              <span className="text-xs">
-                {dueDate && dueDate !== "null" && dueDate !== "undefined"
-                  ? (() => {
-                    try {
-                      const date = new Date(dueDate);
-                      if (isNaN(date.getTime())) {
-                        return "No due date";
-                      }
-                      return date.toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      });
-                    } catch {
-                      return "No due date";
-                    }
-                  })()
-                  : "No due date"}
-              </span>
-              {dueTime && dueTime !== "null" && dueTime !== "undefined" && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {dueTime}
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Status Badge */}

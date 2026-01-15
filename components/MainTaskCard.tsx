@@ -118,6 +118,26 @@ export const MainTaskCard = ({
     }
   };
 
+  // Check if task is due today
+  const isDueToday = () => {
+    const dueDate = task.delivery_date || task.dueDate;
+    if (!dueDate) return false;
+    try {
+      const today = new Date();
+      const taskDue = new Date(dueDate);
+
+      // Set both dates to start of day for comparison
+      today.setHours(0, 0, 0, 0);
+      taskDue.setHours(0, 0, 0, 0);
+
+      return today.getTime() === taskDue.getTime();
+    } catch {
+      return false;
+    }
+  };
+
+  const isTaskDueToday = isDueToday();
+
   // Format time helper
   const formatTime = (timeString: string) => {
     if (!timeString) return "Not set";
@@ -339,10 +359,19 @@ export const MainTaskCard = ({
                   Due Date
                 </h3>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-900">
-                    {formatDate(task.delivery_date || task.dueDate)}
-                  </span>
+                  <Calendar className={`h-4 w-4 ${isTaskDueToday ? "text-orange-500" : "text-gray-500"
+                    }`} />
+                  <div className="flex flex-col gap-1">
+                    <span className={`text-gray-900 ${isTaskDueToday ? "font-semibold text-orange-600" : ""
+                      }`}>
+                      {formatDate(task.delivery_date || task.dueDate)}
+                    </span>
+                    {isTaskDueToday && (
+                      <span className="text-xs font-semibold text-orange-600 uppercase tracking-wide">
+                        DUE TODAY!
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
