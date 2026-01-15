@@ -6,8 +6,9 @@ import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-// import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
 import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { toast } from "react-toastify";
+import { api } from "@/utils/api";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,8 @@ import {
   Calendar,
   AlertCircle,
   CircleDashed,
+  Loader2,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
@@ -83,8 +86,11 @@ export default function DashboardPage() {
       name: string;
       delivery_date: string;
       delivery_time: string;
+      po_hours?: number;
     };
   }>({});
+  const [editingPoHours, setEditingPoHours] = useState<{ [key: string]: string }>({});
+  const [isUpdatingPo, setIsUpdatingPo] = useState<string | null>(null);
   const [currentWorkers, setCurrentWorkers] = useState<{
     [key: string]: {
       name: string;
@@ -115,6 +121,7 @@ export default function DashboardPage() {
               name: string;
               delivery_date: string;
               delivery_time: string;
+              po_hours?: number;
             };
           },
           project: {
@@ -122,12 +129,14 @@ export default function DashboardPage() {
             project_name: string;
             delivery_date: string;
             delivery_time: string;
+            po_hours: number;
           }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
             delivery_date: project.delivery_date,
             delivery_time: project.delivery_time,
+            po_hours: project.po_hours,
           };
           return acc;
         },
@@ -338,6 +347,36 @@ export default function DashboardPage() {
     fetchTasks();
   };
 
+  const handleUpdatePoHours = async (projectId: string) => {
+    const hours = editingPoHours[projectId];
+    if (hours === undefined || hours === "") return;
+
+    try {
+      setIsUpdatingPo(projectId);
+      await api.updateProject(projectId, { po_hours: parseFloat(hours) });
+
+      // Update local state
+      setProjectNames(prev => ({
+        ...prev,
+        [projectId]: {
+          ...prev[projectId],
+          po_hours: parseFloat(hours)
+        }
+      }));
+
+      const newEditing = { ...editingPoHours };
+      delete newEditing[projectId];
+      setEditingPoHours(newEditing);
+
+      toast.success("PO Hours updated successfully");
+    } catch (error) {
+      console.error("Error updating PO Hours:", error);
+      toast.error("Failed to update PO Hours");
+    } finally {
+      setIsUpdatingPo(null);
+    }
+  };
+
   const toggleProjectExpansion = (projectId: string) => {
     setExpandedProjects((prev) => {
       const newSet = new Set(prev);
@@ -522,6 +561,32 @@ export default function DashboardPage() {
                     </span>
                   )}
                 </Badge>
+
+                {/* PO Hours Input for Completed Projects in RFD Tab */}
+                {activeTab === "RFD" && tasks.filter(t => t.project_id === group.projectId && (!(t.completion_status || t.status === "completed"))).length === 0 && (
+                  <div className="flex items-center gap-2 border-l border-gray-200 dark:border-gray-700 pl-6" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500">PO Hours</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Hours"
+                          className="h-9 w-24 text-sm"
+                          value={editingPoHours[group.projectId] ?? projectNames[group.projectId]?.po_hours ?? ""}
+                          onChange={(e) => setEditingPoHours(prev => ({ ...prev, [group.projectId]: e.target.value }))}
+                        />
+                        <Button
+                          size="sm"
+                          className="h-9 px-3"
+                          disabled={isUpdatingPo === group.projectId || editingPoHours[group.projectId] === undefined}
+                          onClick={() => handleUpdatePoHours(group.projectId)}
+                        >
+                          {isUpdatingPo === group.projectId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -186,6 +186,23 @@ export const api = {
     return response.json();
   },
 
+  updateProject: async (projectId: string, data: any) => {
+    const response = await fetch(`/api/projects`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ projectId, ...data }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update project');
+    }
+
+    return response.json();
+  },
+
   // File operations
   getFiles: async (taskId: string, stage?: string) => {
     const params = new URLSearchParams({ taskId });

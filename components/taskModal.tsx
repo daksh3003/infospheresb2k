@@ -564,36 +564,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   placeholder="Enter client name"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    PO Hours
-                    <Tooltip content="Estimated project hours">
-                      <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
-                    </Tooltip>
-                  </label>
-                  <input
-                    type="text"
-                    name="po_hours"
-                    value={projectData.po_hours}
-                    onChange={handleProjectChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter PO hours"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Reference File
-                  </label>
-                  <input
-                    type="text"
-                    name="reference_file"
-                    value={projectData.reference_file}
-                    onChange={handleProjectChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter reference file"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Reference File
+                </label>
+                <input
+                  type="text"
+                  name="reference_file"
+                  value={projectData.reference_file}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Enter reference file"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
@@ -1188,7 +1170,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
