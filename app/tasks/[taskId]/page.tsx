@@ -18,6 +18,7 @@ import { Comments } from "@/components/Comments";
 import { FooterButtons } from "@/components/FooterButtons";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { DownloadHistory } from "@/components/DownloadHistory";
+import { generateSafeStorageFileName } from "@/lib/file-utils";
 
 // Updated interfaces based on actual database schema
 // interface TaskFromDB {
@@ -1583,18 +1584,7 @@ export default function TaskDetailPage() {
     }
   };
 
-  // Helper function to generate safe storage filename (ASCII only)
-  const generateSafeStorageFileName = (fileName: string): string => {
-    // Get file extension
-    const lastDotIndex = fileName.lastIndexOf(".");
-    const extension = lastDotIndex > -1 ? fileName.substring(lastDotIndex) : "";
-
-    // Generate a unique safe filename using timestamp and random string
-    const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(2, 8);
-
-    return `file_${timestamp}_${randomStr}${extension}`;
-  };
+  // No local generateSafeStorageFileName needed anymore as it is imported
 
   const handleSubmitFileUpload = async () => {
     if (!taskId) {

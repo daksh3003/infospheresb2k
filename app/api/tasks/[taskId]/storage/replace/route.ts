@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/server';
 import { requireAuth } from '@/app/api/middleware/auth';
+import { generateSafeStorageFileName } from '@/lib/file-utils';
 
 export async function PUT(
   request: NextRequest,
@@ -51,14 +52,15 @@ export async function PUT(
       );
     }
 
-    // Generate new file path with timestamp to ensure uniqueness
+    // Generate new file path with safe naming
+    const safeStorageFileName = generateSafeStorageFileName(file.name);
     const date = new Date().toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata",
     }).replaceAll("/", "-");
 
     // Extract folder path from old file path
     const folderPath = old_file_path.substring(0, old_file_path.lastIndexOf("/"));
-    const new_file_path = `${folderPath}/${date}_${file.name}`;
+    const new_file_path = `${folderPath}/${safeStorageFileName}`;
 
     // Upload new file
     const { error: uploadError } = await supabase.storage
@@ -89,7 +91,7 @@ export async function PUT(
     // Insert new file record in files_test
     const { error: insertError } = await supabase.from("files_test").insert({
       task_id: taskId,
-      file_name: `${date}_${file.name}`,
+      file_name: file.name, // Keep original name for display
       page_count: parseInt(page_count) || null,
       assigned_to: [],
       storage_name: storage_name,
@@ -115,7 +117,7 @@ export async function PUT(
       metadata: {
         old_file_name: old_file_name,
         old_file_path: old_file_path,
-        new_file_name: `${date}_${file.name}`,
+        new_file_name: file.name,
         new_file_path: new_file_path,
         storage_name: storage_name,
         page_count: parseInt(page_count) || null,
@@ -134,7 +136,7 @@ export async function PUT(
       success: true,
       message: "File replaced successfully",
       new_file_path: new_file_path,
-      new_file_name: `${date}_${file.name}`,
+      new_file_name: file.name,
     });
   } catch (error) {
     return NextResponse.json(

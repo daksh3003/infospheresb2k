@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/server';
 import { requireAuth } from '@/app/api/middleware/auth';
 import { AuthorizationService } from '@/app/api/middleware/authorization';
+import { generateSafeStorageFileName } from '@/lib/file-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -127,9 +128,10 @@ export async function POST(request: NextRequest) {
 
     // Get file extension and determine file type
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
-    const fileName = file.name;
+    const originalFileName = file.name;
+    const safeStorageFileName = generateSafeStorageFileName(originalFileName);
     const fileSize = file.size;
-    
+
     // Define supported file types
     const supportedTypes: Record<string, string[]> = {
       documents: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'],
@@ -166,8 +168,8 @@ export async function POST(request: NextRequest) {
 
     if (stage === 'processor') {
       // Upload to processor storage
-      const filePath = `${taskId}/${fileName}`;
-      
+      const filePath = `${taskId}/${safeStorageFileName}`;
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("processor-files")
         .upload(filePath, file, {
@@ -187,7 +189,7 @@ export async function POST(request: NextRequest) {
         .insert([
           {
             task_id: taskId,
-            file_name: fileName,
+            file_name: originalFileName,
             storage_name: "processor-files",
             folder_path: taskId,
             file_size: fileSize,
@@ -215,8 +217,8 @@ export async function POST(request: NextRequest) {
 
     } else if (stage === 'qc') {
       // Upload to QC storage
-      const filePath = `${taskId}/${fileName}`;
-      
+      const filePath = `${taskId}/${safeStorageFileName}`;
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("qc-files")
         .upload(filePath, file, {
@@ -236,7 +238,7 @@ export async function POST(request: NextRequest) {
         .insert([
           {
             task_id: taskId,
-            file_name: fileName,
+            file_name: originalFileName,
             storage_name: "qc-files",
             folder_path: taskId,
             // file_size: fileSize,
@@ -264,8 +266,8 @@ export async function POST(request: NextRequest) {
 
     } else if (stage === 'pm') {
       // Upload to PM storage
-      const filePath = `${taskId}/${fileName}`;
-      
+      const filePath = `${taskId}/${safeStorageFileName}`;
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("task-files")
         .upload(filePath, file, {
@@ -285,7 +287,7 @@ export async function POST(request: NextRequest) {
         .insert([
           {
             task_id: taskId,
-            file_name: fileName,
+            file_name: originalFileName,
             storage_name: "task-files",
             folder_path: taskId,
             file_size: fileSize,
@@ -322,7 +324,7 @@ export async function POST(request: NextRequest) {
           sent_by: authenticatedUser.role,
           project_id: taskId, // This might need to be the actual project ID
           assigned_to: [],
-          action: `File uploaded: ${fileName} (${fileCategory}, .${fileExtension}, ${Math.round(fileSize / 1024)}KB)`,
+          action: `File uploaded: ${originalFileName} (${fileCategory}, .${fileExtension}, ${Math.round(fileSize / 1024)}KB)`,
           timestamp: new Date().toISOString(),
         },
       ]);
