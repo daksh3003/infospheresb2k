@@ -298,16 +298,36 @@ export default function DashboardPage() {
       priorityFilter === "all" || task.priority === priorityFilter;
     const matchesStage =
       stageFilter === "all" || task.current_stage === stageFilter;
-    const matchesType = activeTab === "all" || task.current_stage === activeTab;
 
     return (
       matchesSearch &&
       matchesStatus &&
       matchesPriority &&
-      matchesStage &&
-      matchesType
+      matchesStage
     );
   });
+
+  // Base tasks for tabs (ignores status filter for RFD)
+  const getBaseFilteredTasks = (includeCompleted = true) => {
+    return tasks.filter((task) => {
+      const matchesSearch =
+        task.task_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.task_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.client_instruction
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase());
+
+      const matchesPriority =
+        priorityFilter === "all" || task.priority === priorityFilter;
+      const matchesStage =
+        stageFilter === "all" || task.current_stage === stageFilter;
+
+      const isCompleted = task.completion_status || task.status === "completed";
+      const matchesCompletion = includeCompleted ? true : !isCompleted;
+
+      return matchesSearch && matchesPriority && matchesStage && matchesCompletion;
+    });
+  };
 
 
 
@@ -362,37 +382,37 @@ export default function DashboardPage() {
     }
   };
 
-  // Group tasks by project and calculate completion metrics
-  const projectGroups = filteredTasks.reduce(
-    (groups: { [key: string]: ProjectGroup }, task) => {
-      const projectId = task.project_id;
-
-      if (!groups[projectId]) {
-        groups[projectId] = {
-          projectId,
-          projectName: projectNames[projectId]?.name || "Unnamed Project",
-          tasks: [],
-          completedCount: 0,
-          totalCount: 0,
-          completionPercentage: 0,
-        };
-      }
-      groups[projectId].tasks.push(task);
-      groups[projectId].totalCount++;
-      if (task.completion_status) {
-        groups[projectId].completedCount++;
-      }
-      groups[projectId].completionPercentage = Math.round(
-        (groups[projectId].completedCount / groups[projectId].totalCount) * 100
-      );
-      return groups;
-    },
-    {}
-  );
-
   // Function to render grouped tasks
-  const renderGroupedTasks = (_tasks: ProjectTask[]) => {
-    return Object.values(projectGroups).map((group, index) => {
+  const renderGroupedTasks = (tasksToGroup: ProjectTask[]) => {
+    // Local grouping within the function to handle filtered subsets
+    const localProjectGroups = tasksToGroup.reduce(
+      (groups: { [key: string]: ProjectGroup }, task) => {
+        const projectId = task.project_id;
+
+        if (!groups[projectId]) {
+          groups[projectId] = {
+            projectId,
+            projectName: projectNames[projectId]?.name || "Unnamed Project",
+            tasks: [],
+            completedCount: 0,
+            totalCount: 0,
+            completionPercentage: 0,
+          };
+        }
+        groups[projectId].tasks.push(task);
+        groups[projectId].totalCount++;
+        if (task.completion_status) {
+          groups[projectId].completedCount++;
+        }
+        groups[projectId].completionPercentage = Math.round(
+          (groups[projectId].completedCount / groups[projectId].totalCount) * 100
+        );
+        return groups;
+      },
+      {}
+    );
+
+    return Object.values(localProjectGroups).map((group, index) => {
       const deliveryDate = projectNames[group.projectId]?.delivery_date;
       const deliveryTime = projectNames[group.projectId]?.delivery_time;
       const isOverdue = isDateOverdue(deliveryDate);
@@ -568,7 +588,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Object.keys(projectGroups).length}
+              {new Set(filteredTasks.map((t) => t.project_id)).size}
             </div>
           </CardContent>
         </Card>
@@ -690,6 +710,10 @@ export default function DashboardPage() {
             <ShieldCheck className="h-4 w-4 mr-2" />
             QA Tasks
           </TabsTrigger>
+          <TabsTrigger value="RFD">
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            RFD (Ready for Delivery)
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
@@ -719,15 +743,15 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-4">
               {filteredTasks.filter(
-                (task) => task.current_stage === "Processor"
+                (task) => task.current_stage === "Processor" && !(task.completion_status || task.status === "completed")
               ).length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No processor tasks found.</p>
+                  <p className="text-gray-500">No active processor tasks found.</p>
                 </div>
               ) : (
                 renderGroupedTasks(
                   filteredTasks.filter(
-                    (task) => task.current_stage === "Processor"
+                    (task) => task.current_stage === "Processor" && !(task.completion_status || task.status === "completed")
                   )
                 )
               )}
@@ -740,14 +764,14 @@ export default function DashboardPage() {
             <LoadingScreen variant="inline" message="Loading QC tasks..." />
           ) : (
             <div className="space-y-4">
-              {filteredTasks.filter((task) => task.current_stage === "QC")
+              {filteredTasks.filter((task) => task.current_stage === "QC" && !(task.completion_status || task.status === "completed"))
                 .length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No QC tasks found.</p>
+                  <p className="text-gray-500">No active QC tasks found.</p>
                 </div>
               ) : (
                 renderGroupedTasks(
-                  filteredTasks.filter((task) => task.current_stage === "QC")
+                  filteredTasks.filter((task) => task.current_stage === "QC" && !(task.completion_status || task.status === "completed"))
                 )
               )}
             </div>
@@ -759,14 +783,33 @@ export default function DashboardPage() {
             <LoadingScreen variant="inline" message="Loading QA tasks..." />
           ) : (
             <div className="space-y-4">
-              {filteredTasks.filter((task) => task.current_stage === "QA")
+              {filteredTasks.filter((task) => task.current_stage === "QA" && !(task.completion_status || task.status === "completed"))
                 .length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No QA tasks found.</p>
+                  <p className="text-gray-500">No active QA tasks found.</p>
                 </div>
               ) : (
                 renderGroupedTasks(
-                  filteredTasks.filter((task) => task.current_stage === "QA")
+                  filteredTasks.filter((task) => task.current_stage === "QA" && !(task.completion_status || task.status === "completed"))
+                )
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="RFD" className="mt-6">
+          {isLoading ? (
+            <LoadingScreen variant="inline" message="Loading completed tasks..." />
+          ) : (
+            <div className="space-y-4">
+              {getBaseFilteredTasks(true).filter((task) => task.completion_status || task.status === "completed")
+                .length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No tasks ready for delivery found.</p>
+                </div>
+              ) : (
+                renderGroupedTasks(
+                  getBaseFilteredTasks(true).filter((task) => task.completion_status || task.status === "completed")
                 )
               )}
             </div>
