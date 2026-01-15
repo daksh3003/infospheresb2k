@@ -392,50 +392,58 @@ export default function DashboardPage() {
 
   // Function to render grouped tasks
   const renderGroupedTasks = (_tasks: ProjectTask[]) => {
-    return Object.values(projectGroups).map((group, index) => (
-      <div
-        key={index}
-        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
-      >
-        {/* Project Header */}
+    return Object.values(projectGroups).map((group, index) => {
+      const deliveryDate = projectNames[group.projectId]?.delivery_date;
+      const deliveryTime = projectNames[group.projectId]?.delivery_time;
+      const isOverdue = isDateOverdue(deliveryDate);
+      const isToday = isDateToday(deliveryDate);
+
+      return (
         <div
-          className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 border-b border-gray-200 dark:border-gray-600"
-          onClick={() => toggleProjectExpansion(group.projectId)}
+          key={index}
+          className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
         >
-          <div className="flex items-center justify-between">
-            {/* Left Side: Info & Meta */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                {expandedProjects.has(group.projectId) ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {group.projectName}
-                </h3>
-                <div className="flex flex-wrap items-center gap-2 mt-1.5 focus-within:ring-0">
-                  <Badge
-                    variant="outline"
-                    className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />
-                    {group.completedCount}/{group.totalCount} Tasks
-                  </Badge>
+          {/* Project Header */}
+          <div
+            className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 border-b border-gray-200 dark:border-gray-600"
+            onClick={() => toggleProjectExpansion(group.projectId)}
+          >
+            <div className="flex items-center justify-between">
+              {/* Left Side: Info & Meta */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                  {expandedProjects.has(group.projectId) ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {group.projectName}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5 focus-within:ring-0">
+                    <Badge
+                      variant="outline"
+                      className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />
+                      {group.completedCount}/{group.totalCount} Tasks
+                    </Badge>
 
-                  {(() => {
-                    const deliveryDate = projectNames[group.projectId]?.delivery_date;
-                    const deliveryTime = projectNames[group.projectId]?.delivery_time;
-
-                    if (!deliveryDate || deliveryDate === "null" || deliveryDate === "undefined") return null;
-
-                    return (
+                    {deliveryDate && deliveryDate !== "null" && deliveryDate !== "undefined" && (
                       <div className="flex flex-col gap-0.5 px-2 border-l border-gray-200 dark:border-gray-700 ml-1">
-                        <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                          Due Date
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                            Due Date
+                          </span>
+                          {isToday && group.completionPercentage < 100 && (
+                            <Badge className="h-4 px-1.5 py-0 text-[8px] font-bold bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800 rounded-full flex items-center gap-1 uppercase tracking-tight">
+                              <Clock className="h-2.5 w-2.5" />
+                              Due Today
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
                             {new Date(deliveryDate).toLocaleDateString(undefined, {
@@ -451,82 +459,89 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right Side: Progress & Status */}
-            <div className="flex items-center gap-6">
-              <div className="flex flex-col items-end gap-2 text-right">
-                <div className="w-48">
-                  <Progress
-                    value={group.completionPercentage}
-                    className="h-2"
+              {/* Right Side: Progress & Status */}
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col items-end gap-2 text-right">
+                  <div className="w-48">
+                    <Progress
+                      value={group.completionPercentage}
+                      className="h-2"
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Progress: {group.completionPercentage}%
+                  </span>
+                </div>
+                <Badge
+                  className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
+                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
+                    : isOverdue
+                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700"
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-600"
+                    }`}
+                >
+                  {group.completionPercentage === 100 ? (
+                    <span className="flex items-center">
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Complete
+                    </span>
+                  ) : isOverdue ? (
+                    <span className="flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      Overdue
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      In Progress
+                    </span>
+                  )}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Tasks Section */}
+          {expandedProjects.has(group.projectId) && (
+            <div>
+              {/* Table Header */}
+              <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="col-span-2">Task Details</div>
+                  <div className="text-center">Status</div>
+                  <div className="text-center">Priority</div>
+                  <div className="text-center">Working On</div>
+                  <div className="text-center">Actions</div>
+                </div>
+              </div>
+              {/* Task Rows */}
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {group.tasks.map((task, index) => (
+                  <TaskCard
+                    taskId={task.task_id}
+                    key={index}
+                    title={task.task_name || "Untitled Task"}
+                    description={
+                      task.client_instruction || "No description available"
+                    }
+                    dueDate={projectNames[task.project_id]?.delivery_date || ""}
+                    dueTime={projectNames[task.project_id]?.delivery_time || ""}
+                    status={task.status || "pending"}
+                    priority={task.priority || "medium"}
+                    currentWorkers={currentWorkers[task.task_id] || []}
                   />
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Progress: {group.completionPercentage}%
-                </span>
+                ))}
               </div>
-              <Badge
-                className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
-                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
-                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-600"
-                  }`}
-              >
-                {group.completionPercentage === 100 ? (
-                  <span className="flex items-center">
-                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                    Complete
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    In Progress
-                  </span>
-                )}
-              </Badge>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* Tasks Section */}
-        {expandedProjects.has(group.projectId) && (
-          <div>
-            {/* Table Header */}
-            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                <div className="col-span-2">Task Details</div>
-                <div className="text-center">Status</div>
-                <div className="text-center">Priority</div>
-                <div className="text-center">Working On</div>
-                <div className="text-center">Actions</div>
-              </div>
-            </div>
-            {/* Task Rows */}
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {group.tasks.map((task, index) => (
-                <TaskCard
-                  taskId={task.task_id}
-                  key={index}
-                  title={task.task_name || "Untitled Task"}
-                  description={
-                    task.client_instruction || "No description available"
-                  }
-                  dueDate={projectNames[task.project_id]?.delivery_date || ""}
-                  dueTime={projectNames[task.project_id]?.delivery_time || ""}
-                  status={task.status || "pending"}
-                  priority={task.priority || "medium"}
-                  currentWorkers={currentWorkers[task.task_id] || []}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    ));
+      );
+    });
   };
 
   // Function to handle task creation
