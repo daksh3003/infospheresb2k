@@ -58,6 +58,9 @@ interface TaskFormData {
   project_id: string;
   created_by: string;
   task_type: string;
+  file_type: string;
+  file_format: string;
+  custom_file_format: string;
 }
 
 interface FileFormData {
@@ -278,6 +281,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
           project_id: "",
           created_by: currentUser?.id || "",
           task_type: "",
+          file_type: "",
+          file_format: "",
+          custom_file_format: "",
         },
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
@@ -303,6 +309,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
         project_id: "",
         created_by: currentUser?.id || "",
         task_type: "",
+        file_type: "",
+        file_format: "",
+        custom_file_format: "",
       },
       filesData: [
         {
@@ -331,6 +340,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
           project_id: "",
           created_by: currentUser?.id || "",
           task_type: "",
+          file_type: "",
+          file_format: "",
+          custom_file_format: "",
         },
         filesData: [],
       },
@@ -810,6 +822,69 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       <option value="image_processing">Image Processing</option>
                       <option value="other">Other</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      File Type *
+                    </label>
+                    <select
+                      value={group.taskData.file_type}
+                      onChange={(e) =>
+                        updateTaskData(
+                          groupIndex,
+                          "file_type",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="">Select file type</option>
+                      <option value="editable">Editable</option>
+                      <option value="scanned">Scanned</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      File Format *
+                    </label>
+                    <select
+                      value={group.taskData.file_format}
+                      onChange={(e) =>
+                        updateTaskData(
+                          groupIndex,
+                          "file_format",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 border rounded-md"
+                    >
+                      <option value="">Select file format</option>
+                      <option value="indesign">InDesign</option>
+                      <option value="ms_excel">MS Excel</option>
+                      <option value="ms_word">MS Word</option>
+                      <option value="photoshop">Photoshop</option>
+                      <option value="powerpoint">PowerPoint</option>
+                      <option value="illustrator">Illustrator</option>
+                      <option value="others">Others</option>
+                    </select>
+                    {group.taskData.file_format === "others" && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          value={group.taskData.custom_file_format}
+                          onChange={(e) =>
+                            updateTaskData(
+                              groupIndex,
+                              "custom_file_format",
+                              e.target.value
+                            )
+                          }
+                          className="w-full p-2 border rounded-md"
+                          placeholder="Please specify the file format"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>

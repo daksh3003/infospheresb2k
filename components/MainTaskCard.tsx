@@ -26,6 +26,9 @@ interface Task {
   created_at: string;
   status: string;
   feedback: string;
+  file_type: string;
+  file_format: string;
+  custom_file_format: string;
 
   // From projects_test
   project_id: string;
@@ -238,6 +241,40 @@ export const MainTaskCard = ({
                 PO Hours
               </h3>
               <p className="text-gray-900">{task.po_hours || 0} hours</p>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">
+                File Type
+              </h3>
+              <p className="text-gray-900 capitalize">
+                {task.file_type || "Not specified"}
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">
+                File Format
+              </h3>
+              <p className="text-gray-900">
+                {task.file_format
+                  ? task.file_format === "ms_excel"
+                    ? "MS Excel"
+                    : task.file_format === "ms_word"
+                      ? "MS Word"
+                      : task.file_format === "indesign"
+                        ? "InDesign"
+                        : task.file_format === "photoshop"
+                          ? "Photoshop"
+                          : task.file_format === "powerpoint"
+                            ? "PowerPoint"
+                            : task.file_format === "illustrator"
+                              ? "Illustrator"
+                              : task.file_format === "others"
+                                ? task.custom_file_format || "Others (not specified)"
+                                : task.file_format
+                  : "Not specified"}
+              </p>
             </div>
           </div>
 
