@@ -74,6 +74,9 @@ interface Task {
   created_at: string;
   status: string;
   feedback: string;
+  file_type: string;
+  file_format: string;
+  custom_file_format: string;
 
   // From projects_test
   project_id: string;
@@ -160,6 +163,9 @@ export default function TaskDetailPage() {
     created_at: "",
     status: "pending",
     feedback: "",
+    file_type: "",
+    file_format: "",
+    custom_file_format: "",
     project_id: "",
     project_name: "",
     po_hours: 0,
@@ -300,6 +306,9 @@ export default function TaskDetailPage() {
         created_at: taskData.created_at || "",
         status: taskData.status || "pending",
         feedback: taskData.feedback || "",
+        file_type: taskData.file_type || "",
+        file_format: taskData.file_format || "",
+        custom_file_format: taskData.custom_file_format || "",
 
         // From projects_test
         project_id: projectData.project_id,
