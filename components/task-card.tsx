@@ -42,6 +42,11 @@ interface TaskCardProps {
     name: string;
     email?: string;
   }[]; // Optional: All users currently working on the task
+  fileType?: string; // Optional: File type (editable, scanned, mixed)
+  fileFormat?: string; // Optional: File format (indesign, ms_excel, etc.)
+  customFileFormat?: string; // Optional: Custom format when format is 'others'
+  pageCount?: number | null; // Optional: Page count
+  showFileMetadata?: boolean; // Optional: Whether to show file metadata
 }
 
 export function TaskCard({
@@ -57,6 +62,11 @@ export function TaskCard({
   isActionableByPM,
   isLoadingAction, // Optional
   currentWorkers, // Optional
+  fileType,
+  fileFormat,
+  customFileFormat,
+  pageCount,
+  showFileMetadata = false,
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -177,6 +187,22 @@ export function TaskCard({
     }
   };
 
+  const formatFileFormat = (format: string | undefined, custom: string | undefined) => {
+    if (!format) return null;
+
+    const formatMap: { [key: string]: string } = {
+      'indesign': 'InDesign',
+      'ms_excel': 'MS Excel',
+      'ms_word': 'MS Word',
+      'photoshop': 'Photoshop',
+      'powerpoint': 'PowerPoint',
+      'illustrator': 'Illustrator',
+      'others': custom || 'Others'
+    };
+
+    return formatMap[format] || format;
+  };
+
   return (
     <div className="w-full border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
       <div className="px-6 py-4">
@@ -286,6 +312,38 @@ export function TaskCard({
             )}
           </div>
         </div>
+
+        {/* File Metadata Section - Only show when showFileMetadata is true */}
+        {showFileMetadata && (fileType || fileFormat || pageCount !== null) && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-4 text-xs">
+              {fileType && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 dark:text-gray-400">File Type:</span>
+                  <Badge variant="outline" className="px-2 py-0.5 text-xs capitalize">
+                    {fileType}
+                  </Badge>
+                </div>
+              )}
+              {fileFormat && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 dark:text-gray-400">Format:</span>
+                  <Badge variant="outline" className="px-2 py-0.5 text-xs">
+                    {formatFileFormat(fileFormat, customFileFormat)}
+                  </Badge>
+                </div>
+              )}
+              {pageCount !== null && pageCount !== undefined && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-500 dark:text-gray-400">Pages:</span>
+                  <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
+                    {pageCount}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
