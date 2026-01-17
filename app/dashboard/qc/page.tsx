@@ -325,6 +325,19 @@ export default function QCDashboard() {
           <LoadingScreen variant="inline" message="Loading QC tasks..." />
         ) : (
           <div className="flex flex-col space-y-4">
+            {/* Table Header */}
+            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
+              <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="col-span-2">Task Details</div>
+                <div className="text-center">Page Count</div>
+                <div className="text-center">File Type</div>
+                <div className="text-center">File Format</div>
+                <div className="text-center col-span-2">Working On</div>
+                <div className="text-center">Status</div>
+                <div className="text-center">Action</div>
+              </div>
+            </div>
+
             {filteredTasks.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">

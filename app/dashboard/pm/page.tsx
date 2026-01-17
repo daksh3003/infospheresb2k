@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
+  ArrowRight,
   CheckCircle2,
   Clock,
   Calendar,
@@ -486,7 +487,7 @@ export default function DashboardPage() {
             className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-all duration-200 border-b border-gray-100 dark:border-gray-700"
             onClick={() => toggleProjectExpansion(group.projectId)}
           >
-            <div className="grid grid-cols-8 gap-4 items-center w-full">
+            <div className="grid grid-cols-9 gap-4 items-center w-full">
               {/* Col 1-2: Info & Meta */}
               <div className="col-span-2 flex flex-col gap-1.5 min-w-0">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none pl-[40px]">
@@ -647,6 +648,28 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+
+              {/* Action Column (Col 9) */}
+              <div className="flex items-center justify-center">
+                {group.tasks.length === 1 && group.tasks[0] && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-3 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full flex items-center gap-1 group transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const taskId = group.tasks[0].task_id;
+                      const pathParts = window.location.pathname.split("/");
+                      const source = pathParts[2] || "global";
+                      // @ts-ignore - _router exists in the component scope but is named with underscore
+                      _router.push(`/tasks/${taskId}?source=${source}`);
+                    }}
+                  >
+                    View
+                    <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -655,13 +678,14 @@ export default function DashboardPage() {
             <div>
               {/* Table Header */}
               <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-8 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="col-span-2">Task Details</div>
                   <div className="text-center">Page Count</div>
                   <div className="text-center">File Type</div>
                   <div className="text-center">File Format</div>
                   <div className="text-center col-span-2">Working On</div>
                   <div className="text-center">Status</div>
+                  <div className="text-center">Action</div>
                 </div>
               </div>
               {/* Task Rows */}
@@ -684,6 +708,7 @@ export default function DashboardPage() {
                     customFileFormat={task.custom_file_format}
                     pageCount={task.page_count}
                     showFileMetadata={group.tasks.length > 1}
+                    hideViewButton={group.tasks.length === 1}
                   />
                 ))}
               </div>
