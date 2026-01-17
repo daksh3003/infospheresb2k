@@ -57,6 +57,10 @@ interface ProjectTask {
   type: "pm" | "qc" | "qa";
   project_delivery_date?: string;
   project_delivery_time?: string;
+  file_type?: string;
+  file_format?: string;
+  custom_file_format?: string;
+  page_count?: number | null;
 }
 
 interface ProjectGroup {
@@ -199,7 +203,18 @@ export default function DashboardPage() {
         {}
       );
 
+      // Fetch page counts from API
+      const pageCountResponse = await fetch("/api/tasks/page-counts");
+      const pageCountData = await pageCountResponse.json();
 
+      // Create a map of task_id to page_count
+      const pageCountMap = pageCountData.reduce(
+        (acc: Record<string, number>, item: { task_id: string; total_pages: number }) => {
+          acc[item.task_id] = item.total_pages;
+          return acc;
+        },
+        {}
+      );
 
       if (projectsData) {
         const processedTasks = projectsData.map(
@@ -214,6 +229,9 @@ export default function DashboardPage() {
             task_name?: string;
             client_instruction?: string;
             created_at?: string;
+            file_type?: string;
+            file_format?: string;
+            custom_file_format?: string;
           }) => {
             return {
               ...task,
@@ -225,6 +243,7 @@ export default function DashboardPage() {
               priority: calculatePriority(task.delivery_date, task.po_hours),
               type: getTaskType(task.process_type),
               current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
+              page_count: pageCountMap[task.task_id] || null, // Add page count
             };
           }
         );
@@ -490,32 +509,77 @@ export default function DashboardPage() {
                       {group.completedCount}/{group.totalCount} Tasks
                     </Badge>
 
-                    {deliveryDate && deliveryDate !== "null" && deliveryDate !== "undefined" && (
-                      <div className="flex flex-col gap-0.5 px-2 border-l border-gray-200 dark:border-gray-700 ml-1">
-                        <div className="flex items-center gap-2">
+                    {/* Metadata Grid - Always show for single task projects with equal spacing */}
+                    {group.tasks.length === 1 && group.tasks[0] && (
+                      <div className="grid grid-cols-4 gap-4 px-4 py-1 border-l border-gray-200 dark:border-gray-700 ml-1 flex-1">
+                        {/* File Type Column */}
+                        <div className="flex flex-col gap-1.5">
                           <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                            Due Date
+                            File Type
                           </span>
-                          {isToday && group.completionPercentage < 100 && (
-                            <Badge className="h-4 px-1.5 py-0 text-[8px] font-bold bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800 rounded-full flex items-center gap-1 uppercase tracking-tight">
-                              <Clock className="h-2.5 w-2.5" />
-                              Due Today
-                            </Badge>
-                          )}
+                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none capitalize">
+                            {group.tasks[0].file_type || '-'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
-                            {new Date(deliveryDate).toLocaleDateString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
+
+                        {/* File Format Column */}
+                        <div className="flex flex-col gap-2 ">
+                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                            File Format
                           </span>
-                          {deliveryTime && deliveryTime !== "null" && deliveryTime !== "undefined" && (
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium leading-none">
-                              {deliveryTime}
+                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
+                            {group.tasks[0].file_format ? (
+                              group.tasks[0].file_format === 'ms_excel' ? 'MS Excel' :
+                                group.tasks[0].file_format === 'ms_word' ? 'MS Word' :
+                                  group.tasks[0].file_format === 'indesign' ? 'InDesign' :
+                                    group.tasks[0].file_format === 'photoshop' ? 'Photoshop' :
+                                      group.tasks[0].file_format === 'powerpoint' ? 'PowerPoint' :
+                                        group.tasks[0].file_format === 'illustrator' ? 'Illustrator' :
+                                          group.tasks[0].file_format === 'others' ? (group.tasks[0].custom_file_format || 'Others') :
+                                            group.tasks[0].file_format
+                            ) : '-'}
+                          </span>
+                        </div>
+
+                        {/* Page Count Column */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                            Page Count
+                          </span>
+                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
+                            {group.tasks[0].page_count ?? '10'}
+                          </span>
+                        </div>
+
+                        {/* Due Date Column */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                              Due Date
                             </span>
-                          )}
+                            {isToday && group.completionPercentage < 100 && (
+                              <Badge className="h-4 px-1.5 py-0 text-[8px] font-bold bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800 rounded-full flex items-center gap-1 uppercase tracking-tight">
+                                <Clock className="h-2.5 w-2.5" />
+                                Due Today
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
+                              {deliveryDate && deliveryDate !== "null" && deliveryDate !== "undefined"
+                                ? new Date(deliveryDate).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                                : 'Jan 14, 2026'}
+                            </span>
+                            {deliveryTime && deliveryTime !== "null" && deliveryTime !== "undefined" && (
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium leading-none">
+                                18:00:00
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -619,6 +683,11 @@ export default function DashboardPage() {
                     status={task.status || "pending"}
                     priority={task.priority || "medium"}
                     currentWorkers={currentWorkers[task.task_id] || []}
+                    fileType={task.file_type}
+                    fileFormat={task.file_format}
+                    customFileFormat={task.custom_file_format}
+                    pageCount={task.page_count}
+                    showFileMetadata={group.tasks.length > 1}
                   />
                 ))}
               </div>
