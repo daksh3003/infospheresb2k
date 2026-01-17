@@ -479,173 +479,168 @@ export default function DashboardPage() {
       return (
         <div
           key={index}
-          className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+          className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow duration-200"
         >
           {/* Project Header */}
           <div
-            className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 border-b border-gray-200 dark:border-gray-600"
+            className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-all duration-200 border-b border-gray-100 dark:border-gray-700"
             onClick={() => toggleProjectExpansion(group.projectId)}
           >
-            <div className="flex items-center justify-between">
-              {/* Left Side: Info & Meta */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {expandedProjects.has(group.projectId) ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {group.projectName}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 mt-1.5 focus-within:ring-0">
-                    <Badge
-                      variant="outline"
-                      className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 flex items-center gap-1.5"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-gray-400" />
-                      {group.completedCount}/{group.totalCount} Tasks
-                    </Badge>
-
-                    {/* Metadata Grid - Always show for single task projects with equal spacing */}
-                    {group.tasks.length === 1 && group.tasks[0] && (
-                      <div className="grid grid-cols-4 gap-4 px-4 py-1 border-l border-gray-200 dark:border-gray-700 ml-1 flex-1">
-                        {/* File Type Column */}
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                            File Type
-                          </span>
-                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none capitalize">
-                            {group.tasks[0].file_type || '-'}
-                          </span>
-                        </div>
-
-                        {/* File Format Column */}
-                        <div className="flex flex-col gap-2 ">
-                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                            File Format
-                          </span>
-                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
-                            {group.tasks[0].file_format ? (
-                              group.tasks[0].file_format === 'ms_excel' ? 'MS Excel' :
-                                group.tasks[0].file_format === 'ms_word' ? 'MS Word' :
-                                  group.tasks[0].file_format === 'indesign' ? 'InDesign' :
-                                    group.tasks[0].file_format === 'photoshop' ? 'Photoshop' :
-                                      group.tasks[0].file_format === 'powerpoint' ? 'PowerPoint' :
-                                        group.tasks[0].file_format === 'illustrator' ? 'Illustrator' :
-                                          group.tasks[0].file_format === 'others' ? (group.tasks[0].custom_file_format || 'Others') :
-                                            group.tasks[0].file_format
-                            ) : '-'}
-                          </span>
-                        </div>
-
-                        {/* Page Count Column */}
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                            Page Count
-                          </span>
-                          <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
-                            {group.tasks[0].page_count ?? '10'}
-                          </span>
-                        </div>
-
-                        {/* Due Date Column */}
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                              Due Date
-                            </span>
-                            {isToday && group.completionPercentage < 100 && (
-                              <Badge className="h-4 px-1.5 py-0 text-[8px] font-bold bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800 rounded-full flex items-center gap-1 uppercase tracking-tight">
-                                <Clock className="h-2.5 w-2.5" />
-                                Due Today
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-none">
-                              {deliveryDate && deliveryDate !== "null" && deliveryDate !== "undefined"
-                                ? new Date(deliveryDate).toLocaleDateString(undefined, {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })
-                                : 'Jan 14, 2026'}
-                            </span>
-                            {deliveryTime && deliveryTime !== "null" && deliveryTime !== "undefined" && (
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium leading-none">
-                                18:00:00
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+            <div className="grid grid-cols-8 gap-4 items-center w-full">
+              {/* Col 1-2: Info & Meta */}
+              <div className="col-span-2 flex flex-col gap-1.5 min-w-0">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none pl-[40px]">
+                  Project
+                </span>
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex-shrink-0 border border-slate-100 dark:border-slate-700">
+                    {expandedProjects.has(group.projectId) ? (
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
                     )}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate text-[15px] leading-tight tracking-tight">
+                      {group.projectName}
+                    </h3>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-50/50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 flex items-center gap-1 uppercase tracking-tight"
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-slate-400" />
+                        {group.completedCount}/{group.totalCount} Tasks
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Right Side: Progress & Status */}
-              <div className="flex items-center gap-6">
-                <div className="flex flex-col items-end gap-2 text-right">
-                  <div className="w-48">
-                    <Progress
-                      value={group.completionPercentage}
-                      className="h-2"
-                    />
+              {/* Metadata Columns (3, 4, 5, 6) */}
+              {group.tasks.length === 1 && group.tasks[0] ? (
+                <>
+                  {/* Page Count Column (Col 3) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                      Page Count
+                    </span>
+                    <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold text-gray-900 dark:text-gray-100 leading-none border-gray-200 dark:border-gray-700 rounded-full">
+                      {group.tasks[0].page_count ?? '-'}
+                    </Badge>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Progress: {group.completionPercentage}%
-                  </span>
-                </div>
-                <Badge
-                  className={`px-3 py-1.5 text-sm font-medium ${group.completionPercentage === 100
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700"
-                    : isOverdue
-                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700"
-                      : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-600"
-                    }`}
-                >
-                  {group.completionPercentage === 100 ? (
-                    <span className="flex items-center">
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Complete
-                    </span>
-                  ) : isOverdue ? (
-                    <span className="flex items-center">
-                      <AlertCircle className="h-4 w-4 mr-1" />
-                      Overdue
-                    </span>
-                  ) : (
-                    <span className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
-                      In Progress
-                    </span>
-                  )}
-                </Badge>
 
-                {/* PO Hours Input for Completed Projects in RFD Tab */}
+                  {/* File Type Column (Col 4) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                      File Type
+                    </span>
+                    <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold text-gray-900 dark:text-gray-100 leading-none capitalize border-gray-200 dark:border-gray-700 rounded-full">
+                      {group.tasks[0].file_type || '-'}
+                    </Badge>
+                  </div>
+
+                  {/* File Format Column (Col 5) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                      File Format
+                    </span>
+                    <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold text-gray-900 dark:text-gray-100 leading-none border-gray-200 dark:border-gray-700 rounded-full">
+                      {group.tasks[0].file_format ? (
+                        group.tasks[0].file_format === 'ms_excel' ? 'MS Excel' :
+                          group.tasks[0].file_format === 'ms_word' ? 'MS Word' :
+                            group.tasks[0].file_format === 'indesign' ? 'InDesign' :
+                              group.tasks[0].file_format === 'photoshop' ? 'Photoshop' :
+                                group.tasks[0].file_format === 'powerpoint' ? 'PowerPoint' :
+                                  group.tasks[0].file_format === 'illustrator' ? 'Illustrator' :
+                                    group.tasks[0].file_format === 'others' ? (group.tasks[0].custom_file_format || 'Others') :
+                                      group.tasks[0].file_format
+                      ) : '-'}
+                    </Badge>
+                  </div>
+
+                  {/* Due Date Column (Col 6) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                        Due Date
+                      </span>
+                      {isToday && group.completionPercentage < 100 && (
+                        <div className="h-3 w-3 rounded-full bg-orange-500 animate-pulse" title="Due Today" />
+                      )}
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[11px] font-bold text-gray-900 dark:text-gray-100 leading-none whitespace-nowrap">
+                        {deliveryDate && deliveryDate !== "null" && deliveryDate !== "undefined"
+                          ? new Date(deliveryDate).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                          : '-'}
+                      </span>
+                      {deliveryTime && deliveryTime !== "null" && deliveryTime !== "undefined" && (
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium leading-tight mt-0.5">
+                          {deliveryTime}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-4" />
+              )}
+
+              {/* Progress Column (Col 7) */}
+              <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                  Progress
+                </span>
+                <Progress
+                  value={group.completionPercentage}
+                  className="h-1 w-full bg-slate-100 dark:bg-slate-800"
+                />
+              </div>
+
+              {/* Status & PO Hours Column (Col 8) */}
+              <div className="flex items-center justify-center gap-3 min-w-[120px]">
+                <div className="flex flex-col items-center gap-1.5 flex-1">
+                  <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                    Status
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`px-3 py-0.5 text-[9px] font-bold w-[100px] justify-center rounded-full uppercase tracking-wider transition-colors ${group.completionPercentage === 100
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+                      : isOverdue
+                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800"
+                        : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                      }`}
+                  >
+                    {group.completionPercentage === 100 ? "Completed" : isOverdue ? "Overdue" : "In Progress"}
+                  </Badge>
+                </div>
+
+                {/* PO Hours Section */}
                 {activeTab === "RFD" && tasks.filter(t => t.project_id === group.projectId && (!(t.completion_status || t.status === "completed"))).length === 0 && (
-                  <div className="flex items-center gap-2 border-l border-gray-200 dark:border-gray-700 pl-6" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500">PO Hours</span>
-                      <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-700 pl-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] uppercase font-bold text-gray-400 dark:text-gray-500 leading-none">PO Hours</span>
+                      <div className="flex items-center gap-1">
                         <Input
                           type="number"
-                          placeholder="Hours"
-                          className="h-9 w-24 text-sm"
+                          placeholder="Hrs"
+                          className="h-6 w-12 text-[10px] px-1.5"
                           value={editingPoHours[group.projectId] ?? projectNames[group.projectId]?.po_hours ?? ""}
                           onChange={(e) => setEditingPoHours(prev => ({ ...prev, [group.projectId]: e.target.value }))}
                         />
                         <Button
                           size="sm"
-                          className="h-9 px-3"
+                          className="h-6 w-6 p-0"
                           disabled={isUpdatingPo === group.projectId || editingPoHours[group.projectId] === undefined}
                           onClick={() => handleUpdatePoHours(group.projectId)}
                         >
-                          {isUpdatingPo === group.projectId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          {isUpdatingPo === group.projectId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                         </Button>
                       </div>
                     </div>
@@ -660,20 +655,21 @@ export default function DashboardPage() {
             <div>
               {/* Table Header */}
               <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="grid grid-cols-8 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="col-span-2">Task Details</div>
+                  <div className="text-center">Page Count</div>
+                  <div className="text-center">File Type</div>
+                  <div className="text-center">File Format</div>
+                  <div className="text-center col-span-2">Working On</div>
                   <div className="text-center">Status</div>
-                  <div className="text-center">Priority</div>
-                  <div className="text-center">Working On</div>
-                  <div className="text-center">Actions</div>
                 </div>
               </div>
               {/* Task Rows */}
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {group.tasks.map((task, index) => (
+                {group.tasks.map((task, taskIndex) => (
                   <TaskCard
                     taskId={task.task_id}
-                    key={index}
+                    key={taskIndex}
                     title={task.task_name || "Untitled Task"}
                     description={
                       task.client_instruction || "No description available"

@@ -142,24 +142,19 @@ export function TaskCard({
   };
 
   const statusColor = {
-    pending: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-    "in-progress":
-      "bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100",
-    completed:
-      "bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100",
-    overdue: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
-    returned:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50",
-    paused:
-      "bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-100",
+    pending: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800",
+    "in-progress": "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
+    completed: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
+    overdue: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800",
+    returned: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+    paused: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800",
   };
 
   const priorityColor = {
-    low: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-    medium:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-50",
-    high: "bg-orange-100 text-orange-800 dark:bg-orange-600 dark:text-orange-50",
-    critical: "bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100",
+    low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    high: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    critical: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
   };
 
   const handleViewDetails = () => {
@@ -204,58 +199,55 @@ export function TaskCard({
   };
 
   return (
-    <div className="w-full border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+    <div className="w-full border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-150">
       <div className="px-6 py-4">
-        <div className="grid grid-cols-5 gap-4 items-center">
+        <div className="grid grid-cols-8 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-1">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-0.5">
               {title}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
               {description}
             </p>
           </div>
 
-          {/* Status Badge */}
+          {/* Page Count Column */}
           <div className="flex items-center justify-center">
-            <Badge
-              className={`${statusColor[status] || statusColor["pending"]
-                } px-2 py-1 text-xs font-medium`}
-              variant="outline"
-            >
-              <span className="flex items-center">
-                {statusIcon[status] || statusIcon["pending"]}
-                <span className="ml-1 capitalize">{status}</span>
-              </span>
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold border-gray-200 dark:border-gray-700 rounded-full">
+              {pageCount !== null && pageCount !== undefined ? pageCount : '-'}
             </Badge>
           </div>
 
-          {/* Priority Badge */}
+          {/* File Type Column */}
           <div className="flex items-center justify-center">
-            <Badge
-              className={`${priorityColor[priority] || priorityColor["medium"]
-                } px-2 py-1 text-xs font-medium`}
-            >
-              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold capitalize border-gray-200 dark:border-gray-700 rounded-full">
+              {fileType || '-'}
             </Badge>
           </div>
 
-          {/* Currently Working On */}
-          <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
+          {/* File Format Column */}
+          <div className="flex items-center justify-center">
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold border-gray-200 dark:border-gray-700 rounded-full">
+              {formatFileFormat(fileFormat, customFileFormat) || '-'}
+            </Badge>
+          </div>
+
+          {/* Currently Working On (Col 6-7) */}
+          <div className="col-span-2 flex items-center justify-center text-gray-600 dark:text-gray-400">
             {currentWorkers && currentWorkers.length > 0 ? (
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <User className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                 <div className="flex items-center gap-1">
                   {/* Show avatar circles for up to 3 members */}
                   <div className="flex -space-x-2">
                     {currentWorkers.slice(0, 3).map((worker, index) => (
                       <div
                         key={index}
-                        className="w-6 h-6 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center ring-2 ring-white dark:ring-gray-800"
+                        className="w-5 h-5 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-900 flex items-center justify-center ring-2 ring-white dark:ring-gray-800"
                         title={worker.email || worker.name}
                       >
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-200">
+                        <span className="text-[10px] font-medium text-blue-600 dark:text-blue-200">
                           {worker.name?.charAt(0).toUpperCase() || "?"}
                         </span>
                       </div>
@@ -263,87 +255,37 @@ export function TaskCard({
                   </div>
                   {/* Show count if more than 3 members */}
                   {currentWorkers.length > 3 && (
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 ml-1">
+                    <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 ml-1">
                       +{currentWorkers.length - 3}
                     </span>
                   )}
                   {/* Show first name for single member, or count for multiple */}
                   {currentWorkers.length === 1 && (
-                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100 ml-1">
+                    <span className="text-[10px] font-medium text-gray-900 dark:text-gray-100 ml-1">
                       {currentWorkers[0].name}
                     </span>
                   )}
                 </div>
               </div>
             ) : (
-              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
                 Unassigned
               </span>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-gray-700"
-              onClick={handleViewDetails}
+          {/* Status Column (Col 8) */}
+          <div className="flex items-center justify-center">
+            <Badge
+              variant="outline"
+              className={`px-3 py-0.5 text-[9px] font-bold w-[100px] justify-center rounded-full uppercase tracking-wider border transition-colors ${statusColor[status] ||
+                "bg-slate-100 text-slate-800"
+                }`}
             >
-              <ArrowRight className="h-3 w-3 mr-1" />
-              <span className="text-xs">View</span>
-            </Button>
-
-            {isActionableByPM && onSendToQC && (
-              <Button
-                variant="default"
-                size="sm"
-                className="h-7 px-2 bg-green-500 hover:bg-green-600 text-white text-xs"
-                onClick={handleSendToQCClick}
-                disabled={isLoadingAction}
-              >
-                {isLoadingAction ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <Send className="h-3 w-3 mr-1" />
-                )}
-                {isLoadingAction ? "..." : "QC"}
-              </Button>
-            )}
+              {status === 'completed' ? 'Completed' : status}
+            </Badge>
           </div>
         </div>
-
-        {/* File Metadata Section - Only show when showFileMetadata is true */}
-        {showFileMetadata && (fileType || fileFormat || pageCount !== null) && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-4 text-xs">
-              {fileType && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 dark:text-gray-400">File Type:</span>
-                  <Badge variant="outline" className="px-2 py-0.5 text-xs capitalize">
-                    {fileType}
-                  </Badge>
-                </div>
-              )}
-              {fileFormat && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 dark:text-gray-400">Format:</span>
-                  <Badge variant="outline" className="px-2 py-0.5 text-xs">
-                    {formatFileFormat(fileFormat, customFileFormat)}
-                  </Badge>
-                </div>
-              )}
-              {pageCount !== null && pageCount !== undefined && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-500 dark:text-gray-400">Pages:</span>
-                  <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
-                    {pageCount}
-                  </Badge>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
