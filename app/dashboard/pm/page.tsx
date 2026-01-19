@@ -96,12 +96,7 @@ export default function DashboardPage() {
   }>({});
   const [editingPoHours, setEditingPoHours] = useState<{ [key: string]: string }>({});
   const [isUpdatingPo, setIsUpdatingPo] = useState<string | null>(null);
-  const [currentWorkers, setCurrentWorkers] = useState<{
-    [key: string]: {
-      name: string;
-      email?: string;
-    }[];
-  }>({});
+
 
   const _router = useRouter();
 
@@ -154,28 +149,7 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchCurrentWorkers = async (taskIds: string[]) => {
-    try {
-      // Use the new utility function instead of API call
-      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
-      const result = await fetchBatchTaskAssignments(taskIds);
 
-      // Convert to the format expected by the component
-      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
-
-      for (const [taskId, assignments] of Object.entries(result)) {
-        workerMap[taskId] = assignments.map(user => ({
-          name: user.name,
-          email: user.email || undefined,
-        }));
-      }
-
-
-      setCurrentWorkers(workerMap);
-    } catch (error) {
-      console.error("Error fetching current workers:", error);
-    }
-  };
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -249,9 +223,11 @@ export default function DashboardPage() {
           }
         );
 
+        // Set tasks immediately to render the UI
         setTasks(processedTasks);
+        setIsLoading(false);
 
-        // Get unique project IDs and fetch their names
+        // Get unique project IDs and fetch their names (non-blocking)
         const uniqueProjectIds = [
           ...new Set(
             processedTasks.map(
@@ -259,14 +235,12 @@ export default function DashboardPage() {
             )
           ),
         ];
-        await fetchProjectNames(uniqueProjectIds as string[]);
 
-        // Fetch current workers for all tasks
-        await fetchCurrentWorkers(processedTasks.map((task: { task_id: string }) => task.task_id));
+        // Fetch project names without blocking
+        fetchProjectNames(uniqueProjectIds as string[]);
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -702,7 +676,6 @@ export default function DashboardPage() {
                     dueTime={projectNames[task.project_id]?.delivery_time || ""}
                     status={task.status || "pending"}
                     priority={task.priority || "medium"}
-                    currentWorkers={currentWorkers[task.task_id] || []}
                     fileType={task.file_type}
                     fileFormat={task.file_format}
                     customFileFormat={task.custom_file_format}

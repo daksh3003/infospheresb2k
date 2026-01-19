@@ -70,12 +70,7 @@ export default function ProcessorDashboard() {
       delivery_time: string;
     };
   }>({});
-  const [currentWorkers, setCurrentWorkers] = useState<{
-    [key: string]: {
-      name: string;
-      email?: string;
-    }[];
-  }>({});
+
 
   useEffect(() => {
     setMounted(true);
@@ -124,27 +119,6 @@ export default function ProcessorDashboard() {
     }
   };
 
-  const fetchCurrentWorkers = async (taskIds: string[]) => {
-    try {
-      // Use the new utility function instead of individual API calls
-      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
-      const result = await fetchBatchTaskAssignments(taskIds);
-
-      // Convert to the format expected by the component
-      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
-
-      for (const [taskId, assignments] of Object.entries(result)) {
-        workerMap[taskId] = assignments.map(user => ({
-          name: user.name,
-          email: user.email || undefined,
-        }));
-      }
-
-      setCurrentWorkers(workerMap);
-    } catch (error) {
-      console.error("Error fetching current workers:", error);
-    }
-  };
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -194,23 +168,23 @@ export default function ProcessorDashboard() {
             taskId: item.task_id,
           })
         );
-        setTasks(processedTasks);
 
-        // Get unique project IDs and fetch their names and delivery info
+        // Set tasks immediately to render the UI
+        setTasks(processedTasks);
+        setIsLoading(false);
+
+        // Get unique project IDs and fetch their names and delivery info (non-blocking)
         const uniqueProjectIds = [
           ...new Set(processedTasks.map((task) => task.projectId)),
         ];
-        await fetchProjectNames(uniqueProjectIds);
-
-        // Fetch current workers for all tasks
-        await fetchCurrentWorkers(processedTasks.map((task) => task.taskId));
+        fetchProjectNames(uniqueProjectIds);
       } else {
         setTasks([]);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
       setTasks([]);
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -359,7 +333,6 @@ export default function ProcessorDashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.calculatedStatus}
                   priority={task.calculatedPriority}
-                  currentWorkers={currentWorkers[task.taskId] || []}
                 />
               ))
             )}
