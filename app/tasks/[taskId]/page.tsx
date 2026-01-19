@@ -707,11 +707,8 @@ export default function TaskDetailPage() {
 
     let overall_completion_status = false;
 
-    if (
-      (currentStage === "Processor" && sentBy === "QA") ||
-      (currentStage === "QA" && sentBy === "QC") ||
-      (currentStage === "QA" && sentBy === "Processor")
-    ) {
+    // Only mark as overall complete when task reaches Delivery stage
+    if (currentStage === "Delivery") {
       overall_completion_status = true;
     }
 
@@ -849,6 +846,43 @@ export default function TaskDetailPage() {
         position: "top-right",
       });
       return;
+    }
+
+    // If sending to Delivery, update task and project completion status
+    if (next_current_stage === "Delivery") {
+      // Update task completion_status to true
+      const { error: taskUpdateError } = await supabase
+        .from("tasks_test")
+        .update({ completion_status: true })
+        .eq("task_id", taskId);
+
+      if (taskUpdateError) {
+        console.error("Error updating task completion:", taskUpdateError);
+      } else {
+        // Check if all tasks in project are complete
+        const { data: projectTasks, error: projectTasksError } = await supabase
+          .from("tasks_test")
+          .select("completion_status")
+          .eq("project_id", task.project_id);
+
+        if (!projectTasksError && projectTasks) {
+          const isAllTasksCompleted = projectTasks.every(
+            (t) => t.completion_status
+          );
+
+          if (isAllTasksCompleted) {
+            // Update project completion status
+            const { error: projectError } = await supabase
+              .from("projects_test")
+              .update({ completion_status: true })
+              .eq("project_id", task.project_id);
+
+            if (projectError) {
+              console.error("Error updating project:", projectError);
+            }
+          }
+        }
+      }
     }
 
     if (realStatus !== "completed") {
@@ -1546,11 +1580,13 @@ export default function TaskDetailPage() {
 
     if (current_stage.sent_by !== "PM") {
       // Fetch processor files directly from database instead of storage listing
+      // Filter by folder path to show only files from the current iteration
       const { data: processorFiles, error: processorError } = await supabase
         .from("files_test")
         .select("file_name, page_count, file_path")
         .eq("task_id", taskId)
-        .eq("storage_name", storage_name);
+        .eq("storage_name", storage_name)
+        .ilike("file_path", `${folder_path}/%`); // Filter by folder path to get only current iteration files
 
       if (processorError) {
         console.error("Error fetching processor files:", processorError);
@@ -1800,22 +1836,28 @@ export default function TaskDetailPage() {
       }
 
       let storage_name = "";
+      let folder_path_prefix = "";
 
       if (current_stage === "Processor") {
         storage_name = "processor-files";
+        folder_path_prefix = `${sent_by}_${taskId}`;
       } else if (current_stage === "QC") {
         storage_name = "qc-files";
+        folder_path_prefix = taskId;
       } else if (current_stage === "QA") {
         storage_name = "qa-files";
+        folder_path_prefix = taskId;
       }
 
 
       // Fetch uploaded files directly from database instead of storage listing
+      // Filter by folder path to ensure we only get files from the current iteration
       const { data: uploadedFiles, error: uploadedError } = await supabase
         .from("files_test")
         .select("file_name, page_count, file_path")
         .eq("task_id", taskId)
-        .eq("storage_name", storage_name);
+        .eq("storage_name", storage_name)
+        .ilike("file_path", `${folder_path_prefix}/%`); // Filter by folder path prefix
 
       if (uploadedError) {
         console.error("Error fetching uploaded files:", uploadedError);
