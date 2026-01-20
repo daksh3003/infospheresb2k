@@ -566,35 +566,26 @@ export default function DashboardPage() {
                 <div className="col-span-4" />
               )}
 
-              {/* Progress Column (Col 7) */}
-              <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
+              {/* Status Column (Col 7) */}
+              <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                  Progress
+                  Status
                 </span>
-                <Progress
-                  value={group.completionPercentage}
-                  className="h-1 w-full bg-slate-100 dark:bg-slate-800"
-                />
+                <Badge
+                  variant="outline"
+                  className={`px-3 py-0.5 text-[9px] font-bold w-[100px] justify-center rounded-full uppercase tracking-wider transition-colors ${group.completionPercentage === 100
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+                    : isOverdue
+                      ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800"
+                      : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                    }`}
+                >
+                  {group.completionPercentage === 100 ? "Completed" : isOverdue ? "Overdue" : "In Progress"}
+                </Badge>
               </div>
 
-              {/* Status & PO Hours Column (Col 8) */}
+              {/* PO Hours Column (Col 8) */}
               <div className="flex items-center justify-center gap-3 min-w-[120px]">
-                <div className="flex flex-col items-center gap-1.5 flex-1">
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
-                    Status
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className={`px-3 py-0.5 text-[9px] font-bold w-[100px] justify-center rounded-full uppercase tracking-wider transition-colors ${group.completionPercentage === 100
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
-                      : isOverdue
-                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800"
-                        : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
-                      }`}
-                  >
-                    {group.completionPercentage === 100 ? "Completed" : isOverdue ? "Overdue" : "In Progress"}
-                  </Badge>
-                </div>
 
                 {/* PO Hours Section */}
                 {activeTab === "RFD" && tasks.filter(t => t.project_id === group.projectId && (!(t.completion_status || t.status === "completed"))).length === 0 && (
