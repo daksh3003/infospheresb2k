@@ -22,7 +22,7 @@ export async function GET(
 
     const stagesArray = stages.stages;
     const len = stagesArray.length;
-    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number; uploaded_by_name: string, uploaded_by_role : string }[]; completed: boolean; date: string }[] = [];
+    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number; uploaded_by_name: string, uploaded_by_role: string }[]; completed: boolean; date: string }[] = [];
     let cnt_of_processor = 1;
     let latest_processor_folder_path = "";
 
@@ -80,30 +80,40 @@ export async function GET(
         return NextResponse.json({ error: 'Failed to fetch uploaded files' }, { status: 500 });
       }
 
-      // For each file, fetch uploaded_by from files_test
+      // For each file, fetch uploaded_by and original filename from files_test
       const contentWithUploader = await Promise.all(
         uploadedFiles.map(async (file: { name: string }, index: number) => {
-          // Query files_test for this file
+          // Construct the file_path that would have been stored in files_test
+          // The file.name from storage listing is the sanitized storage filename
+          const storagePath = `${folder_path}/${file.name}`;
+
+          // Query files_test for this file using the file_path
           const { data: fileTestData, error: fileTestError } = await supabase
             .from('files_test')
-            .select('uploaded_by')
+            .select('uploaded_by, file_name')
             .eq('task_id', taskId)
-            .eq('file_name', file.name)
+            .eq('file_path', storagePath)
             .maybeSingle();
 
           let uploaderName = null;
           let uploaderRole = null;
-          
-          if (!fileTestError && fileTestData && fileTestData.uploaded_by) {
-            uploaderName = fileTestData.uploaded_by.name || "Unknown";
-            uploaderRole = fileTestData.uploaded_by.role || "Unknown";
+          let originalFileName = file.name; // Default to storage name if no match
+
+          if (!fileTestError && fileTestData) {
+            // Use the original filename from files_test table
+            originalFileName = fileTestData.file_name || file.name;
+
+            if (fileTestData.uploaded_by) {
+              uploaderName = fileTestData.uploaded_by.name || "Unknown";
+              uploaderRole = fileTestData.uploaded_by.role || "Unknown";
+            }
           } else if (fileTestError) {
             // Error fetching file test data - non-critical
           }
 
           // Always return a valid object, never undefined
           return {
-            name: file.name,
+            name: originalFileName, // Use original filename from database
             storage_name,
             folder_path,
             index,
@@ -115,7 +125,7 @@ export async function GET(
 
       // Filter out any potential undefined values (though we shouldn't have any now)
       const validContent = contentWithUploader.filter(item => item !== undefined);
-      
+
       const timelineItem = {
         id: taskId,
         title: current_stage,
