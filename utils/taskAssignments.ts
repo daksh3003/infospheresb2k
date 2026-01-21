@@ -79,19 +79,41 @@ export async function fetchTaskAssignments(
                             user_role?: string;
                             stage?: string;
                             assignment_stage?: string;
+                            assigned_to_user_id?: string;
+                            assigned_to_user_name?: string;
+                            assigned_to_user_email?: string;
+                            assigned_to_user_role?: string;
                         };
-                    }) => ({
-                        user_id: action.user_id,
-                        name: action.metadata?.user_name || action.user_id,
-                        email: action.metadata?.user_email || "",
-                        role: action.metadata?.user_role || "",
-                        action_type: action.action_type,
-                        assigned_at: action.created_at,
-                        stage: action.action_type === "assigned_to"
-                            ? (action.metadata?.assignment_stage || "")
-                            : (action.metadata?.stage || ""),
-                        source: "task_actions",
-                    })
+                    }) => {
+                        // For 'assigned_to' actions, use the assigned_to_user_* fields from metadata
+                        // which represent the person BEING assigned, not the person doing the assigning
+                        const isAssignedToAction = action.action_type === "assigned_to";
+                        const actualUserId = isAssignedToAction
+                            ? (action.metadata?.assigned_to_user_id || action.user_id)
+                            : action.user_id;
+                        const actualUserName = isAssignedToAction
+                            ? (action.metadata?.assigned_to_user_name || action.metadata?.user_name || action.user_id)
+                            : (action.metadata?.user_name || action.user_id);
+                        const actualUserEmail = isAssignedToAction
+                            ? (action.metadata?.assigned_to_user_email || action.metadata?.user_email || "")
+                            : (action.metadata?.user_email || "");
+                        const actualUserRole = isAssignedToAction
+                            ? (action.metadata?.assigned_to_user_role || action.metadata?.user_role || "")
+                            : (action.metadata?.user_role || "");
+
+                        return {
+                            user_id: actualUserId,
+                            name: actualUserName,
+                            email: actualUserEmail,
+                            role: actualUserRole,
+                            action_type: action.action_type,
+                            assigned_at: action.created_at,
+                            stage: action.action_type === "assigned_to"
+                                ? (action.metadata?.assignment_stage || "")
+                                : (action.metadata?.stage || ""),
+                            source: "task_actions",
+                        };
+                    }
                 );
 
             // Filter by current stage if available
