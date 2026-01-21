@@ -6,7 +6,7 @@ import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { fetchBatchTaskAssignments, AssignedUser } from "@/utils/taskAssignments";
 import { toast } from "react-toastify";
 import { api } from "@/utils/api";
 import {
@@ -98,6 +98,7 @@ export default function DashboardPage() {
   const [isUpdatingPo, setIsUpdatingPo] = useState<string | null>(null);
 
 
+  const [workers, setWorkers] = useState<Record<string, AssignedUser[]>>({});
   const _router = useRouter();
 
   useEffect(() => {
@@ -238,6 +239,14 @@ export default function DashboardPage() {
 
         // Fetch project names without blocking
         fetchProjectNames(uniqueProjectIds as string[]);
+
+        // Fetch task assignments (workers) for all tasks
+        const taskIds = processedTasks.map((t: any) => t.task_id);
+        if (taskIds.length > 0) {
+          fetchBatchTaskAssignments(taskIds).then(workersData => {
+            setWorkers(workersData);
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -673,6 +682,7 @@ export default function DashboardPage() {
                     pageCount={task.page_count}
                     showFileMetadata={group.tasks.length > 1}
                     hideViewButton={group.tasks.length === 1}
+                    currentWorkers={workers[task.task_id]?.map(w => ({ name: w.name, email: w.email }))}
                   />
                 ))}
               </div>

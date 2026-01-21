@@ -15,7 +15,7 @@ import {
 import { Search } from "lucide-react";
 
 import LoadingScreen from "@/components/ui/loading-screen";
-import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { fetchBatchTaskAssignments, AssignedUser } from "@/utils/taskAssignments";
 
 interface QCDashboardTask {
   taskId: string;
@@ -68,6 +68,7 @@ export default function QCDashboard() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<QCDashboardTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [workers, setWorkers] = useState<Record<string, AssignedUser[]>>({});
   const [projectNames, setProjectNames] = useState<{
     [key: string]: {
       name: string;
@@ -187,6 +188,14 @@ export default function QCDashboard() {
           ...new Set(processedTasks.map((task) => task.projectId)),
         ];
         fetchProjectNames(uniqueProjectIds);
+
+        // Fetch task assignments (workers) for all tasks
+        const taskIds = processedTasks.map((t: any) => t.taskId);
+        if (taskIds.length > 0) {
+          fetchBatchTaskAssignments(taskIds).then(workersData => {
+            setWorkers(workersData);
+          });
+        }
       } else {
         setTasks([]);
         setIsLoading(false);
@@ -329,6 +338,7 @@ export default function QCDashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.status}
                   priority={task.priority}
+                  currentWorkers={workers[task.taskId]?.map(w => ({ name: w.name, email: w.email }))}
                 />
               ))
             )}

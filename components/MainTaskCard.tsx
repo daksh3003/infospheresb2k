@@ -307,7 +307,7 @@ export const MainTaskCard = ({
                       <ChevronDown className="h-4 w-4 text-gray-500" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuContent align="start" className="w-64">
                     <div className="py-2 px-3 space-y-2">
                       {assignedTo.length === 0 ? (
                         <div className="text-sm text-gray-500">
@@ -315,13 +315,18 @@ export const MainTaskCard = ({
                         </div>
                       ) : (
                         assignedTo.map((user, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                              <span className="text-xs text-gray-600">
+                          <div key={index} className="flex items-center gap-3 py-1">
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                              <span className="text-sm text-gray-600 font-medium">
                                 {user.name?.charAt(0) || "?"}
                               </span>
                             </div>
-                            <span className="text-gray-900">{user.name}</span>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {user.role && `${user.role}`}
+                              </div>
+                            </div>
                           </div>
                         ))
                       )}

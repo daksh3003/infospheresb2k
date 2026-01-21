@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { fetchBatchTaskAssignments, AssignedUser } from "@/utils/taskAssignments";
 import {
   Select,
   SelectContent,
@@ -38,6 +38,7 @@ export default function QADashboard() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<QADashboardTask[]>([]);
+  const [workers, setWorkers] = useState<Record<string, AssignedUser[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [projectNames, setProjectNames] = useState<{
     [key: string]: {
@@ -145,6 +146,14 @@ export default function QADashboard() {
           ),
         ];
         fetchProjectNames(uniqueProjectIds);
+
+        // Fetch task assignments (workers) for all tasks
+        const taskIds = processedTasks.map((t: any) => t.taskId);
+        if (taskIds.length > 0) {
+          fetchBatchTaskAssignments(taskIds).then(workersData => {
+            setWorkers(workersData);
+          });
+        }
       } else {
         setTasks([]);
         setIsLoading(false);
@@ -287,6 +296,7 @@ export default function QADashboard() {
                   dueTime={projectNames[task.projectId]?.delivery_time || ""}
                   status={task.status}
                   priority={task.priority}
+                  currentWorkers={workers[task.taskId]?.map(w => ({ name: w.name, email: w.email }))}
                 />
               ))
             )}
