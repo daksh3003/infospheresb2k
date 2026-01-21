@@ -72,6 +72,11 @@ export async function GET(
         current_stage = "Delivery";
       }
 
+      console.log("folder_path", folder_path);
+      console.log("storage_name", storage_name);
+      console.log("stagesArray", stagesArray);
+      console.log("i : ", i)
+
       // Get files from storage
       const { data: uploadedFiles, error: uploadedFilesError } =
         await supabase.storage.from(storage_name).list(folder_path);
