@@ -101,13 +101,38 @@ export async function POST(request: NextRequest) {
 
       // Create task - normalize task_type (empty string to null) and remove processor_type if it doesn't exist in table
       const { processor_type: _processor_type, ...taskDataWithoutProcessorType } = group.taskData;
+      
+      // Ensure task_name is set - use project_name-{index} if empty
+      const taskName = group.taskData.task_name && group.taskData.task_name.trim() !== ''
+        ? group.taskData.task_name
+        : `${projectData.project_name}-${groupIndex + 1}`;
+      
+      // Fallback to project-level values if task-level values are empty
+      const taskType = group.taskData.task_type && group.taskData.task_type.trim() !== ''
+        ? group.taskData.task_type
+        : (projectData.task_type || null);
+      const fileType = group.taskData.file_type && group.taskData.file_type.trim() !== ''
+        ? group.taskData.file_type
+        : (projectData.file_type || null);
+      const fileFormat = group.taskData.file_format && group.taskData.file_format.trim() !== ''
+        ? group.taskData.file_format
+        : (projectData.file_format || null);
+      const customFileFormat = group.taskData.custom_file_format && group.taskData.custom_file_format.trim() !== ''
+        ? group.taskData.custom_file_format
+        : (projectData.custom_file_format || null);
+      const clientInstruction = group.taskData.client_instruction && group.taskData.client_instruction.trim() !== ''
+        ? group.taskData.client_instruction
+        : (projectData.client_instructions || null);
+      
       const taskDataToInsert = {
         ...taskDataWithoutProcessorType,
         project_id: projectId,
-        // Convert empty string to null for task_type
-        task_type: group.taskData.task_type && group.taskData.task_type.trim() !== ''
-          ? group.taskData.task_type
-          : null,
+        task_name: taskName,
+        task_type: taskType,
+        file_type: fileType,
+        file_format: fileFormat,
+        custom_file_format: customFileFormat,
+        client_instruction: clientInstruction,
       };
 
       const { data: taskResult, error: taskError } = await supabase

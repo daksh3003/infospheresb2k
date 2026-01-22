@@ -45,6 +45,11 @@ interface ProjectFormData {
   delivery_time: string;
   completion_status: boolean;
   created_by: string;
+  task_type: string;
+  file_type: string;
+  file_format: string;
+  custom_file_format: string;
+  client_instructions: string;
 }
 
 interface TaskFormData {
@@ -125,6 +130,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
     delivery_time: "",
     completion_status: false,
     created_by: "",
+    task_type: "",
+    file_type: "",
+    file_format: "",
+    custom_file_format: "",
+    client_instructions: "",
   });
 
   // File upload state
@@ -209,10 +219,32 @@ const TaskModal: React.FC<TaskModalProps> = ({
     >
   ) => {
     const { name, value } = e.target;
-    setProjectData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setProjectData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+      
+      // Update task data if file groups are already initialized
+      if (fileGroups.length > 0 && (name === 'task_type' || name === 'file_type' || name === 'file_format' || name === 'custom_file_format' || name === 'client_instructions' || name === 'project_name')) {
+        setFileGroups((prevGroups) => 
+          prevGroups.map((group, index) => ({
+            ...group,
+            taskData: {
+              ...group.taskData,
+              task_name: name === 'project_name' && value ? `${value}-${index + 1}` : group.taskData.task_name,
+              task_type: name === 'task_type' ? value : group.taskData.task_type,
+              file_type: name === 'file_type' ? value : group.taskData.file_type,
+              file_format: name === 'file_format' ? value : group.taskData.file_format,
+              custom_file_format: name === 'custom_file_format' ? value : group.taskData.custom_file_format,
+              client_instruction: name === 'client_instructions' ? value : group.taskData.client_instruction,
+            },
+          }))
+        );
+      }
+      
+      return updated;
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,6 +267,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
       // Validate project form
       if (!projectData.project_name.trim()) {
         toast.error("Project name is required");
+        return;
+      }
+      if (!projectData.task_type) {
+        toast.error("Task type is required");
+        return;
+      }
+      if (!projectData.file_type) {
+        toast.error("File type is required");
+        return;
+      }
+      if (!projectData.file_format) {
+        toast.error("File format is required");
         return;
       }
       setCurrentStep(2);
@@ -271,8 +315,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       {
         files: selectedFiles,
         taskData: {
-          task_name: "",
-          client_instruction: "",
+          task_name: projectData.project_name ? `${projectData.project_name}-1` : "",
+          client_instruction: projectData.client_instructions || "",
           processor_type: [],
           estimated_hours_ocr: 0,
           estimated_hours_qc: 0,
@@ -280,10 +324,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
-          task_type: "",
-          file_type: "",
-          file_format: "",
-          custom_file_format: "",
+          task_type: projectData.task_type || "",
+          file_type: projectData.file_type || "",
+          file_format: projectData.file_format || "",
+          custom_file_format: projectData.custom_file_format || "",
         },
         filesData: selectedFiles.map((file) => ({
           file_name: file.name,
@@ -296,11 +340,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   const initializeFileGroups = () => {
     // Auto-group: 1 file per group
-    const groups = selectedFiles.map((file) => ({
+    const groups = selectedFiles.map((file, index) => ({
       files: [file],
       taskData: {
-        task_name: "",
-        client_instruction: "",
+        task_name: projectData.project_name ? `${projectData.project_name}-${index + 1}` : "",
+        client_instruction: projectData.client_instructions || "",
         processor_type: [],
         estimated_hours_ocr: 0,
         estimated_hours_qc: 0,
@@ -308,10 +352,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         completion_status: false,
         project_id: "",
         created_by: currentUser?.id || "",
-        task_type: "",
-        file_type: "",
-        file_format: "",
-        custom_file_format: "",
+        task_type: projectData.task_type || "",
+        file_type: projectData.file_type || "",
+        file_format: projectData.file_format || "",
+        custom_file_format: projectData.custom_file_format || "",
       },
       filesData: [
         {
@@ -330,8 +374,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       {
         files: [],
         taskData: {
-          task_name: "",
-          client_instruction: "",
+          task_name: projectData.project_name ? `${projectData.project_name}-${prev.length + 1}` : "",
+          client_instruction: projectData.client_instructions || "",
           processor_type: [],
           estimated_hours_ocr: 0,
           estimated_hours_qc: 0,
@@ -339,10 +383,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
           completion_status: false,
           project_id: "",
           created_by: currentUser?.id || "",
-          task_type: "",
-          file_type: "",
-          file_format: "",
-          custom_file_format: "",
+          task_type: projectData.task_type || "",
+          file_type: projectData.file_type || "",
+          file_format: projectData.file_format || "",
+          custom_file_format: projectData.custom_file_format || "",
         },
         filesData: [],
       },
@@ -604,6 +648,97 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   rows={3}
                   placeholder="Enter mail instructions"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Client Instructions
+                  <Tooltip content="Default client instructions for all tasks in this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <textarea
+                  name="client_instructions"
+                  value={projectData.client_instructions}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                  rows={3}
+                  placeholder="Enter client instructions"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Task Type *
+                  <Tooltip content="Default task type for all tasks in this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <select
+                  name="task_type"
+                  value={projectData.task_type}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Select task type</option>
+                  <option value="dtp">DTP</option>
+                  <option value="ocr_review">OCR Review</option>
+                  <option value="prep">Prep</option>
+                  <option value="image_processing">Image Processing</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  File Format *
+                  <Tooltip content="Default file format for all tasks in this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <select
+                  name="file_format"
+                  value={projectData.file_format}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Select file format</option>
+                  <option value="indesign">InDesign</option>
+                  <option value="ms_excel">MS Excel</option>
+                  <option value="ms_word">MS Word</option>
+                  <option value="photoshop">Photoshop</option>
+                  <option value="powerpoint">PowerPoint</option>
+                  <option value="illustrator">Illustrator</option>
+                  <option value="others">Others</option>
+                </select>
+                {projectData.file_format === "others" && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      name="custom_file_format"
+                      value={projectData.custom_file_format}
+                      onChange={handleProjectChange}
+                      className="w-full p-2 border rounded-md"
+                      placeholder="Please specify the file format"
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  File Type *
+                  <Tooltip content="Default file type for all tasks in this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <select
+                  name="file_type"
+                  value={projectData.file_type}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Select file type</option>
+                  <option value="editable">Editable</option>
+                  <option value="scanned">Scanned</option>
+                  <option value="mixed">Mixed</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
