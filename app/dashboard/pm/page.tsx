@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { ProjectFeedback } from "@/components/ProjectFeedback";
 
 interface ProjectTask {
   id: string;
@@ -675,6 +676,12 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Project Feedback - Shows only for completed projects */}
+          <ProjectFeedback
+            projectId={group.projectId}
+            isCompleted={group.completedCount === group.totalCount && group.totalCount > 0}
+          />
 
           {/* Tasks Section */}
           {expandedProjects.has(group.projectId) && (
