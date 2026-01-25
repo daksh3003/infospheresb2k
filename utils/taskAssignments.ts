@@ -217,7 +217,44 @@ export async function fetchTaskAssignments(
         }
 
         // Combine both sources
-        const allUsers = [...taskActionsUsers, ...filesUsers];
+        let allUsers = [...taskActionsUsers, ...filesUsers];
+
+        console.log(`🔍 Before handover check: ${allUsers.length} total users (${taskActionsUsers.length} from actions, ${filesUsers.length} from files)`);
+
+        // Check if there's a handover action after the last assignment (check AFTER combining sources)
+        const handoverResult = await getTaskActions({
+            task_id: taskId,
+            action_type: "handover",
+        });
+
+        if (handoverResult.success && handoverResult.data && handoverResult.data.length > 0) {
+            // Get the latest handover timestamp
+            const latestHandover = handoverResult.data[0]; // Already sorted by created_at desc
+            const handoverTime = new Date(latestHandover.created_at);
+
+            // Get the latest assignment timestamp from ALL sources
+            const latestAssignmentTime = allUsers.length > 0
+                ? new Date(Math.max(...allUsers.map(u => new Date(u.assigned_at).getTime())))
+                : new Date(0);
+
+            console.log('🔍 Handover check (combined):', {
+                handoverTime: handoverTime.toISOString(),
+                latestAssignmentTime: latestAssignmentTime.toISOString(),
+                willClear: handoverTime > latestAssignmentTime,
+                currentAssignments: allUsers.length
+            });
+
+            // If handover happened after the last assignment, clear ALL assignments
+            if (handoverTime > latestAssignmentTime) {
+                allUsers = [];
+                console.log('✅ Cleared ALL assignments due to handover');
+            } else {
+                // If there was a handover but new assignments after it,
+                // keep only assignments that happened AFTER the handover
+                allUsers = allUsers.filter(u => new Date(u.assigned_at) > handoverTime);
+                console.log(`✅ Filtered to ${allUsers.length} assignments after handover`);
+            }
+        }
 
         // Remove duplicates based on user_id and keep the latest action
         const uniqueAssignedUsers = allUsers.reduce(
@@ -293,18 +330,28 @@ export async function fetchTaskAssignments(
         );
 
         // Filter out the task creator from assigned users (redundant but safe)
-        const finalFilteredUsers = usersWithResolvedNames.filter(
+        let finalFilteredUsers = usersWithResolvedNames.filter(
             (user) => user.user_id !== taskCreatorId && user.user_id !== creatorId
         );
 
+        // Keep only the most recent assignment (latest person working on the task)
+        if (finalFilteredUsers.length > 1) {
+            const mostRecent = finalFilteredUsers.reduce((latest, current) => {
+                return new Date(current.assigned_at) > new Date(latest.assigned_at) ? current : latest;
+            });
+            finalFilteredUsers = [mostRecent];
+        }
+
         // Return simplified format
-        return finalFilteredUsers.map((user) => ({
+        const result = finalFilteredUsers.map((user) => ({
             user_id: user.user_id,
             name: user.name,
             email: user.email,
             role: user.role,
             action_type: user.action_type,
         }));
+
+        return result;
     } catch (error) {
         console.error("Error fetching task assignments:", error);
         return [];
@@ -313,20 +360,30 @@ export async function fetchTaskAssignments(
 
 /**
  * Batch fetch assigned users for multiple tasks
- * Uses the same logic as fetchTaskAssignments but optimized for multiple tasks
+ * Uses optimized batch endpoint instead of individual calls
  */
 export async function fetchBatchTaskAssignments(
     taskIds: string[]
 ): Promise<Record<string, AssignedUser[]>> {
-    const results: Record<string, AssignedUser[]> = {};
+    try {
+        // Use the batch endpoint for efficiency
+        const response = await fetch('/api/batch-task-assignments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ taskIds }),
+        });
 
-    // Fetch assignments for each task
-    await Promise.all(
-        taskIds.map(async (taskId) => {
-            const assignments = await fetchTaskAssignments(taskId);
-            results[taskId] = assignments;
-        })
-    );
+        if (!response.ok) {
+            console.error('Batch task assignments request failed:', response.statusText);
+            return {};
+        }
 
-    return results;
+        const results = await response.json();
+        return results;
+    } catch (error) {
+        console.error('Error in fetchBatchTaskAssignments:', error);
+        return {};
+    }
 }
