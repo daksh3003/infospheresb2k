@@ -11,15 +11,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    
+
     // Validate required fields
     const { user_id, task_id, action_type, metadata } = body;
-    
+
     if (!user_id || !task_id || !action_type) {
       return NextResponse.json(
-        { 
-          error: "Missing required fields", 
-          details: "user_id, task_id, and action_type are required" 
+        {
+          error: "Missing required fields",
+          details: "user_id, task_id, and action_type are required"
         },
         { status: 400 }
       );
@@ -27,15 +27,15 @@ export async function POST(request: NextRequest) {
 
     // Validate action_type against allowed values
     const allowedActions = [
-      'start', 'pause', 'resume', 'complete', 
-      'send_to', 'download', 'upload', 'taken_by', 'assigned_to'
+      'start', 'pause', 'resume', 'complete',
+      'send_to', 'download', 'upload', 'taken_by', 'assigned_to', 'handover'
     ];
-    
+
     if (!allowedActions.includes(action_type)) {
       return NextResponse.json(
-        { 
-          error: "Invalid action_type", 
-          details: `action_type must be one of: ${allowedActions.join(', ')}` 
+        {
+          error: "Invalid action_type",
+          details: `action_type must be one of: ${allowedActions.join(', ')}`
         },
         { status: 400 }
       );
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { 
+        {
           error: "Failed to log task action"
         },
         { status: 500 }
@@ -66,17 +66,17 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: true, 
+      {
+        success: true,
         data,
-        message: "Task action logged successfully" 
+        message: "Task action logged successfully"
       },
       { status: 201 }
     );
 
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: "Internal server error"
       },
       { status: 500 }
@@ -111,11 +111,11 @@ export async function GET(request: NextRequest) {
     if (taskId) {
       query = query.eq('task_id', taskId);
     }
-    
+
     if (userId) {
       query = query.eq('user_id', userId);
     }
-    
+
     if (actionType) {
       // Support comma-separated action types
       const actionTypes = actionType.split(',').map(type => type.trim());
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { 
+        {
           error: "Failed to fetch task actions"
         },
         { status: 500 }
@@ -138,17 +138,17 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: true, 
+      {
+        success: true,
         data,
-        count: data.length 
+        count: data.length
       },
       { status: 200 }
     );
 
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: "Internal server error"
       },
       { status: 500 }

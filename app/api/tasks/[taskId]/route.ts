@@ -101,6 +101,18 @@ export async function GET(
       // Error fetching users - non-critical
     }
 
+    // Get the latest handover action to show who handed it over
+    const { data: latestHandover } = await supabase
+      .from('task_actions')
+      .select('metadata')
+      .eq('task_id', taskId)
+      .eq('action_type', 'handover')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const last_handover_by = latestHandover?.metadata?.user_name || null;
+
     return NextResponse.json({
       task: response,
       projectTasks: projectTasks || [],
@@ -108,6 +120,7 @@ export async function GET(
       stages: stages || [],
       assignedUsers: assignedData?.assigned_to || [],
       availableUsers: users || [],
+      lastHandoverBy: last_handover_by,
     });
 
   } catch (error: unknown) {
@@ -141,13 +154,15 @@ export async function POST(
     }
 
     // Check if user can modify this task
-    const canModify = await AuthorizationService.canModifyTask(authenticatedUser.id, taskId);
-    if (!canModify) {
-
-      return NextResponse.json(
-        { error: 'You do not have permission to modify this task' },
-        { status: 403 }
-      );
+    // Relaxed for handover and pickup as per user requirement
+    if (action !== 'handover' && action !== 'pickup') {
+      const canModify = await AuthorizationService.canModifyTask(authenticatedUser.id, taskId);
+      if (!canModify) {
+        return NextResponse.json(
+          { error: 'You do not have permission to modify this task' },
+          { status: 403 }
+        );
+      }
     }
 
     switch (action) {
@@ -155,6 +170,8 @@ export async function POST(
         return await handleTaskAssignment(taskId, data);
       case 'pickup':
         return await handleTaskPickup(taskId, authenticatedUser);
+      case 'handover':
+        return await handleTaskHandover(taskId);
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -219,7 +236,16 @@ async function handleTaskAssignment(taskId: string, selectedUserData: { id: stri
       throw updateError;
     }
 
+    // Reset task status to pending so the assigned user has to start the task
+    const { error: statusError } = await supabase
+      .from("task_iterations")
+      .update({ status: "pending" })
+      .eq("task_id", taskId);
 
+    if (statusError) {
+      console.error('❌ Error resetting task status:', statusError);
+      throw statusError;
+    }
 
     return NextResponse.json({ message: 'Task assigned successfully' });
 
@@ -274,6 +300,17 @@ async function handleTaskPickup(taskId: string, authenticatedUser: {
       if (updateError) {
         throw updateError;
       }
+
+      // Reset task status to pending so the user has to start the task
+      const { error: statusError } = await supabase
+        .from("task_iterations")
+        .update({ status: "pending" })
+        .eq("task_id", taskId);
+
+      if (statusError) {
+        console.error('❌ Error resetting task status:', statusError);
+        throw statusError;
+      }
     } else {
       // Insert new record
       const { error: insertError } = await supabase
@@ -290,6 +327,43 @@ async function handleTaskPickup(taskId: string, authenticatedUser: {
   } catch (error: unknown) {
     return NextResponse.json(
       { error: 'Failed to pick up task' },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleTaskHandover(taskId: string) {
+  try {
+    const supabase = await createClient();
+
+    // Clear assigned_to in files_test for this task to make it unassigned
+    const { error: updateError } = await supabase
+      .from("files_test")
+      .update({ assigned_to: [] })
+      .eq("task_id", taskId);
+
+    if (updateError) {
+      console.error('❌ Error in handleTaskHandover (files_test):', updateError);
+      throw updateError;
+    }
+
+    // Reset task status to pending so the next person has to start fresh
+    const { error: statusError } = await supabase
+      .from("task_iterations")
+      .update({ status: "pending" })
+      .eq("task_id", taskId);
+
+    if (statusError) {
+      console.error('❌ Error resetting task status:', statusError);
+      throw statusError;
+    }
+
+    return NextResponse.json({ message: 'Task handed over successfully' });
+
+  } catch (error: unknown) {
+    console.error('❌ handleTaskHandover error:', error);
+    return NextResponse.json(
+      { error: 'Failed to handover task' },
       { status: 500 }
     );
   }
