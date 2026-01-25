@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { authManager, type AuthUser } from "@/utils/auth";
-import { toast } from "react-toastify";
+import { createClient } from "@/lib/client";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // Function to fetch user role from Supabase directly (no API call)
     const fetchUserRole = async (userId: string) => {
       try {
-        const supabase = (await import('@/lib/client')).createClient();
+        const supabase = await createClient();
         const { data, error } = await supabase
           .from('profiles')
           .select('role')
