@@ -70,23 +70,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // Check current auth status on mount
     authManager.checkAuthStatus();
 
-    // Function to fetch user role from API
+    // Function to fetch user role from Supabase directly (no API call)
     const fetchUserRole = async (userId: string) => {
       try {
-        const response = await fetch(`/api/auth/user/role?userId=${userId}`);
+        const supabase = (await import('@/lib/client')).createClient();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single();
 
-        if (!response.ok) {
-          // console.error('Failed to fetch user role:', response.statusText);
-          // toast.error("Invalid login credentials. Please try again.");
-          toast("Invalid login credentials", {
-            type: "error",
-            position: "top-right",
-          });
+        if (error) {
+          console.error('Error fetching user role:', error);
           return null;
         }
 
-        const data = await response.json();
-        return data.role || null;
+        return data?.role || null;
       } catch (error) {
         console.error("Error in fetchUserRole:", error);
         return null;
