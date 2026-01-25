@@ -34,7 +34,7 @@ export const FooterButtons = ({
   handlePauseResumeTask,
   handleSendTo,
   showSubmitToButton,
-  // setShowHandoverDialog,
+  setShowHandoverDialog,
   setShowCompleteDialog,
   status,
   SubmitTo,
@@ -50,7 +50,7 @@ export const FooterButtons = ({
   handlePauseResumeTask: () => void;
   handleSendTo: () => void;
   showSubmitToButton: boolean;
-  // setShowHandoverDialog: (value: boolean) => void;
+  setShowHandoverDialog: (value: boolean) => void;
   setShowCompleteDialog: (value: boolean) => void;
   status: string;
   SubmitTo: string;
@@ -262,6 +262,11 @@ export const FooterButtons = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  // Check if assigned to current user
+  const isAssignedToCurrentUser = _assignedTo.some(
+    (user) => user.user_id === currentUser?.id
+  );
+
   return (
     <>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
@@ -279,7 +284,10 @@ export const FooterButtons = ({
                   availableUsers.map((user) => (
                     <DropdownMenuItem
                       key={user.id}
-                      onClick={() => onAssignTask(user)}
+                      onClick={async () => {
+                        await onAssignTask(user);
+                        window.location.reload();
+                      }}
                       className="cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
@@ -315,7 +323,7 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {realStatus === "pending" && (
+          {realStatus === "pending" && isAssignedToCurrentUser && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               onClick={async () => {
@@ -333,12 +341,14 @@ export const FooterButtons = ({
             onStatusUpdate?.(); // Notify parent component
           })}
 
-          {/* <button
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-            onClick={() => setShowHandoverDialog(true)}
-          >
-            <Share2 className="h-4 w-4" /> Handover
-          </button> */}
+          {realStatus !== "completed" && hasAssignedUsers && (
+            <button
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              onClick={() => setShowHandoverDialog(true)}
+            >
+              <ArrowBigUpDashIcon className="h-4 w-4 rotate-180" /> Handover
+            </button>
+          )}
 
           {realStatus !== "completed" && (
             <button
