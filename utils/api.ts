@@ -156,6 +156,32 @@ export const api = {
     return response.json();
   },
 
+  handoverTask: async (taskId: string) => {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'handover' }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to handover task');
+    }
+
+    return response.json();
+  },
+
+  getHandoverQueue: async () => {
+    const response = await fetch('/api/tasks/handover-queue');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch handover queue');
+    }
+    return response.json();
+  },
+
   // Project operations
   createProject: async (projectData: any, fileGroups: any[], selectedFiles: any[], currentUser: any, files?: { [key: string]: File }) => {
     const formData = new FormData();

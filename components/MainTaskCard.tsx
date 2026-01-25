@@ -65,6 +65,7 @@ export const MainTaskCard = ({
   progress,
   onAssignTask: _onAssignTask,
   assignmentRefreshTrigger,
+  lastHandoverBy,
 }: {
   task: Task;
   status: string;
@@ -76,6 +77,7 @@ export const MainTaskCard = ({
     role: string;
   }) => void;
   assignmentRefreshTrigger?: number;
+  lastHandoverBy?: string | null;
 }) => {
   const [assignedTo, setAssignedTo] = useState<
     {
@@ -190,6 +192,25 @@ export const MainTaskCard = ({
           </div>
         </div>
       </div>
+
+      {/* Handover Notice Banner */}
+      {assignedTo.length === 0 && lastHandoverBy && (
+        <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900">
+                This task was handed over by <span className="font-semibold">{lastHandoverBy}</span>
+              </p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Task is currently unassigned and available for pickup or reassignment
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-6 pb-6">
         <div className="mb-8">
@@ -310,8 +331,15 @@ export const MainTaskCard = ({
                   <DropdownMenuContent align="start" className="w-64">
                     <div className="py-2 px-3 space-y-2">
                       {assignedTo.length === 0 ? (
-                        <div className="text-sm text-gray-500">
-                          No assignments yet
+                        <div className="flex flex-col gap-1">
+                          <div className="text-sm text-gray-500 font-medium italic">
+                            Unassigned
+                          </div>
+                          {lastHandoverBy && (
+                            <div className="text-xs text-blue-600 font-medium">
+                              Handed over by {lastHandoverBy}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         assignedTo.map((user, index) => (
