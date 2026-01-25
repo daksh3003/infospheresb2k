@@ -48,6 +48,7 @@ interface TaskCardProps {
   pageCount?: number | null; // Optional: Page count
   showFileMetadata?: boolean; // Optional: Whether to show file metadata
   hideViewButton?: boolean; // Optional: Whether to hide the view button
+  disableStatusFetch?: boolean; // Optional: Disable internal status fetching (for lists)
 }
 
 export function TaskCard({
@@ -69,6 +70,7 @@ export function TaskCard({
   pageCount,
   showFileMetadata = false,
   hideViewButton = false,
+  disableStatusFetch = false,
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -117,10 +119,10 @@ export function TaskCard({
       }
     };
 
-    if (taskId) {
+    if (taskId && !disableStatusFetch) {
       fetchRealStatus();
     }
-  }, [taskId, propStatus]);
+  }, [taskId, propStatus, disableStatusFetch]);
 
   // Sync realStatus with propStatus when it changes
   useEffect(() => {
