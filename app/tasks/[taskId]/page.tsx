@@ -145,6 +145,7 @@ export default function TaskDetailPage() {
 
   // Dialog states :
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
+  const [isHandingOver, setIsHandingOver] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showSubmitToButton, setShowSubmitToButton] = useState(false);
   const [SubmitTo, setSubmitTo] = useState("QC");
@@ -210,6 +211,7 @@ export default function TaskDetailPage() {
     useState<UserProfile | null>(null);
   const [_isAssigning, _setIsAssigning] = useState(false);
   const [_isTaskPickedUp, _setIsTaskPickedUp] = useState(false);
+  const [lastHandoverBy, setLastHandoverBy] = useState<string | null>(null);
 
   // Refresh triggers
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
@@ -493,7 +495,8 @@ export default function TaskDetailPage() {
       | "download"
       | "upload"
       | "taken_by"
-      | "assigned_to",
+      | "assigned_to"
+      | "handover",
     additionalMetadata?: Record<string, unknown>
   ) => {
     if (!currentUser || !taskId) return;
@@ -768,6 +771,42 @@ export default function TaskDetailPage() {
       setShowCompleteDialog(false);
     } catch (error) {
       console.error("Error completing task:", error);
+    }
+  };
+
+  const handleHandoverTask = async () => {
+    console.log("Handover task");
+    if (!taskId || !currentUser) return;
+    console.log("Handover procedure started for task:", taskId);
+    // Show initial feedback
+    toast.info("Handover initiated...");
+    setIsHandingOver(true);
+
+    try {
+      console.log("Logging handover action...");
+      // Log the handover action
+      await logTaskActionHelper("handover", {
+        previous_status: realStatus,
+        handover_stage: currentStage,
+      });
+
+      console.log("Calling handover API...");
+      // Call API to handover task
+      await api.handoverTask(taskId);
+
+      console.log("Handover API successful!");
+      toast.success("Task handed over successfully!");
+      setShowHandoverDialog(false);
+
+      // Redirect to dashboard after a delay
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error handing over task:", error);
+      toast.error(`Handover failed: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsHandingOver(false);
     }
   };
 
@@ -1759,6 +1798,7 @@ export default function TaskDetailPage() {
   // Modified fetchData to handle loading state
   const fetchData = async () => {
     try {
+      // Fetch task iteration data
       const { data, error } = await supabase
         .from("task_iterations")
         .select("sent_by, current_stage, assigned_to_processor_user_id")
@@ -1769,6 +1809,23 @@ export default function TaskDetailPage() {
         console.error("Error fetching 'sent_by' data:", error);
         return;
       }
+
+      // Fetch the absolutely latest action to see if it was a handover
+      // This prevents showing stale handover messages if other actions (like completion) happened after
+      const { data: latestAction } = await supabase
+        .from('task_actions')
+        .select('action_type, metadata')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Only show banner if the LAST thing that happened was a handover
+      const handoverBy = latestAction?.action_type === 'handover'
+        ? latestAction?.metadata?.user_name
+        : null;
+
+      setLastHandoverBy(handoverBy);
 
       setSentBy(data?.sent_by);
       setCurrentStage(data?.current_stage);
@@ -2173,6 +2230,7 @@ export default function TaskDetailPage() {
           progress={progress}
           onAssignTask={handleAssignTask}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
+          lastHandoverBy={lastHandoverBy}
         />
 
         {/* Footer with buttons */}
@@ -2191,8 +2249,19 @@ export default function TaskDetailPage() {
           onAssignTask={handleAssignTask}
           onStatusUpdate={fetchRealStatus}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
+          setShowHandoverDialog={setShowHandoverDialog}
         />
       </div>
+
+      {/* Handover Dialog */}
+      <Dialog
+        isOpen={showHandoverDialog}
+        onClose={() => setShowHandoverDialog(false)}
+        title="Handover this task?"
+        description="Are you sure you want to hand over this task? This will remove your assignment and make the task available in the handover queue for others to pick up or for the PM to re-assign."
+        confirmText="Confirm Handover"
+        onConfirm={handleHandoverTask}
+      />
 
       {/* Download History */}
       <DownloadHistory
@@ -2265,16 +2334,6 @@ export default function TaskDetailPage() {
       }
 
       {activeTab === "comments" && <Comments taskId={taskId} />}
-
-      {/* Handover Dialog */}
-      <Dialog
-        isOpen={showHandoverDialog}
-        onClose={() => setShowHandoverDialog(false)}
-        title="Hand over this task?"
-        description="This will transfer ownership of the task to another team member."
-        confirmText="Continue"
-        onConfirm={() => { }}
-      />
 
       {/* Complete Task Dialog */}
       <Dialog
