@@ -31,6 +31,7 @@ import {
   CircleDashed,
   Loader2,
   Save,
+  Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TaskModal from "@/components/taskModal";
@@ -62,6 +63,7 @@ interface ProjectTask {
   file_format?: string;
   custom_file_format?: string;
   page_count?: number | null;
+  latest_action?: string | null;
 }
 
 interface ProjectGroup {
@@ -96,6 +98,8 @@ export default function DashboardPage() {
   }>({});
   const [editingPoHours, setEditingPoHours] = useState<{ [key: string]: string }>({});
   const [isUpdatingPo, setIsUpdatingPo] = useState<string | null>(null);
+  const [handoverTasks, setHandoverTasks] = useState<ProjectTask[]>([]);
+  const [isHandoverLoading, setIsHandoverLoading] = useState(false);
 
 
   const [workers, setWorkers] = useState<Record<string, AssignedUser[]>>({});
@@ -220,6 +224,7 @@ export default function DashboardPage() {
               type: getTaskType(task.process_type),
               current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
               page_count: pageCountMap[task.task_id] || null, // Add page count
+              latest_action: (task as any).latest_action || null,
             };
           }
         );
@@ -251,6 +256,28 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Error fetching tasks:", error);
       setIsLoading(false);
+    }
+  }, []);
+
+  const fetchHandoverTasks = useCallback(async () => {
+    setIsHandoverLoading(true);
+    try {
+      const projectsData = await api.getHandoverQueue();
+
+      const processedTasks = projectsData.map((task: any) => ({
+        ...task,
+        id: (task.id || task.task_id).toString(),
+        status: calculateStatus(task.delivery_date, task.completion_status),
+        priority: calculatePriority(task.delivery_date, task.po_hours),
+        type: getTaskType(task.process_type),
+        current_stage: "Handover",
+      }));
+
+      setHandoverTasks(processedTasks);
+    } catch (error) {
+      console.error("Error fetching handover tasks:", error);
+    } finally {
+      setIsHandoverLoading(false);
     }
   }, []);
 
@@ -337,7 +364,9 @@ export default function DashboardPage() {
       const isCompleted = task.completion_status || task.status === "completed";
       const matchesCompletion = includeCompleted ? true : !isCompleted;
 
-      return matchesSearch && matchesPriority && matchesStage && matchesCompletion;
+      const isHandedOver = task.latest_action === 'handover';
+
+      return matchesSearch && matchesPriority && matchesStage && matchesCompletion && !isHandedOver;
     });
   };
 
@@ -683,6 +712,7 @@ export default function DashboardPage() {
                     showFileMetadata={group.tasks.length > 1}
                     hideViewButton={group.tasks.length === 1}
                     currentWorkers={workers[task.task_id]?.map(w => ({ name: w.name, email: w.email }))}
+                    disableStatusFetch={true}
                   />
                 ))}
               </div>
@@ -843,6 +873,10 @@ export default function DashboardPage() {
             <CheckCircle2 className="h-4 w-4 mr-2" />
             RFD (Ready for Delivery)
           </TabsTrigger>
+          <TabsTrigger value="Handover" onClick={fetchHandoverTasks}>
+            <Inbox className="h-4 w-4 mr-2" />
+            Handover Queue
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
@@ -940,6 +974,22 @@ export default function DashboardPage() {
                 renderGroupedTasks(
                   getBaseFilteredTasks(true).filter((task) => task.completion_status || task.status === "completed")
                 )
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="Handover" className="mt-6">
+          {isHandoverLoading ? (
+            <LoadingScreen variant="inline" message="Loading handover queue..." />
+          ) : (
+            <div className="space-y-4">
+              {handoverTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Handover queue is empty.</p>
+                </div>
+              ) : (
+                renderGroupedTasks(handoverTasks)
               )}
             </div>
           )}
