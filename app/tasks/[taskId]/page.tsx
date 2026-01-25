@@ -2231,6 +2231,8 @@ export default function TaskDetailPage() {
           onAssignTask={handleAssignTask}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
           lastHandoverBy={lastHandoverBy}
+          onTaskUpdate={fetchProcessorFiles}
+          currentUser={currentUser}
         />
 
         {/* Footer with buttons */}

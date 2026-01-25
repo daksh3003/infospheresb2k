@@ -172,6 +172,8 @@ export async function POST(
         return await handleTaskPickup(taskId, authenticatedUser);
       case 'handover':
         return await handleTaskHandover(taskId);
+      case 'update':
+        return await handleTaskUpdate(taskId, data, authenticatedUser);
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -184,6 +186,70 @@ export async function POST(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+async function handleTaskUpdate(taskId: string, updateData: any, authenticatedUser: any) {
+  try {
+    const supabase = await createClient();
+
+    // Only allow PM role to update task details
+    if (authenticatedUser.role !== 'projectManager') {
+      return NextResponse.json({ error: 'Only PMs can update task details' }, { status: 403 });
+    }
+
+    // Fetch the task to get project_id
+    const { data: task, error: fetchError } = await supabase
+      .from('tasks_test')
+      .select('project_id')
+      .eq('task_id', taskId)
+      .single();
+
+    if (fetchError || !task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Separate updates for tasks_test and projects_test
+    const taskUpdates: any = {};
+    if (updateData.task_name !== undefined) taskUpdates.task_name = updateData.task_name;
+    if (updateData.client_instruction !== undefined) taskUpdates.client_instruction = updateData.client_instruction;
+    if (updateData.estimated_hours_ocr !== undefined) taskUpdates.estimated_hours_ocr = updateData.estimated_hours_ocr;
+    if (updateData.estimated_hours_qc !== undefined) taskUpdates.estimated_hours_qc = updateData.estimated_hours_qc;
+    if (updateData.estimated_hours_qa !== undefined) taskUpdates.estimated_hours_qa = updateData.estimated_hours_qa;
+    if (updateData.file_type !== undefined) taskUpdates.file_type = updateData.file_type;
+    if (updateData.file_format !== undefined) taskUpdates.file_format = updateData.file_format;
+    if (updateData.custom_file_format !== undefined) taskUpdates.custom_file_format = updateData.custom_file_format;
+
+    const projectUpdates: any = {};
+    if (updateData.po_hours !== undefined) projectUpdates.po_hours = updateData.po_hours;
+    if (updateData.mail_instruction !== undefined) projectUpdates.mail_instruction = updateData.mail_instruction;
+    if (updateData.delivery_date !== undefined) projectUpdates.delivery_date = updateData.delivery_date;
+    if (updateData.delivery_time !== undefined) projectUpdates.delivery_time = updateData.delivery_time;
+
+    // Update tasks_test
+    if (Object.keys(taskUpdates).length > 0) {
+      const { error: taskError } = await supabase
+        .from('tasks_test')
+        .update(taskUpdates)
+        .eq('task_id', taskId);
+
+      if (taskError) throw taskError;
+    }
+
+    // Update projects_test
+    if (Object.keys(projectUpdates).length > 0 && task.project_id) {
+      const { error: projectError } = await supabase
+        .from('projects_test')
+        .update(projectUpdates)
+        .eq('project_id', task.project_id);
+
+      if (projectError) throw projectError;
+    }
+
+    return NextResponse.json({ success: true, message: 'Task updated successfully' });
+  } catch (error: any) {
+    console.error('Error updating task:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update task' }, { status: 500 });
   }
 }
 

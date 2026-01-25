@@ -1,4 +1,4 @@
-import { Calendar, Clock, ChevronDown } from "lucide-react";
+import { Calendar, Clock, ChevronDown, Edit2, Loader2 } from "lucide-react";
 import React from "react";
 import { getPriorityBadge } from "./task/priority";
 import { getStatusBadge } from "./task/status";
@@ -11,6 +11,25 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { toast } from "react-toastify";
+import { Button } from "./ui/button";
 
 // Updated Task interface to match the one from page.tsx
 interface Task {
@@ -59,6 +78,13 @@ interface Task {
   overall_completion_status: boolean;
 }
 
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export const MainTaskCard = ({
   task,
   status,
@@ -66,6 +92,8 @@ export const MainTaskCard = ({
   onAssignTask: _onAssignTask,
   assignmentRefreshTrigger,
   lastHandoverBy,
+  onTaskUpdate,
+  currentUser,
 }: {
   task: Task;
   status: string;
@@ -78,6 +106,8 @@ export const MainTaskCard = ({
   }) => void;
   assignmentRefreshTrigger?: number;
   lastHandoverBy?: string | null;
+  onTaskUpdate?: () => void;
+  currentUser?: UserProfile | null;
 }) => {
   const [assignedTo, setAssignedTo] = useState<
     {
@@ -90,6 +120,24 @@ export const MainTaskCard = ({
   >([]);
   const [realStatus, setRealStatus] = useState<string>(status);
   const [statusLoading, _setStatusLoading] = useState(false);
+
+  // Edit State
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editData, setEditData] = useState({
+    task_name: task.task_name || task.title || "",
+    client_instruction: task.client_instruction || "",
+    mail_instruction: task.mail_instruction || "",
+    po_hours: task.po_hours || 0,
+    file_type: task.file_type || "",
+    file_format: task.file_format || "",
+    custom_file_format: task.custom_file_format || "",
+    estimated_hours_ocr: task.estimated_hours_ocr || 0,
+    estimated_hours_qc: task.estimated_hours_qc || 0,
+    estimated_hours_qa: task.estimated_hours_qa || 0,
+    delivery_date: task.delivery_date || task.dueDate || "",
+    delivery_time: task.delivery_time || task.deliveryTime || "",
+  });
 
   const supabase = createClient();
 
@@ -107,6 +155,54 @@ export const MainTaskCard = ({
   useEffect(() => {
     setRealStatus(status);
   }, [status]);
+
+  // Sync editData with task prop when it changes
+  useEffect(() => {
+    setEditData({
+      task_name: task.task_name || task.title || "",
+      client_instruction: task.client_instruction || "",
+      mail_instruction: task.mail_instruction || "",
+      po_hours: task.po_hours || 0,
+      file_type: task.file_type || "",
+      file_format: task.file_format || "",
+      custom_file_format: task.custom_file_format || "",
+      estimated_hours_ocr: task.estimated_hours_ocr || 0,
+      estimated_hours_qc: task.estimated_hours_qc || 0,
+      estimated_hours_qa: task.estimated_hours_qa || 0,
+      delivery_date: task.delivery_date || task.dueDate || "",
+      delivery_time: task.delivery_time || task.deliveryTime || "",
+    });
+  }, [task]);
+
+  const handleSaveEdit = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.task_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          data: editData
+        })
+      });
+
+      if (response.ok) {
+        toast.success("Task updated successfully");
+        setIsEditDialogOpen(false);
+        if (onTaskUpdate) {
+          onTaskUpdate();
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update task");
+      }
+    } catch (error) {
+      console.error("Error saving task:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -183,6 +279,17 @@ export const MainTaskCard = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {currentUser?.role === 'projectManager' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditDialogOpen(true)}
+                className="h-8 px-2 text-slate-600 hover:text-slate-900"
+              >
+                <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                Edit Details
+              </Button>
+            )}
             {statusLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
             ) : (
@@ -247,15 +354,6 @@ export const MainTaskCard = ({
                 {task.mail_instruction || "No mail instructions provided"}
               </p>
             </div>
-
-            {/* <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">
-                Processor Type
-              </h3>
-              <p className="text-gray-900">
-                {task.processor_type || "Not specified"}
-              </p>
-            </div> */}
 
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">
@@ -429,11 +527,9 @@ export const MainTaskCard = ({
                   Due Date
                 </h3>
                 <div className="flex items-center gap-2">
-                  <Calendar className={`h-4 w-4 ${isTaskDueToday ? "text-orange-500" : "text-gray-500"
-                    }`} />
+                  <Calendar className={`h-4 w-4 ${isTaskDueToday ? "text-orange-500" : "text-gray-500"}`} />
                   <div className="flex flex-col gap-1">
-                    <span className={`text-gray-900 ${isTaskDueToday ? "font-semibold text-orange-600" : ""
-                      }`}>
+                    <span className={`text-gray-900 ${isTaskDueToday ? "font-semibold text-orange-600" : ""}`}>
                       {formatDate(task.delivery_date || task.dueDate)}
                     </span>
                     {isTaskDueToday && (
@@ -475,15 +571,6 @@ export const MainTaskCard = ({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">
-                  Task Status
-                </h3>
-                <p className="text-gray-900">
-                  {task.completion_status ? "Completed" : "In Progress"}
-                </p>
-              </div> */}
-
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">
                   Overall Status
@@ -514,6 +601,162 @@ export const MainTaskCard = ({
           </div>
         </div>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Task Details</DialogTitle>
+            <DialogDescription>
+              Make changes to task information here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Task Name</label>
+                <Input
+                  value={editData.task_name}
+                  onChange={(e) => setEditData({ ...editData, task_name: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">File Type</label>
+                <Select
+                  value={editData.file_type}
+                  onValueChange={(val) => setEditData({ ...editData, file_type: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select file type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="editable">Editable</SelectItem>
+                    <SelectItem value="non_editable">Non-Editable</SelectItem>
+                    <SelectItem value="others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">File Format</label>
+                <Select
+                  value={editData.file_format}
+                  onValueChange={(val) => setEditData({ ...editData, file_format: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select file format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ms_excel">MS Excel</SelectItem>
+                    <SelectItem value="ms_word">MS Word</SelectItem>
+                    <SelectItem value="indesign">InDesign</SelectItem>
+                    <SelectItem value="photoshop">Photoshop</SelectItem>
+                    <SelectItem value="powerpoint">PowerPoint</SelectItem>
+                    <SelectItem value="illustrator">Illustrator</SelectItem>
+                    <SelectItem value="others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editData.file_format === 'others' && (
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Specify Format</label>
+                  <Input
+                    value={editData.custom_file_format}
+                    onChange={(e) => setEditData({ ...editData, custom_file_format: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Due Date</label>
+                <Input
+                  type="date"
+                  value={editData.delivery_date ? (editData.delivery_date.includes('T') ? editData.delivery_date.split('T')[0] : editData.delivery_date) : ""}
+                  onChange={(e) => setEditData({ ...editData, delivery_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Due Time</label>
+                <Input
+                  type="time"
+                  value={editData.delivery_time ? (editData.delivery_time.length > 5 ? editData.delivery_time.substring(0, 5) : editData.delivery_time) : ""}
+                  onChange={(e) => setEditData({ ...editData, delivery_time: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">PO Hours</label>
+                <Input
+                  type="number"
+                  value={editData.po_hours}
+                  onChange={(e) => setEditData({ ...editData, po_hours: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="grid gap-2 col-span-2">
+                <label className="text-sm font-medium italic text-slate-400">Estimated Hours</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="grid gap-1">
+                    <span className="text-[10px] uppercase text-slate-500 font-bold">OCR</span>
+                    <Input
+                      type="number"
+                      value={editData.estimated_hours_ocr}
+                      onChange={(e) => setEditData({ ...editData, estimated_hours_ocr: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-[10px] uppercase text-slate-500 font-bold">QC</span>
+                    <Input
+                      type="number"
+                      value={editData.estimated_hours_qc}
+                      onChange={(e) => setEditData({ ...editData, estimated_hours_qc: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-[10px] uppercase text-slate-500 font-bold">QA</span>
+                    <Input
+                      type="number"
+                      value={editData.estimated_hours_qa}
+                      onChange={(e) => setEditData({ ...editData, estimated_hours_qa: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Client Instructions</label>
+              <Textarea
+                value={editData.client_instruction}
+                onChange={(e) => setEditData({ ...editData, client_instruction: e.target.value })}
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Mail Instructions</label>
+              <Textarea
+                value={editData.mail_instruction}
+                onChange={(e) => setEditData({ ...editData, mail_instruction: e.target.value })}
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
