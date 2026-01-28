@@ -2235,7 +2235,7 @@ export default function TaskDetailPage() {
           currentUser={currentUser}
         />
 
-        {/* Footer with buttons */}
+        {/* Footer with primary buttons (no actions) */}
         <FooterButtons
           currentUser={currentUser || { id: "", name: "", email: "", role: "" }}
           currentStage={currentStage}
@@ -2252,6 +2252,7 @@ export default function TaskDetailPage() {
           onStatusUpdate={fetchRealStatus}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
           setShowHandoverDialog={setShowHandoverDialog}
+          hideActionButtons={true}
         />
       </div>
 
@@ -2330,6 +2331,26 @@ export default function TaskDetailPage() {
               onDeleteUploadedFile={handleDeleteFileFromUploadedSection}
               onReplaceUploadedFile={handleReplaceFileFromUploadedSection}
               fileEdits={fileEdits}
+              extraButtons={
+                <FooterButtons
+                  currentUser={currentUser || { id: "", name: "", email: "", role: "" }}
+                  currentStage={currentStage}
+                  sentBy={sentBy}
+                  taskId={taskId}
+                  handleStartTask={handleStartTask}
+                  handlePauseResumeTask={handlePauseResumeTask}
+                  handleSendTo={handleSendTo}
+                  showSubmitToButton={showSubmitToButton}
+                  setShowCompleteDialog={setShowCompleteDialog}
+                  status={realStatus}
+                  SubmitTo={SubmitTo}
+                  onAssignTask={handleAssignTask}
+                  onStatusUpdate={fetchRealStatus}
+                  assignmentRefreshTrigger={assignmentRefreshTrigger}
+                  setShowHandoverDialog={setShowHandoverDialog}
+                  showOnlyActionButtons={true}
+                />
+              }
             />
           </div>
         )

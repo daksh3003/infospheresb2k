@@ -41,6 +41,8 @@ export const FooterButtons = ({
   onAssignTask,
   onStatusUpdate,
   assignmentRefreshTrigger,
+  showOnlyActionButtons,
+  hideActionButtons,
 }: {
   currentUser: { id: string; name: string; email: string; role: string };
   currentStage: string;
@@ -62,6 +64,8 @@ export const FooterButtons = ({
   }) => void;
   onStatusUpdate?: () => void;
   assignmentRefreshTrigger?: number;
+  showOnlyActionButtons?: boolean;
+  hideActionButtons?: boolean;
 }) => {
   const [availableUsers, setAvailableUsers] = useState<
     { id: string; name: string; email: string; role: string }[]
@@ -269,9 +273,9 @@ export const FooterButtons = ({
 
   return (
     <>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
+      <div className={`${showOnlyActionButtons ? 'flex flex-wrap gap-3' : 'px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4'}`}>
         <div className="flex flex-wrap gap-3">
-          {currentUser?.role === "projectManager" && (
+          {!showOnlyActionButtons && currentUser?.role === "projectManager" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="p-5">
@@ -312,7 +316,7 @@ export const FooterButtons = ({
           )}
 
           {/* Pick up task button - shows when no one is assigned and user can pick up */}
-          {!hasAssignedUsers && canPickupTask() && (
+          {!showOnlyActionButtons && !hasAssignedUsers && canPickupTask() && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               onClick={() => setShowPickupDialog(true)}
@@ -323,7 +327,7 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {realStatus === "pending" && isAssignedToCurrentUser && (
+          {!showOnlyActionButtons && realStatus === "pending" && isAssignedToCurrentUser && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               onClick={async () => {
@@ -335,13 +339,13 @@ export const FooterButtons = ({
               <Play className="h-4 w-4" /> Start Task
             </button>
           )}
-          {getPauseResumeButton(realStatus, async () => {
+          {!showOnlyActionButtons && getPauseResumeButton(realStatus, async () => {
             await handlePauseResumeTask();
             // await fetchRealStatus(); // Refresh local status
             onStatusUpdate?.(); // Notify parent component
           })}
 
-          {realStatus !== "completed" && hasAssignedUsers && (
+          {!showOnlyActionButtons && realStatus !== "completed" && hasAssignedUsers && (
             <button
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               onClick={() => setShowHandoverDialog(true)}
@@ -350,7 +354,7 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {realStatus !== "completed" && (
+          {!hideActionButtons && realStatus !== "completed" && (
             <button
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               onClick={() => setShowCompleteDialog(true)}
@@ -358,9 +362,9 @@ export const FooterButtons = ({
               <CheckCircle2 className="h-4 w-4" /> Mark Complete
             </button>
           )}
-          {showSubmitToButton && realStatus === "completed" && (
+          {!hideActionButtons && showSubmitToButton && realStatus === "completed" && (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               onClick={() => handleSendTo()}
             >
               <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}

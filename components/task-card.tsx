@@ -203,7 +203,10 @@ export function TaskCard({
   };
 
   return (
-    <div className="w-full border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-150">
+    <div
+      className="w-full border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-150 cursor-pointer"
+      onClick={handleViewDetails}
+    >
       <div className="px-6 py-4">
         <div className="grid grid-cols-9 gap-4 items-center">
           {/* Left side - Title and Description */}
@@ -293,22 +296,8 @@ export function TaskCard({
             </Badge>
           </div>
 
-          {/* Action Column (Col 9) */}
+          {/* Action Column (Col 9) - Placeholder to maintain grid */}
           <div className="flex items-center justify-center">
-            {!hideViewButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-3 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full flex items-center gap-1 group transition-all"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewDetails();
-                }}
-              >
-                View
-                <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-            )}
           </div>
         </div>
       </div>
