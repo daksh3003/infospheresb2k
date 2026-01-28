@@ -149,6 +149,7 @@ export default function TaskDetailPage() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showSubmitToButton, setShowSubmitToButton] = useState(false);
   const [SubmitTo, setSubmitTo] = useState("QC");
+  const [submittingFiles, setSubmittingFiles] = useState(false);
 
   // Updated task state with proper typing
   const [task, setTask] = useState<Task>({
@@ -939,17 +940,21 @@ export default function TaskDetailPage() {
         position: "top-right",
       });
 
-      setTimeout(() => {
-        // Redirect based on source
-        if (source === "global") {
-          router.push("/dashboard");
-        } else if (source) {
-          router.push(`/dashboard/${source}`);
-        } else {
-          // Default fallback to PM dashboard if no source
-          router.push("/dashboard");
-        }
-      }, 4000);
+      // Wait for the timeout before resolving, so the button stays disabled
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          // Redirect based on source
+          if (source === "global") {
+            router.push("/dashboard");
+          } else if (source) {
+            router.push(`/dashboard/${source}`);
+          } else {
+            // Default fallback to PM dashboard if no source
+            router.push("/dashboard");
+          }
+          resolve(true);
+        }, 4000);
+      });
     }
   };
 
@@ -1691,6 +1696,7 @@ export default function TaskDetailPage() {
       alert("Please select files to upload.");
       return;
     }
+    setSubmittingFiles(true);
     try {
       // Check if all files have page counts
       for (const file of filesToBeUploaded) {
@@ -1792,6 +1798,8 @@ export default function TaskDetailPage() {
       setfilesToBeUploaded([]);
     } catch (error) {
       console.error("Error uploading files:", error);
+    } finally {
+      setSubmittingFiles(false);
     }
   };
 
@@ -2351,6 +2359,7 @@ export default function TaskDetailPage() {
                   showOnlyActionButtons={true}
                 />
               }
+              isSubmitting={submittingFiles}
             />
           </div>
         )

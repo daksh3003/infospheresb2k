@@ -78,6 +78,11 @@ export const FooterButtons = ({
   const [hasAssignedUsers, setHasAssignedUsers] = useState(false);
   const [realStatus, setRealStatus] = useState<string>(status);
   const [_statusLoading, _setStatusLoading] = useState(false);
+  const [isStartingTask, setIsStartingTask] = useState(false);
+  const [isPausingTask, setIsPausingTask] = useState(false);
+  const [isCompletingTask, setIsCompletingTask] = useState(false);
+  const [isSendingTo, setIsSendingTo] = useState(false);
+  const [isHandoverLoading, setIsHandoverLoading] = useState(false);
 
   // Status configuration
   const _statusConfig = {
@@ -329,45 +334,66 @@ export const FooterButtons = ({
 
           {!showOnlyActionButtons && realStatus === "pending" && isAssignedToCurrentUser && (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               onClick={async () => {
-                await handleStartTask();
-                // await fetchRealStatus(); // Refresh local status
-                onStatusUpdate?.(); // Notify parent component
+                setIsStartingTask(true);
+                try {
+                  await handleStartTask();
+                  onStatusUpdate?.(); // Notify parent component
+                } finally {
+                  setIsStartingTask(false);
+                }
               }}
+              disabled={isStartingTask}
             >
-              <Play className="h-4 w-4" /> Start Task
+              <Play className="h-4 w-4" /> {isStartingTask ? "Starting..." : "Start Task"}
             </button>
           )}
           {!showOnlyActionButtons && getPauseResumeButton(realStatus, async () => {
-            await handlePauseResumeTask();
-            // await fetchRealStatus(); // Refresh local status
-            onStatusUpdate?.(); // Notify parent component
-          })}
+            setIsPausingTask(true);
+            try {
+              await handlePauseResumeTask();
+              onStatusUpdate?.(); // Notify parent component
+            } finally {
+              setIsPausingTask(false);
+            }
+          }, isPausingTask)}
 
           {!showOnlyActionButtons && realStatus !== "completed" && hasAssignedUsers && (
             <button
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
               onClick={() => setShowHandoverDialog(true)}
+              disabled={isHandoverLoading}
             >
-              <ArrowBigUpDashIcon className="h-4 w-4 rotate-180" /> Handover
+              <ArrowBigUpDashIcon className="h-4 w-4 rotate-180" /> {isHandoverLoading ? "Processing..." : "Handover"}
             </button>
           )}
 
           {!hideActionButtons && realStatus !== "completed" && (
             <button
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
               onClick={() => setShowCompleteDialog(true)}
+              disabled={isCompletingTask}
             >
-              <CheckCircle2 className="h-4 w-4" /> Mark Complete
+              <CheckCircle2 className="h-4 w-4" /> {isCompletingTask ? "Completing..." : "Mark Complete"}
             </button>
           )}
           {!hideActionButtons && showSubmitToButton && realStatus === "completed" && (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-              onClick={() => handleSendTo()}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              onClick={async () => {
+                setIsSendingTo(true);
+                try {
+                  await handleSendTo();
+                  // No resetting setIsSendingTo(false) on success to keep it disabled during redirect
+                } catch (error) {
+                  console.error("Error in handleSendTo:", error);
+                  setIsSendingTo(false);
+                }
+              }}
+              disabled={isSendingTo}
             >
-              <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
+              <ArrowBigUpDashIcon className="h-4 w-4" /> {isSendingTo ? "Sending..." : SubmitTo}
             </button>
           )}
         </div>
