@@ -54,6 +54,7 @@ export function ProjectFeedback({ projectId, isCompleted }: ProjectFeedbackProps
     const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -107,6 +108,7 @@ export function ProjectFeedback({ projectId, isCompleted }: ProjectFeedbackProps
     };
 
     const handleDeleteFile = async () => {
+        setIsDeleting(true);
         try {
             const response = await fetch(`/api/projects/${projectId}/feedback/delete-file`, {
                 method: 'DELETE'
@@ -116,14 +118,19 @@ export function ProjectFeedback({ projectId, isCompleted }: ProjectFeedbackProps
                 setExistingFilePath(null);
                 setExistingFileName(null);
                 setExistingFileUrl(null);
-                setShowDeleteConfirm(false);
+
+                // Show toast first, then close dialog and reset loading state
                 toast.success('File deleted successfully');
+                setShowDeleteConfirm(false);
+                setIsDeleting(false);
             } else {
                 toast.error('Failed to delete file');
+                setIsDeleting(false);
             }
         } catch (error) {
             console.error('Error deleting file:', error);
             toast.error('Failed to delete file');
+            setIsDeleting(false);
         }
     };
 
@@ -391,13 +398,15 @@ export function ProjectFeedback({ projectId, isCompleted }: ProjectFeedbackProps
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <Button
                             onClick={handleDeleteFile}
+                            disabled={isDeleting}
                             className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                         >
-                            Delete
-                        </AlertDialogAction>
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
