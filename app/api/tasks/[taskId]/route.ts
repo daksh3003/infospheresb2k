@@ -216,9 +216,9 @@ async function handleTaskUpdate(taskId: string, updateData: any, authenticatedUs
     if (updateData.estimated_hours_ocr !== undefined) taskUpdates.estimated_hours_ocr = updateData.estimated_hours_ocr;
     if (updateData.estimated_hours_qc !== undefined) taskUpdates.estimated_hours_qc = updateData.estimated_hours_qc;
     if (updateData.estimated_hours_qa !== undefined) taskUpdates.estimated_hours_qa = updateData.estimated_hours_qa;
-    if (updateData.file_type !== undefined) taskUpdates.file_type = updateData.file_type;
-    if (updateData.file_format !== undefined) taskUpdates.file_format = updateData.file_format;
-    if (updateData.custom_file_format !== undefined) taskUpdates.custom_file_format = updateData.custom_file_format;
+    if (updateData.file_type !== undefined) taskUpdates.file_type = updateData.file_type || null;
+    if (updateData.file_format !== undefined) taskUpdates.file_format = updateData.file_format || null;
+    if (updateData.custom_file_format !== undefined) taskUpdates.custom_file_format = updateData.custom_file_format || null;
 
     const projectUpdates: any = {};
     if (updateData.po_hours !== undefined) projectUpdates.po_hours = updateData.po_hours;
