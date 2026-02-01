@@ -49,6 +49,7 @@ interface TaskCardProps {
   showFileMetadata?: boolean; // Optional: Whether to show file metadata
   hideViewButton?: boolean; // Optional: Whether to hide the view button
   disableStatusFetch?: boolean; // Optional: Disable internal status fetching (for lists)
+  currentStage?: string; // Optional: Current stage of the task (Processor, QC, QA)
 }
 
 export function TaskCard({
@@ -71,6 +72,7 @@ export function TaskCard({
   showFileMetadata = false,
   hideViewButton = false,
   disableStatusFetch = false,
+  currentStage,
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -208,7 +210,7 @@ export function TaskCard({
       onClick={handleViewDetails}
     >
       <div className="px-6 py-4">
-        <div className="grid grid-cols-9 gap-4 items-center">
+        <div className="grid grid-cols-8 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-0.5">
@@ -240,8 +242,8 @@ export function TaskCard({
             </Badge>
           </div>
 
-          {/* Currently Working On (Col 6-7) */}
-          <div className="col-span-2 flex items-center justify-center text-gray-600 dark:text-gray-400">
+          {/* Currently Working On (Col 6) */}
+          <div className="flex items-center justify-center text-gray-600 dark:text-gray-400">
             {currentWorkers && currentWorkers.length > 0 ? (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
@@ -284,6 +286,27 @@ export function TaskCard({
             )}
           </div>
 
+          {/* Current Stage Column (Col 7) */}
+          <div className="flex items-center justify-center">
+            {currentStage ? (
+              <Badge
+                variant="outline"
+                className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${currentStage === 'Processor'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800'
+                  : currentStage === 'QC'
+                    ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800'
+                    : currentStage === 'QA'
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800'
+                  }`}
+              >
+                {currentStage}
+              </Badge>
+            ) : (
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">-</span>
+            )}
+          </div>
+
           {/* Status Column (Col 8) */}
           <div className="flex items-center justify-center">
             <Badge
@@ -294,10 +317,6 @@ export function TaskCard({
             >
               {status === 'completed' ? 'Completed' : status}
             </Badge>
-          </div>
-
-          {/* Action Column (Col 9) - Placeholder to maintain grid */}
-          <div className="flex items-center justify-center">
           </div>
         </div>
       </div>

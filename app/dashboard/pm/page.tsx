@@ -500,7 +500,7 @@ export default function DashboardPage() {
             className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-all duration-200 border-b border-gray-100 dark:border-gray-700"
             onClick={() => toggleProjectExpansion(group.projectId)}
           >
-            <div className="grid grid-cols-9 gap-4 items-center w-full">
+            <div className="grid grid-cols-8 gap-4 items-center w-full">
               {/* Col 1-2: Info & Meta */}
               <div className="col-span-2 flex flex-col gap-1.5 min-w-0">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none pl-[40px]">
@@ -600,80 +600,69 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Current Stage Column (Col 7) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                      Current Stage
+                    </span>
+                    {group.tasks[0].current_stage ? (
+                      <Badge
+                        variant="outline"
+                        className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${group.tasks[0].current_stage === 'Processor'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800'
+                          : group.tasks[0].current_stage === 'QC'
+                            ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800'
+                            : group.tasks[0].current_stage === 'QA'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800'
+                          }`}
+                      >
+                        {group.tasks[0].current_stage}
+                      </Badge>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">-</span>
+                    )}
+                  </div>
                 </>
               ) : (
-                <div className="col-span-4" />
+                <div className="col-span-5" />
               )}
 
-              {/* Status Column (Col 7) */}
+              {/* Status Column (Col 8) */}
               <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
                   Status
                 </span>
                 <Badge
                   variant="outline"
-                  className={`px-3 py-0.5 text-[9px] font-bold w-[100px] justify-center rounded-full uppercase tracking-wider transition-colors ${group.completionPercentage === 100
+                  className={`px-3 py-1 text-[10px] font-bold justify-center rounded-full uppercase tracking-wider transition-all flex items-center gap-1.5 ${group.completionPercentage === 100
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
                     : isOverdue
                       ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800"
                       : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
                     }`}
                 >
-                  {group.completionPercentage === 100 ? "Completed" : isOverdue ? "Overdue" : "In Progress"}
+                  {group.completionPercentage === 100 ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3" />
+                      Completed
+                    </>
+                  ) : isOverdue ? (
+                    <>
+                      <AlertCircle className="h-3 w-3" />
+                      Overdue
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3" />
+                      In Progress
+                    </>
+                  )}
                 </Badge>
               </div>
 
-              {/* PO Hours Column (Col 8) */}
-              <div className="flex items-center justify-center gap-3 min-w-[120px]">
-
-                {/* PO Hours Section */}
-                {activeTab === "RFD" && tasks.filter(t => t.project_id === group.projectId && (!(t.completion_status || t.status === "completed"))).length === 0 && (
-                  <div className="flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-700 pl-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[9px] uppercase font-bold text-gray-400 dark:text-gray-500 leading-none">PO Hours</span>
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          placeholder="Hrs"
-                          className="h-6 w-12 text-[10px] px-1.5"
-                          value={editingPoHours[group.projectId] ?? projectNames[group.projectId]?.po_hours ?? ""}
-                          onChange={(e) => setEditingPoHours(prev => ({ ...prev, [group.projectId]: e.target.value }))}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          disabled={isUpdatingPo === group.projectId || editingPoHours[group.projectId] === undefined}
-                          onClick={() => handleUpdatePoHours(group.projectId)}
-                        >
-                          {isUpdatingPo === group.projectId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Column (Col 9) */}
-              <div className="flex items-center justify-center">
-                {group.tasks.length === 1 && group.tasks[0] && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-3 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full flex items-center gap-1 group transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const taskId = group.tasks[0].task_id;
-                      const pathParts = window.location.pathname.split("/");
-                      const source = pathParts[2] || "global";
-                      // @ts-ignore - _router exists in the component scope but is named with underscore
-                      _router.push(`/tasks/${taskId}?source=${source}`);
-                    }}
-                  >
-                    View
-                    <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
-                  </Button>
-                )}
-              </div>
+              {/* Note: PO Hours and Action columns removed for cleaner project-level view */}
             </div>
           </div>
 
@@ -688,14 +677,14 @@ export default function DashboardPage() {
             <div>
               {/* Table Header */}
               <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="grid grid-cols-8 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="col-span-2">Task Details</div>
                   <div className="text-center">Page Count</div>
                   <div className="text-center">File Type</div>
                   <div className="text-center">File Format</div>
-                  <div className="text-center col-span-2">Working On</div>
+                  <div className="text-center">Working On</div>
+                  <div className="text-center">Current Stage</div>
                   <div className="text-center">Status</div>
-                  <div className="text-center">Action</div>
                 </div>
               </div>
               {/* Task Rows */}
@@ -719,6 +708,7 @@ export default function DashboardPage() {
                     showFileMetadata={group.tasks.length > 1}
                     hideViewButton={group.tasks.length === 1}
                     currentWorkers={workers[task.task_id]?.map(w => ({ name: w.name, email: w.email }))}
+                    currentStage={task.current_stage}
                     disableStatusFetch={true}
                   />
                 ))}
