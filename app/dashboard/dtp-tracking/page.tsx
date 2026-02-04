@@ -36,6 +36,105 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Check } from "lucide-react";
+
+// Custom Checkbox component
+const CustomCheckbox = ({ 
+  checked, 
+  onCheckedChange, 
+  id, 
+  className = "" 
+}: { 
+  checked: boolean; 
+  onCheckedChange: (checked: boolean) => void; 
+  id: string;
+  className?: string;
+}) => {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      onClick={() => onCheckedChange(!checked)}
+      className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+        checked ? "bg-blue-600 border-blue-600" : "bg-white"
+      } ${className}`}
+    >
+      {checked && <Check className="h-3 w-3 text-white" />}
+    </button>
+  );
+};
+
+// Define column categories and their fields
+const COLUMN_CATEGORIES = {
+  jobDetails: {
+    label: "Job Details",
+    columns: [
+      { key: "job_no", label: "Job No" },
+      { key: "delivered_by", label: "Delivered by" },
+      { key: "po", label: "PO" },
+      { key: "mail_instruction", label: "Mail instruction" },
+      { key: "task_type", label: "Task type" },
+      { key: "task_name", label: "Task Name" },
+      { key: "file_count", label: "File Count" },
+      { key: "page_count", label: "Page count" },
+    ],
+  },
+  dtpProcessTracking: {
+    label: "DTP Process Tracking",
+    columns: [
+      { key: "language", label: "Language" },
+      { key: "platform", label: "Platform" },
+      { key: "file_type", label: "File Type" },
+      { key: "date", label: "Date" },
+      { key: "delivery_time", label: "Delivery Time" },
+      { key: "dtp_person", label: "DTP Person" },
+      { key: "dtp_start_time", label: "DTP Start Time" },
+      { key: "dtp_end_time", label: "DTP End Time" },
+      { key: "abbyy_compare_dtp", label: "DTP Abbyy Compare" },
+      { key: "dtp_status", label: "DTP Status" },
+    ],
+  },
+  qcTracking: {
+    label: "QC Tracking",
+    columns: [
+      { key: "qc_taken_by", label: "QC taken by" },
+      { key: "qc_start_time", label: "QC Start Time" },
+      { key: "qc_end_time", label: "QC End Time" },
+      { key: "abbyy_compare_qc", label: "QC Abbyy Compare" },
+      { key: "qc_status", label: "QC Status" },
+      { key: "qc_cxn_taken", label: "QC CXN taken" },
+      { key: "qc_cxn_start_time", label: "QC CXN Start Time" },
+      { key: "qc_cxn_end_time", label: "QC CXN End Time" },
+      { key: "cxn_status", label: "CXN Status" },
+    ],
+  },
+  qaTrackingAndFinalStatus: {
+    label: "QA Tracking & Final Status",
+    columns: [
+      { key: "qa_taken_by", label: "QA taken by" },
+      { key: "qa_start_time", label: "QA Start Time" },
+      { key: "qa_end_time", label: "QA End Time" },
+      { key: "abbyy_compare_qa", label: "QA Abbyy Compare" },
+      { key: "qa_status", label: "QA Status" },
+      { key: "qa_cxn_taken", label: "QA CXN taken" },
+      { key: "qa_cxn_start_time", label: "QA CXN Start Time" },
+      { key: "qa_cxn_end_time", label: "QA CXN End Time" },
+      { key: "file_status", label: "File Status" },
+    ],
+  },
+};
 
 export default function DTPTrackingPage() {
     const [reportData, setReportData] = useState<any[]>([]);
@@ -46,6 +145,18 @@ export default function DTPTrackingPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    // State for selected columns (all selected by default)
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>(() => {
+        const initial: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                initial[col.key] = true;
+            });
+        });
+        return initial;
+    });
 
     useEffect(() => {
         fetchDTPTracking();
@@ -136,52 +247,85 @@ export default function DTPTrackingPage() {
         setCurrentPage(1);
     }, [searchQuery]);
 
-    // Export to Excel function
+    // Handle category selection (select/deselect all columns in category)
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAll = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAll = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "Job No": entry.job_no,
-            "Delivered by": entry.delivered_by,
-            "PO": entry.po,
-            "Mail instruction": entry.mail_instruction,
-            "Task type": entry.task_type,
-            "Task Name": entry.task_name,
-            "File Count": entry.file_count,
-            "Page count": entry.page_count,
-            "Language": entry.language,
-            "Platform": entry.platform,
-            "File Type": entry.file_type,
-            "Date": entry.date,
-            "Delivery Time": entry.delivery_time,
-            "DTP Person": entry.dtp_person,
-            "DTP Start Time": entry.dtp_start_time,
-            "DTP End Time": entry.dtp_end_time,
-            "DTP Abbyy Compare": entry.abbyy_compare_dtp,
-            "DTP Status": entry.dtp_status,
-            "QC taken by": entry.qc_taken_by,
-            "QC Start Time": entry.qc_start_time,
-            "QC End Time": entry.qc_end_time,
-            "QC Abbyy Compare": entry.abbyy_compare_qc,
-            "QC Status": entry.qc_status,
-            "QC CXN taken": entry.qc_cxn_taken,
-            "QC CXN Start Time": entry.qc_cxn_start_time,
-            "QC CXN End Time": entry.qc_cxn_end_time,
-            "CXN Status": entry.cxn_status,
-            "QA taken by": entry.qa_taken_by,
-            "QA Start Time": entry.qa_start_time,
-            "QA End Time": entry.qa_end_time,
-            "QA Abbyy Compare": entry.abbyy_compare_qa,
-            "QA Status": entry.qa_status,
-            "QA CXN taken": entry.qa_cxn_taken,
-            "QA CXN Start Time": entry.qa_cxn_start_time,
-            "QA CXN End Time": entry.qa_cxn_end_time,
-            "File Status": entry.file_status,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        let value = entry[col.key];
+                        
+                        // Format specific fields
+                        if (col.key === "po" && typeof value === 'number') {
+                            value = value.toFixed(2);
+                        }
+                        
+                        row[col.label] = value || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "DTP Tracking");
         XLSX.writeFile(wb, `DTP_Tracking_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
 
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
@@ -299,15 +443,118 @@ export default function DTPTrackingPage() {
                                     Clear
                                 </Button>
                             )}
-                            {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            
+                            {/* Export Excel Button with Column Selection Dialog */}
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAll}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAll}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[400px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </div>

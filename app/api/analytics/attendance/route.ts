@@ -7,7 +7,7 @@ const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 function calculateTimeDifference(start: string, end: string): string {
-    if(!start || !end) return "00:00";
+    if(!start || !end) return "00:00:00";
     const startTime = new Date(start);
     const endTime = new Date(end);
     const timeDiff = endTime.getTime() - startTime.getTime();
@@ -19,6 +19,24 @@ function calculateTimeDifference(start: string, end: string): string {
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function calculateTimeDifferenceInMinutes(start: string, end: string): number {
+    if(!start || !end) return 0;
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const timeDiff = endTime.getTime() - startTime.getTime();
+    
+    // Ensure non-negative time difference
+    if (timeDiff < 0) return 0;
+    
+    return Math.floor(timeDiff / (1000 * 60)); // Return minutes
+}
+
+function minutesToTimeString(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
 }
 
 function calculateLateEarly(actual: string, expected: string): string {
@@ -226,96 +244,50 @@ export async function GET() {
                 }
             }
             
-            // Calculate work duration (total time from login to logout)
-            const workDuration = loginTime && logoutTime
-                ? calculateTimeDifference(loginTime, logoutTime)
-                : "00:00:00";
-            
-            // Calculate overtime as time worked beyond shift end time
-            // Overtime = logout_time - shift_out_time (only if logout is after shift end)
+            // Calculate total time worked (login to logout)
+            const totalWorkedMinutes = loginTime && logoutTime
+                ? calculateTimeDifferenceInMinutes(loginTime, logoutTime)
+                : 0;
+
+            // Determine status, work duration, and overtime based on hours worked
+            let status = "Absent";
+            let workDuration = "00:00:00";
             let overtime = "00:00:00";
-            if (logoutTime && shiftOutDateTime && loginTime) {
-                const logoutDate = new Date(logoutTime);
-                const shiftEndDate = new Date(shiftOutDateTime);
-                const loginDate = new Date(loginTime);
-                
-                // Ensure we're comparing dates correctly - normalize to same date context
-                // For shifts that span midnight, we need to handle date boundaries properly
-                if (shift === "Night" || shift === "Evening") {
-                    // For shifts spanning midnight, if logout is on a different calendar day than shift end,
-                    // we need to check if logout is actually after the shift end time
-                    const logoutDateOnly = logoutTime.split('T')[0];
-                    const shiftEndDateOnly = shiftOutDateTime.split('T')[0];
-                    
-                    // If logout is on the same day or next day as shift end, compare times
-                    if (logoutDateOnly === shiftEndDateOnly || 
-                        (new Date(logoutDateOnly).getTime() - new Date(shiftEndDateOnly).getTime()) === 86400000) {
-                        // Same day or next day - compare times
-                        if (logoutDate > shiftEndDate) {
-                            overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
-                        }
-                    } else if (logoutDateOnly < shiftEndDateOnly) {
-                        // Logout is before shift end date - this shouldn't happen, but handle gracefully
-                        overtime = "00:00:00";
-                    } else {
-                        // Logout is more than one day after shift end - calculate normally
-                        if (logoutDate > shiftEndDate) {
-                            overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
-                        }
-                    }
-                } else {
-                    // For regular shifts, simple comparison
-                    if (logoutDate > shiftEndDate) {
-                        overtime = calculateTimeDifference(shiftOutDateTime, logoutTime);
-                    }
+            
+            if (loginTime) {
+                if (totalWorkedMinutes >= 480) { // 8+ hours = 480 minutes
+                    // Present: Work time = 8 hours, OT = remaining time
+                    status = "Present";
+                    workDuration = "08:00:00";
+                    const overtimeMinutes = totalWorkedMinutes - 480;
+                    overtime = minutesToTimeString(overtimeMinutes);
+                } else if (totalWorkedMinutes >= 270) { // 4.5-7.99 hours = 270-479 minutes
+                    // Half Day: Work time = 4.5 hours, OT = remaining time
+                    status = "Half Day";
+                    workDuration = "04:30:00";
+                    const overtimeMinutes = totalWorkedMinutes - 270; // 4.5 hours = 270 minutes
+                    overtime = minutesToTimeString(overtimeMinutes);
+                } else { // Less than 4.5 hours
+                    // Absent: Work time = 0, OT = all time worked
+                    status = "Absent";
+                    workDuration = "00:00:00";
+                    overtime = minutesToTimeString(totalWorkedMinutes);
                 }
-                
-                // Sanity check: Overtime should never exceed work duration
-                // Parse work duration and overtime to minutes for comparison
-                const [workHours, workMins] = workDuration.split(':').map(Number);
-                const workTotalMins = workHours * 60 + workMins;
-                
-                const [otHours, otMins] = overtime.split(':').map(Number);
-                const otTotalMins = otHours * 60 + otMins;
-                
-                // Calculate shift duration
-                const [shiftInH, shiftInM] = shiftInTime.split(':').map(Number);
-                const [shiftOutH, shiftOutM] = shiftOutTime.split(':').map(Number);
-                let shiftDurationMins = 0;
-                
-                if (shift === "Night" || shift === "Evening") {
-                    // For shifts spanning midnight: (24:00 - shiftIn) + shiftOut
-                    shiftDurationMins = (24 * 60 - (shiftInH * 60 + shiftInM)) + (shiftOutH * 60 + shiftOutM);
-                } else {
-                    // Regular shift: shiftOut - shiftIn
-                    shiftDurationMins = (shiftOutH * 60 + shiftOutM) - (shiftInH * 60 + shiftInM);
-                }
-                
-                // Overtime should be: max(0, workDuration - shiftDuration)
-                // But also ensure it doesn't exceed what we calculated from logout time
-                const expectedOvertimeMins = Math.max(0, workTotalMins - shiftDurationMins);
-                const calculatedOvertimeMins = otTotalMins;
-                
-                // Use the minimum of calculated overtime and expected overtime
-                // Also ensure overtime never exceeds work duration (safety check)
-                const finalOvertimeMins = Math.min(calculatedOvertimeMins, expectedOvertimeMins, workTotalMins);
-                
-                if (finalOvertimeMins !== otTotalMins) {
-                    const finalHours = Math.floor(finalOvertimeMins / 60);
-                    const finalMins = finalOvertimeMins % 60;
-                    const finalSeconds = Math.floor((finalOvertimeMins % (1000 * 60)) / 1000);
-                    overtime = `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}:${String(finalSeconds).padStart(2, '0')}`;
-                }
+            } else {
+                // No login time
+                status = "Absent";
+                workDuration = "00:00:00";
+                overtime = "00:00:00";
             }
             
-            const totalDuration = workDuration;
+            const totalDuration = minutesToTimeString(totalWorkedMinutes);
 
             let lateBy = "00:00:00";
             if(loginTime && shiftInDateTime) {
                 const loginDate = new Date(loginTime);
                 const shiftStartDate = new Date(shiftInDateTime);
                 if(loginDate > shiftStartDate) {
-                    // Late by = loginTime - shiftInDateTime (intime - shiftintime)
+                    // Late by = loginTime - shiftInDateTime
                     lateBy = calculateTimeDifference(shiftInDateTime, loginTime);
                 }
             }
@@ -328,8 +300,6 @@ export async function GET() {
                     earlyBy = calculateLateEarly(logoutTime, shiftOutDateTime);
                 }
             }
-            
-            const status = loginTime ? "Present" : "Absent";
 
             const punchRecords = [];
             if(loginTime) {
