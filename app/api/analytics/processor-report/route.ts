@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
         const { data: tasks, error: tasksError } = await supabase
             .from("tasks_test")
-            .select("task_id, project_id")
+            .select("task_id, project_id, estimated_hours_ocr")
             .in("task_id", taskIds);
 
         if(tasksError) {
@@ -75,16 +75,18 @@ export async function GET(request: NextRequest) {
         }
 
         const taskToProjectMap = new Map();
+        const taskToEstimatedHoursMap = new Map();
         if(tasks) {
             tasks.forEach((task: any) => {
                 taskToProjectMap.set(task.task_id, task.project_id);
+                taskToEstimatedHoursMap.set(task.task_id, task.estimated_hours_ocr ?? 0);
             });
         }
         
         const projectIds = [...new Set(Array.from(taskToProjectMap.values()))].filter(Boolean);
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name, po_hours")
+            .select("project_id, project_name")
             .in("project_id", projectIds);
             
         if(projectsError) {
@@ -93,12 +95,9 @@ export async function GET(request: NextRequest) {
         }
         
         const projectToNameMap = new Map();
-        const projectToPOHoursMap = new Map();
         if(projects) {
             projects.forEach((project: any) => {
                 projectToNameMap.set(project.project_id, project.project_name);
-                const pohours = project.po_hours || project.pohours || project.poHours || 0;
-                projectToPOHoursMap.set(project.project_id, pohours);
             });
         }
         
@@ -177,7 +176,7 @@ export async function GET(request: NextRequest) {
                     const projectId = taskToProjectMap.get(taskId);
                     const clientName = "N/A";
                     const filename = taskToFileMap.get(taskId) || "N/A";
-                    const poHours = projectId ? (projectToPOHoursMap.get(projectId) || 0) : 0;
+                    const poHours = taskToEstimatedHoursMap.get(taskId) ?? 0;
                     const username = metadata.user_name || userIdToNameMap.get(action.user_id) || "N/A";
 
                     let endTime = timestamp;
@@ -206,13 +205,15 @@ export async function GET(request: NextRequest) {
                     const startTime = startTimeObj.toLocaleTimeString('en-US', {
                         hour12: false,
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        second: '2-digit'
                     });
 
                     const endTimeFormatted = endTimeObj.toLocaleTimeString('en-US', {
                         hour12: false,
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        second: '2-digit'
                     });
 
                     reportEntries.push({

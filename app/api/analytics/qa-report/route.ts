@@ -210,12 +210,14 @@ export async function GET(request: NextRequest) {
                     const startTime = startTimeObj.toLocaleTimeString('en-US', {
                         hour12: false,
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        second: '2-digit'
                     });
                     const endTimeFormatted = endTimeObj.toLocaleTimeString('en-US', {
                         hour12: false,
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        second: '2-digit'
                     });
                     
                     reportEntries.push({

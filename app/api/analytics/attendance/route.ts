@@ -13,27 +13,29 @@ function calculateTimeDifference(start: string, end: string): string {
     const timeDiff = endTime.getTime() - startTime.getTime();
     
     // Ensure non-negative time difference
-    if (timeDiff < 0) return "00:00";
+    if (timeDiff < 0) return "00:00:00";
     
     const hours = Math.floor(timeDiff / (1000 * 60 * 60));
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function calculateLateEarly(actual: string, expected: string): string {
-    if(!actual || !expected) return "00:00";
+    if(!actual || !expected) return "00:00:00";
     const actualTime = new Date(actual);
     const expectedTime = new Date(expected);
     const timeDiff = expectedTime.getTime() - actualTime.getTime();
     const hours = Math.floor(timeDiff / (1000 * 60 * 60));
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function formatTime(timestamp: string | null): string {
     if(!timestamp) return "N/A";
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDate(timestamp: string | null): string {
@@ -45,8 +47,8 @@ function formatDate(timestamp: string | null): string {
 function determineShift(loginTime: string | null, logoutTime: string | null): { shift: string; shiftInTime: string; shiftOutTime: string } {
     // Default values
     let shift = "General";
-    let shiftInTime = "10:00";
-    let shiftOutTime = "19:00";
+    let shiftInTime = "10:00:00";
+    let shiftOutTime = "19:00:00";
     
     if (!loginTime) {
         return { shift, shiftInTime, shiftOutTime };
@@ -55,7 +57,8 @@ function determineShift(loginTime: string | null, logoutTime: string | null): { 
     const loginDate = new Date(loginTime);
     const loginHour = loginDate.getHours();
     const loginMinute = loginDate.getMinutes();
-    const loginTimeMinutes = loginHour * 60 + loginMinute;
+    const loginSecond = loginDate.getSeconds();
+    const loginTimeMinutes = loginHour * 60 + loginMinute + loginSecond / 60;
     
     // Define all shifts with their time ranges
     const shifts = [
@@ -112,8 +115,8 @@ function determineShift(loginTime: string | null, logoutTime: string | null): { 
         // No matching shift found, assign to General as default
         // This handles edge cases like login before 10am
         shift = "General";
-        shiftInTime = "10:00";
-        shiftOutTime = "19:00";
+        shiftInTime = "10:00:00";
+        shiftOutTime = "19:00:00";
     }
     
     return { shift, shiftInTime, shiftOutTime };
@@ -158,7 +161,7 @@ export async function GET() {
                 profileMap.set(profile.id, profile);
             });
         }
-
+      
         // Join sessions with profiles manually
         const attendanceData = sessions.map((session: any) => {
             // Find matching profile using user_id from sessions and id from profiles
@@ -185,11 +188,12 @@ export async function GET() {
                 const loginDate = new Date(loginTime);
                 const loginHour = loginDate.getHours();
                 const loginMinute = loginDate.getMinutes();
-                const loginTimeMinutes = loginHour * 60 + loginMinute;
+                const loginSecond = loginDate.getSeconds();
+                const loginTimeMinutes = loginHour * 60 + loginMinute + loginSecond / 60;
                 
                 // Parse shift out time to minutes
-                const [outHour, outMinute] = shiftOutTime.split(':').map(Number);
-                const shiftOutTimeMinutes = outHour * 60 + outMinute;
+                const [outHour, outMinute, outSecond] = shiftOutTime.split(':').map(Number);
+                const shiftOutTimeMinutes = outHour * 60 + outMinute + outSecond / 60;
                 
                 // Shifts that span midnight: Night (22:00-06:00) and Evening (18:00-02:00)
                 if (shift === "Night") {
@@ -225,11 +229,11 @@ export async function GET() {
             // Calculate work duration (total time from login to logout)
             const workDuration = loginTime && logoutTime
                 ? calculateTimeDifference(loginTime, logoutTime)
-                : "00:00";
+                : "00:00:00";
             
             // Calculate overtime as time worked beyond shift end time
             // Overtime = logout_time - shift_out_time (only if logout is after shift end)
-            let overtime = "00:00";
+            let overtime = "00:00:00";
             if (logoutTime && shiftOutDateTime && loginTime) {
                 const logoutDate = new Date(logoutTime);
                 const shiftEndDate = new Date(shiftOutDateTime);
@@ -252,7 +256,7 @@ export async function GET() {
                         }
                     } else if (logoutDateOnly < shiftEndDateOnly) {
                         // Logout is before shift end date - this shouldn't happen, but handle gracefully
-                        overtime = "00:00";
+                        overtime = "00:00:00";
                     } else {
                         // Logout is more than one day after shift end - calculate normally
                         if (logoutDate > shiftEndDate) {
@@ -299,13 +303,14 @@ export async function GET() {
                 if (finalOvertimeMins !== otTotalMins) {
                     const finalHours = Math.floor(finalOvertimeMins / 60);
                     const finalMins = finalOvertimeMins % 60;
-                    overtime = `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}`;
+                    const finalSeconds = Math.floor((finalOvertimeMins % (1000 * 60)) / 1000);
+                    overtime = `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}:${String(finalSeconds).padStart(2, '0')}`;
                 }
             }
             
             const totalDuration = workDuration;
 
-            let lateBy = "00:00";
+            let lateBy = "00:00:00";
             if(loginTime && shiftInDateTime) {
                 const loginDate = new Date(loginTime);
                 const shiftStartDate = new Date(shiftInDateTime);
@@ -315,7 +320,7 @@ export async function GET() {
                 }
             }
 
-            let earlyBy = "00:00";
+            let earlyBy = "00:00:00";
             if(logoutTime && shiftOutDateTime) {
                 const logoutDate = new Date(logoutTime);
                 const shiftEndDate = new Date(shiftOutDateTime);
@@ -334,11 +339,10 @@ export async function GET() {
                 punchRecords.push(`${formatTime(logoutTime)}:out(TD)`);
             }
             const punchRecordsStr = punchRecords.length > 0 ? punchRecords.join(',') : '';
-            
+
             return {
                 id: session.id,
                 department: profile?.role || 'Unknown',
-                employee_id: profile?.id || session.user_id || 'Unknown',
                 employee_name: profile?.name || 'Unknown',
                 role: profile?.role || 'Unknown',
                 attendance_date: attendanceDate ? formatDate(attendanceDate) : 'Unknown',

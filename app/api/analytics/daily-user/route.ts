@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         // Updated: task_test table (correct name)
         const { data: tasks, error: tasksError } = await supabase
             .from("task_test")
-            .select("task_id, project_id")
+            .select("task_id, project_id, task_name")
             .in("task_id", taskIds);
 
         if(tasksError) {
@@ -54,9 +54,11 @@ export async function GET(request: NextRequest) {
         }
 
         const taskToProjectMap = new Map();
+        const taskToNameMap = new Map();
         if(tasks) {
             tasks.forEach((task: any) => {
                 taskToProjectMap.set(task.task_id, task.project_id);
+                taskToNameMap.set(task.task_id, task.task_name || "N/A");
             });
         }
 
@@ -145,6 +147,8 @@ export async function GET(request: NextRequest) {
                     const fileId = taskToFileMap.get(taskId) || "N/A";
                     const projectId = taskToProjectMap.get(taskId);
                     const clientName = projectId ? (projectToNameMap.get(projectId) || "N/A") : "N/A";
+                    const taskName = taskToNameMap.get(taskId) || "N/A";
+                    const projectName = projectToNameMap.get(projectId) || "N/A";
                     
                     // Use user_name from metadata if available, otherwise use profile name
                     const displayName = metadata.user_name || userName;
@@ -181,6 +185,8 @@ export async function GET(request: NextRequest) {
                         }),
                         name: displayName,
                         client_name: clientName,
+                        task_name: taskName,
+                        project_name: projectName,
                         file_no: fileId,
                         work_type: currentStage, 
                         no_of_pages: pageCount,
@@ -188,11 +194,13 @@ export async function GET(request: NextRequest) {
                             hour12: false,
                             hour: '2-digit',
                             minute: '2-digit',
+                            second: '2-digit'
                         }),
                         end_time: new Date(endTime).toLocaleTimeString('en-US', {
                             hour12: false,
                             hour: '2-digit',
                             minute: '2-digit',
+                            second: '2-digit'
                         }),
                         total_working_time: totalWorkingTime,
                     });

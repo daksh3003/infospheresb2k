@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCog,
+  Box,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "QC Team", href: "/dashboard/qc", icon: ClipboardCheck },
     { name: "QA Team", href: "/dashboard/qa", icon: ShieldCheck },
     { name: "Analytics", href: "/dashboard/analytics", icon: ChartNoAxesCombined },
+    { name: "DTP Tracking", href: "/dashboard/dtp-tracking", icon: Box },
     { name: "User Management", href: "/dashboard/user-management", icon: UserCog },
   ];
 
@@ -211,6 +213,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       "/dashboard/qc",
                       "/dashboard/qa",
                       "/dashboard/analytics",
+                      "/dashboard/dtp-tracking",
                       "/dashboard/user-management",
                     ],
                     processor: ["/dashboard/processor"],

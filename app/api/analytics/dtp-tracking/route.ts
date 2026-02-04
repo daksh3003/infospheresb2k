@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
         // Fetch all projects with their tasks
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name, po_hours, mail_instruction, delivery_date, delivery_time, created_by, created_at, language, platform")
+            .select("project_id, project_name, po_hours, mail_instruction, delivery_date, delivery_time, created_by, created_at, language, platform, file_type")
             .order("created_at", { ascending: false });
 
         if (projectsError) {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         // Fetch tasks for these projects
         const { data: tasks, error: tasksError } = await supabase
             .from("tasks_test")
-            .select("task_id, task_name, project_id, task_type, created_at")
+            .select("task_id, task_name, project_id, task_type, created_at, estimated_hours_ocr, estimated_hours_qc, estimated_hours_qa")
             .in("project_id", projectIds);
 
         if (tasksError) {
@@ -132,6 +132,19 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        const projectToPOHoursMap = new Map<string, number>();
+        if(tasks) {
+            tasks.forEach((task: any) => {
+                const projectId = task.project_id;
+                if(!projectId) return;
+                const ocr = task.estimated_hours_ocr ?? 0;
+                const qc = task.estimated_hours_qc ?? 0;
+                const qa = task.estimated_hours_qa ?? 0;
+                const total = ocr + qc + qa;
+                projectToPOHoursMap.set(projectId, total);
+            });
+        }
+
         const taskToFilesMap = new Map();
         if (files) {
             files.forEach((file: any) => {
@@ -213,7 +226,7 @@ export async function GET(request: NextRequest) {
                 }
 
                 const deliveredBy = project.created_by ? userIdToNameMap.get(project.created_by) : "N/A";
-                const poHours = project.po_hours || project.pohours || project.poHours || 0;
+                const poHours = projectToPOHoursMap.get(project.project_id) ?? 0;
 
                 reportEntries.push({
                     job_no: jobNo++,
@@ -226,7 +239,7 @@ export async function GET(request: NextRequest) {
                     page_count: 0,
                     language: project.language || "N/A",
                     platform: project.platform || "N/A",
-                    stage: "Pending",
+                    file_type: project.file_type || "N/A",
                     date: date,
                     delivery_time: deliveryTime,
                     dtp_person: "N/A",
@@ -270,20 +283,6 @@ export async function GET(request: NextRequest) {
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
 
-                // Get stages array from the most recent iteration (it contains the full history)
-                // The 'stages' column is a JSON array with the complete stage history
-                let stages: string[] = [];
-                if (sortedIterations.length > 0) {
-                    const mostRecentIteration = sortedIterations[sortedIterations.length - 1];
-                    // Use the 'stages' column if available, otherwise fall back to current_stage
-                    if (mostRecentIteration.stages && Array.isArray(mostRecentIteration.stages)) {
-                        stages = mostRecentIteration.stages;
-                    } else if (mostRecentIteration.current_stage) {
-                        // Fallback: if no stages array, use current_stage from all iterations
-                        stages = sortedIterations.map((it: any) => it.current_stage);
-                    }
-                }
-
 
 
                 // Check for QC CXN: Find actions where sent_by is QC and current_stage is Processor
@@ -307,9 +306,9 @@ export async function GET(request: NextRequest) {
                     // Get the person who took it up (first action's user_id)
                     qcCXNPersonId = qcCXNActions[0].user_id;
                     // Start time: first action
-                    qcCXNStartTime = new Date(qcCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    qcCXNStartTime = new Date(qcCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     // End time: last action
-                    qcCXNEndTime = new Date(qcCXNActions[qcCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    qcCXNEndTime = new Date(qcCXNActions[qcCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 }
 
                 // Check for QA CXN: Find actions where sent_by is QA and current_stage is Processor
@@ -333,9 +332,9 @@ export async function GET(request: NextRequest) {
                     // Get the person who took it up (first action's user_id)
                     qaCXNPersonId = qaCXNActions[0].user_id;
                     // Start time: first action
-                    qaCXNStartTime = new Date(qaCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    qaCXNStartTime = new Date(qaCXNActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     // End time: last action
-                    qaCXNEndTime = new Date(qaCXNActions[qaCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                    qaCXNEndTime = new Date(qaCXNActions[qaCXNActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 }
 
 
@@ -408,8 +407,7 @@ export async function GET(request: NextRequest) {
                 const qaEndTime = qaActions[qaActions.length - 1]?.created_at ?
                     new Date(qaActions[qaActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
 
-                // Format PO hours - use same format as other tables (raw decimal)
-                const poHours = project.po_hours || project.pohours || project.poHours || 0;
+                const poHours = projectToPOHoursMap.get(project.project_id) ?? 0;
 
                 // Format delivery time - ensure only hours and minutes (HH:MM)
                 let deliveryTime = "N/A";
@@ -421,7 +419,8 @@ export async function GET(request: NextRequest) {
                             deliveryTime = timeObj.toLocaleTimeString('en-US', {
                                 hour12: false,
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                second: '2-digit'
                             });
                         } else {
                             // If it's already a time string (e.g., "14:30:45"), extract HH:MM
@@ -430,7 +429,8 @@ export async function GET(request: NextRequest) {
                             if (timeMatch) {
                                 const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
                                 const minutes = timeMatch[2];
-                                deliveryTime = `${hours}:${minutes}`;
+                                const seconds = timeMatch[3] || '00';
+                                deliveryTime = `${hours}:${minutes}:${seconds}`;
                             } else {
                                 deliveryTime = project.delivery_time;
                             }
@@ -442,7 +442,8 @@ export async function GET(request: NextRequest) {
                         if (timeMatch) {
                             const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
                             const minutes = timeMatch[2];
-                            deliveryTime = `${hours}:${minutes}`;
+                            const seconds = timeMatch[3] || '00';
+                            deliveryTime = `${hours}:${minutes}:${seconds}`;
                         } else {
                             deliveryTime = project.delivery_time;
                         }
@@ -475,7 +476,7 @@ export async function GET(request: NextRequest) {
                     // DTP Process
                     language: project.language || "N/A", // This might need to come from metadata or another source
                     platform: project.platform || "N/A", // Default or from metadata
-                    stage: iterations.find((it: any) => it.current_stage === "Processor" || it.assigned_to_processor_user_id) ? "Completed" : "Pending",
+                    file_type: project.file_type || "N/A",
                     date: date,
                     delivery_time: deliveryTime,
                     dtp_person: dtpPerson,
