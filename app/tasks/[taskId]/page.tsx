@@ -1863,42 +1863,39 @@ export default function TaskDetailPage() {
 
       setPMFiles(pmFilesWithPageCount);
 
-      let storage_name_correction = "";
+      // Fetch QC and QA files and combine them into correctionFiles
+      const { data: qcFilesData, error: qcError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", "qc-files");
 
-      if (sent_by !== "PM") {
-        if (current_stage === "Processor") {
-          if (sent_by === "QC") {
-            storage_name_correction = "qc-files";
-          } else if (sent_by === "QA") {
-            storage_name_correction = "qa-files";
-          }
-        } else if (current_stage === "QA" && sent_by === "Processor") {
-          storage_name_correction = "qc-files";
-        }
+      const { data: qaFilesData, error: qaError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", "qa-files");
 
-        // Fetch correction files directly from database instead of storage listing
-        const { data: correctionFiles, error: correctionError } = await supabase
-          .from("files_test")
-          .select("file_name, page_count, file_path")
-          .eq("task_id", taskId)
-          .eq("storage_name", storage_name_correction);
+      // Combine QC and QA files into correctionFiles
+      const combinedCorrectionFiles = [];
 
-        if (correctionError) {
-          console.error("Error fetching correction files:", correctionError);
-          // return;
-        }
-
-        // Map to the expected format using original filename for display
-        const correctionFilesWithPageCount = (correctionFiles || []).map(
-          (file) => ({
-            name: file.file_name, // Use original filename (with Chinese characters)
-            pageCount: file.page_count || null,
-          })
-        );
-
-        setCorrectionFiles(correctionFilesWithPageCount);
-        // }
+      if (!qcError && qcFilesData) {
+        const qcFiles = qcFilesData.map((file) => ({
+          name: file.file_name,
+          pageCount: file.page_count || null,
+        }));
+        combinedCorrectionFiles.push(...qcFiles);
       }
+
+      if (!qaError && qaFilesData) {
+        const qaFiles = qaFilesData.map((file) => ({
+          name: file.file_name,
+          pageCount: file.page_count || null,
+        }));
+        combinedCorrectionFiles.push(...qaFiles);
+      }
+
+      setCorrectionFiles(combinedCorrectionFiles);
 
       let storage_name = "";
       let folder_path_prefix = "";

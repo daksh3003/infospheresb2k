@@ -300,12 +300,12 @@ export const TaskAttachments = ({
             ) : null}
           </div>
 
-          {/* Correction Files */}
+          {/* Correction Files (QC + QA) */}
           <div>
             {correctionFiles && correctionFiles.length > 0 ? (
               <>
                 <h3 className="text-sm font-semibold tracking-wider uppercase text-gray-500 border-b pb-2 mb-3">
-                  Correction Files
+                  Correction Files (QC/QA)
                 </h3>
                 <div className="space-y-2">
                   {correctionFiles.map((item, index: number) => (
