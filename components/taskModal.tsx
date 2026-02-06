@@ -50,6 +50,7 @@ interface ProjectFormData {
   file_format: string;
   custom_file_format: string;
   client_instructions: string;
+  language: string;
 }
 
 interface TaskFormData {
@@ -135,6 +136,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     file_format: "",
     custom_file_format: "",
     client_instructions: "",
+    language: "",
   });
 
   // File upload state
@@ -224,10 +226,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         ...prev,
         [name]: value,
       };
-      
+
       // Update task data if file groups are already initialized
       if (fileGroups.length > 0 && (name === 'task_type' || name === 'file_type' || name === 'file_format' || name === 'custom_file_format' || name === 'client_instructions' || name === 'project_name')) {
-        setFileGroups((prevGroups) => 
+        setFileGroups((prevGroups) =>
           prevGroups.map((group, index) => ({
             ...group,
             taskData: {
@@ -242,7 +244,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           }))
         );
       }
-      
+
       return updated;
     });
   };
@@ -618,6 +620,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   onChange={handleProjectChange}
                   className="w-full p-2 border rounded-md"
                   placeholder="Enter client name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Language
+                  <Tooltip content="Enter the language for this project">
+                    <Info className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  name="language"
+                  value={projectData.language}
+                  onChange={handleProjectChange}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Enter language"
                 />
               </div>
               <div>

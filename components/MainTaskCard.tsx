@@ -58,6 +58,7 @@ interface Task {
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
+  language: string;
 
   // Creator information
   created_by: {
@@ -360,6 +361,15 @@ export const MainTaskCard = ({
                 PO Hours
               </h3>
               <p className="text-gray-900">{task.po_hours || 0} hours</p>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">
+                Language
+              </h3>
+              <p className="text-gray-900 capitalize">
+                {task.language || "Not specified"}
+              </p>
             </div>
 
             <div>

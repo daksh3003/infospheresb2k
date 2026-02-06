@@ -65,6 +65,7 @@ interface ProjectTask {
   custom_file_format?: string;
   page_count?: number | null;
   latest_action?: string | null;
+  language?: string;
 }
 
 interface ProjectGroup {
@@ -95,6 +96,7 @@ export default function DashboardPage() {
       delivery_date: string;
       delivery_time: string;
       po_hours?: number;
+      language?: string;
     };
   }>({});
   const [editingPoHours, setEditingPoHours] = useState<{ [key: string]: string }>({});
@@ -128,6 +130,7 @@ export default function DashboardPage() {
               delivery_date: string;
               delivery_time: string;
               po_hours?: number;
+              language?: string;
             };
           },
           project: {
@@ -136,6 +139,7 @@ export default function DashboardPage() {
             delivery_date: string;
             delivery_time: string;
             po_hours: number;
+            language: string;
           }
         ) => {
           acc[project.project_id] = {
@@ -143,6 +147,7 @@ export default function DashboardPage() {
             delivery_date: project.delivery_date,
             delivery_time: project.delivery_time,
             po_hours: project.po_hours,
+            language: project.language,
           };
           return acc;
         },
@@ -500,7 +505,7 @@ export default function DashboardPage() {
             className="px-6 py-4 cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-all duration-200 border-b border-gray-100 dark:border-gray-700"
             onClick={() => toggleProjectExpansion(group.projectId)}
           >
-            <div className="grid grid-cols-8 gap-4 items-center w-full">
+            <div className="grid grid-cols-9 gap-4 items-center w-full">
               {/* Col 1-2: Info & Meta */}
               <div className="col-span-2 flex flex-col gap-1.5 min-w-0">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none pl-[40px]">
@@ -573,7 +578,17 @@ export default function DashboardPage() {
                     </Badge>
                   </div>
 
-                  {/* Due Date Column (Col 6) */}
+                  {/* Language Column (Col 6) */}
+                  <div className="flex flex-col gap-1.5 items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
+                      Language
+                    </span>
+                    <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold text-gray-900 dark:text-gray-100 leading-none capitalize border-gray-200 dark:border-gray-700 rounded-full">
+                      {group.tasks[0].language || projectNames[group.projectId]?.language || '-'}
+                    </Badge>
+                  </div>
+
+                  {/* Due Date Column (Col 7) - was Col 6) */}
                   <div className="flex flex-col gap-1.5 items-center">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
@@ -601,7 +616,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Current Stage Column (Col 7) */}
+                  {/* Current Stage Column (Col 8) - was Col 7 */}
                   <div className="flex flex-col gap-1.5 items-center">
                     <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
                       Current Stage
@@ -626,10 +641,10 @@ export default function DashboardPage() {
                   </div>
                 </>
               ) : (
-                <div className="col-span-5" />
+                <div className="col-span-6" />
               )}
 
-              {/* Status Column (Col 8) */}
+              {/* Status Column (Col 9) - was Col 8 */}
               <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
                 <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 dark:text-gray-500 leading-none">
                   Status
@@ -677,11 +692,12 @@ export default function DashboardPage() {
             <div>
               {/* Table Header */}
               <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-8 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="col-span-2">Task Details</div>
                   <div className="text-center">Page Count</div>
                   <div className="text-center">File Type</div>
                   <div className="text-center">File Format</div>
+                  <div className="text-center">Language</div>
                   <div className="text-center">Working On</div>
                   <div className="text-center">Current Stage</div>
                   <div className="text-center">Status</div>
@@ -710,6 +726,7 @@ export default function DashboardPage() {
                     currentWorkers={workers[task.task_id]?.map(w => ({ name: w.name, email: w.email }))}
                     currentStage={task.current_stage}
                     disableStatusFetch={true}
+                    language={task.language || projectNames[task.project_id]?.language}
                   />
                 ))}
               </div>

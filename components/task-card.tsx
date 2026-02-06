@@ -50,6 +50,7 @@ interface TaskCardProps {
   hideViewButton?: boolean; // Optional: Whether to hide the view button
   disableStatusFetch?: boolean; // Optional: Disable internal status fetching (for lists)
   currentStage?: string; // Optional: Current stage of the task (Processor, QC, QA)
+  language?: string; // Optional: Language of the project
 }
 
 export function TaskCard({
@@ -73,6 +74,7 @@ export function TaskCard({
   hideViewButton = false,
   disableStatusFetch = false,
   currentStage,
+  language,
 }: TaskCardProps) {
   const router = useRouter();
   const [realStatus, setRealStatus] = useState<TaskStatus>(propStatus);
@@ -210,7 +212,7 @@ export function TaskCard({
       onClick={handleViewDetails}
     >
       <div className="px-6 py-4">
-        <div className="grid grid-cols-8 gap-4 items-center">
+        <div className="grid grid-cols-9 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-0.5">
@@ -239,6 +241,13 @@ export function TaskCard({
           <div className="flex items-center justify-center">
             <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold border-gray-200 dark:border-gray-700 rounded-full">
               {formatFileFormat(fileFormat, customFileFormat) || '-'}
+            </Badge>
+          </div>
+
+          {/* Language Column */}
+          <div className="flex items-center justify-center">
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] font-bold capitalize border-gray-200 dark:border-gray-700 rounded-full">
+              {language || '-'}
             </Badge>
           </div>
 

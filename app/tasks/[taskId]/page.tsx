@@ -87,6 +87,7 @@ interface Task {
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
+  language: string;
 
   // Creator information
   created_by: UserProfile;
@@ -177,6 +178,7 @@ export default function TaskDetailPage() {
     delivery_date: "",
     delivery_time: "",
     created_by: { id: "", name: "", email: "", role: "" },
+    language: "",
     priority: "low",
     dueDate: "",
     deliveryTime: "",
@@ -248,7 +250,7 @@ export default function TaskDetailPage() {
       const { data: projectData, error: projectError } = await supabase
         .from("projects_test")
         .select(
-          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by"
+          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by, language"
         )
         .eq("project_id", taskData.project_id)
         .single();
@@ -322,6 +324,7 @@ export default function TaskDetailPage() {
         reference_file: projectData.reference_file || "",
         delivery_date: projectData.delivery_date || "",
         delivery_time: projectData.delivery_time || "",
+        language: projectData.language || "",
 
         // Creator information
         created_by: creatorData,
