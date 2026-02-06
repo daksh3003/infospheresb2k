@@ -26,6 +26,7 @@ import { EditUserDialog } from "./edit-user-dialog";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { api } from "@/utils/api";
 import { toast } from "react-toastify";
+import { isShiftActive, isShiftExpired } from "@/lib/shifts";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -43,6 +44,9 @@ interface User {
     email: string;
     role: string;
     created_at: string;
+    shift?: string | null;
+    shift_start_date?: string | null;
+    shift_end_date?: string | null;
 }
 
 interface Pagination {
@@ -255,6 +259,7 @@ export function UserManagementTable() {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
+                            <TableHead>Shift</TableHead>
                             <TableHead>Created Date</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -262,7 +267,7 @@ export function UserManagementTable() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <div className="flex justify-center">
                                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                                     </div>
@@ -270,7 +275,7 @@ export function UserManagementTable() {
                             </TableRow>
                         ) : users.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <p className="text-muted-foreground">
                                         No users found matching your criteria.
                                     </p>
@@ -285,6 +290,19 @@ export function UserManagementTable() {
                                         <Badge variant={getRoleBadgeVariant(user.role)}>
                                             {getRoleDisplayName(user.role)}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        {user.shift ? (
+                                            isShiftActive(user.shift_start_date ?? null, user.shift_end_date ?? null) ? (
+                                                <Badge variant="default">{user.shift}</Badge>
+                                            ) : isShiftExpired(user.shift_end_date ?? null) ? (
+                                                <Badge variant="secondary">{user.shift} (Expired)</Badge>
+                                            ) : (
+                                                <Badge variant="outline">{user.shift} (Upcoming)</Badge>
+                                            )
+                                        ) : (
+                                            <Badge variant="secondary">Unassigned</Badge>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">
                                         {formatDate(user.created_at)}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { SHIFTS, getShiftByName, isShiftActive } from "@/lib/shifts";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -57,14 +58,8 @@ function determineShift(loginTime: string | null, logoutTime: string | null): { 
     const loginMinute = loginDate.getMinutes();
     const loginTimeMinutes = loginHour * 60 + loginMinute;
     
-    // Define all shifts with their time ranges
-    const shifts = [
-        { name: "Night", start: 22 * 60, end: 6 * 60, startTime: "22:00", endTime: "06:00", spansMidnight: true },
-        { name: "Evening", start: 18 * 60, end: 2 * 60, startTime: "18:00", endTime: "02:00", spansMidnight: true },
-        { name: "Afternoon", start: 14 * 60, end: 22 * 60, startTime: "14:00", endTime: "22:00", spansMidnight: false },
-        { name: "Middle", start: 11 * 60, end: 20 * 60, startTime: "11:00", endTime: "20:00", spansMidnight: false },
-        { name: "General", start: 10 * 60, end: 19 * 60, startTime: "10:00", endTime: "19:00", spansMidnight: false },
-    ];
+    // Use shared shifts definitions
+    const shifts = SHIFTS;
     
     // Find all shifts that the login time falls into
     const matchingShifts = shifts.filter(s => {
@@ -143,7 +138,7 @@ export async function GET() {
         // Fetch profiles data for all users
         const { data: profiles, error: profilesError } = await supabase
             .from("profiles")
-            .select("id, name, email, role")
+            .select("id, name, email, role, shift, shift_start_date, shift_end_date")
             .in("id", userIds);
 
         if (profilesError) {
@@ -167,12 +162,36 @@ export async function GET() {
             const loginTime = session.login_time;
             const logoutTime = session.logout_time;
             const attendanceDate = session.session_date || (loginTime ? loginTime.split('T')[0] : null);
-            
-            // Determine shift based on login and logout times
-            const shiftInfo = determineShift(loginTime, logoutTime);
-            const shift = shiftInfo.shift;
-            const shiftInTime = shiftInfo.shiftInTime;
-            const shiftOutTime = shiftInfo.shiftOutTime;
+
+            // Check if user has an active assigned shift
+            let shift: string;
+            let shiftInTime: string;
+            let shiftOutTime: string;
+
+            const storedShift = profile?.shift;
+            const storedStart = profile?.shift_start_date;
+            const storedEnd = profile?.shift_end_date;
+
+            if (storedShift && isShiftActive(storedStart, storedEnd)) {
+                const shiftDef = getShiftByName(storedShift);
+                if (shiftDef) {
+                    shift = shiftDef.name;
+                    shiftInTime = shiftDef.startTime;
+                    shiftOutTime = shiftDef.endTime;
+                } else {
+                    // Invalid stored shift name, fall back to auto-detection
+                    const shiftInfo = determineShift(loginTime, logoutTime);
+                    shift = shiftInfo.shift;
+                    shiftInTime = shiftInfo.shiftInTime;
+                    shiftOutTime = shiftInfo.shiftOutTime;
+                }
+            } else {
+                // No active assigned shift, fall back to auto-detection
+                const shiftInfo = determineShift(loginTime, logoutTime);
+                shift = shiftInfo.shift;
+                shiftInTime = shiftInfo.shiftInTime;
+                shiftOutTime = shiftInfo.shiftOutTime;
+            }
             
             // Calculate shift in datetime
             const shiftInDateTime = attendanceDate && shiftInTime 

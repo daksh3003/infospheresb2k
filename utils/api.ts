@@ -347,7 +347,7 @@ export const api = {
 
 
   // User management
-  updateUser: async (userId: string, data: { name?: string; role?: string }) => {
+  updateUser: async (userId: string, data: { name?: string; role?: string; shift?: string | null; shift_start_date?: string | null; shift_end_date?: string | null }) => {
     const response = await fetch('/api/users', {
       method: 'PATCH',
       headers: {
