@@ -189,7 +189,8 @@ export async function GET(request: NextRequest) {
                     const diffMins = Math.floor(diffMs / (1000 * 60));
                     const hours = Math.floor(diffMins / 60);
                     const minutes = diffMins % 60;
-                    const totalTimeTaken = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+                    const totalTimeTaken = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
                     // Format date as "DD-MM-YYYY" (manually format to ensure hyphens)
                     const day = String(actionDate.getDate()).padStart(2, '0');
@@ -218,7 +219,7 @@ export async function GET(request: NextRequest) {
                         client: clientName,
                         job_no: jobNo,
                         process: currentStage,
-                        pager: pageCount,  // Make sure this is 'pager', not 'page_no'
+                        page_count: pageCount,
                         start_time: startTime,
                         end_time: endTimeFormatted,
                         total_time_taken: totalTimeTaken,

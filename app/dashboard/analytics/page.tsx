@@ -29,13 +29,40 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Search, ChevronLeft, ChevronRight, CalendarIcon, ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, ShieldCheck, Cpu, ChartNoAxesCombined, FileText, BarChart3, MessageSquare, Download } from "lucide-react"
+import { ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, ShieldCheck, Cpu, ChartNoAxesCombined, FileText, MessageSquare } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, parse } from "date-fns"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog";
+  import { 
+    Clock, 
+    Timer, 
+    TrendingUp, 
+    Coffee, 
+    UserX, 
+    User, 
+    Calendar as CalendarIcon, 
+    RefreshCw, 
+    Download, 
+    Search, 
+    ChevronLeft, 
+    ChevronRight, 
+    Check, 
+    AlertCircle, 
+    Table as TableIcon, 
+    BarChart3 
+} from "lucide-react"
 
 const analyticsTables = [
     { id: "attendance", name: "Attendance", icon: Users },
@@ -46,7 +73,6 @@ const analyticsTables = [
     { id: "processor-report", name: "Processor Report", icon: Cpu },
     { id: "qa-report", name: "QA Report", icon: ShieldCheck },
     { id: "dtp-monthly", name: "DTP Monthly Report", icon: ChartNoAxesCombined },
-    //{ id: "dtp-tracking", name: "DTP Tracking", icon: Box },
     { id: "feedback", name: "Feedback Report", icon: MessageSquare },
 ];
 export default function AnalyticsPage() {
@@ -71,8 +97,6 @@ export default function AnalyticsPage() {
                 return <ProcessorReport />;
             case "dtp-monthly":
                 return <DTPMonthlyReport />;
-            //case "dtp-tracking":
-                //return <DTPTracking />;
             case "feedback":
                 return <FeedbackReport />;
             default:
@@ -126,20 +150,84 @@ function AttendanceTable() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [selectedUser, setSelectedUser] = useState<string | null>(null)
+    const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const [searchQuery, setSearchQuery] = useState("")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(10)
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
+
+    // State for selected columns (all selected by default)
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        department: true,
+        employee_name: true,
+        role: true,
+        attendance_date: true,
+        in_time: true,
+        out_time: true,
+        shift: true,
+        shift_in_time: true,
+        shift_out_time: true,
+        work_duration: true,
+        ot: true,
+        total_duration: true,
+        late_by: true,
+        early_going_by: true,
+        status: true,
+        punch_records: true,
+    })
+
+    // Define column categories
+    const COLUMN_CATEGORIES = {
+        employeeInfo: {
+            label: "Employee Information",
+            columns: [
+                { key: "department", label: "Department" },
+                { key: "employee_name", label: "Employee Name" },
+                { key: "role", label: "Role" },
+                { key: "attendance_date", label: "Date" },
+            ],
+        },
+        timeTracking: {
+            label: "Time Tracking",
+            columns: [
+                { key: "in_time", label: "In" },
+                { key: "out_time", label: "Out" },
+                { key: "shift", label: "Shift" },
+                { key: "shift_in_time", label: "Shift In Time" },
+                { key: "shift_out_time", label: "Shift Out Time" },
+            ],
+        },
+        workHours: {
+            label: "Work Hours & Overtime",
+            columns: [
+                { key: "work_duration", label: "Work" },
+                { key: "ot", label: "OT" },
+                { key: "total_duration", label: "Total Duration" },
+            ],
+        },
+        attendance: {
+            label: "Attendance & Punctuality",
+            columns: [
+                { key: "late_by", label: "Late By" },
+                { key: "early_going_by", label: "Early Going By" },
+                { key: "status", label: "Status" },
+                { key: "punch_records", label: "Punch Records" },
+            ],
+        },
+    }
 
     useEffect(() => {
         fetchAttendanceData()
-    }, [])
+    }, [selectedDate])
 
     const fetchAttendanceData = async () => {
         try {
             setIsLoading(true)
             setError(null)
 
-            const response = await fetch("/api/analytics/attendance")
+            const formattedDate = format(selectedDate, "yyyy-MM-dd")
+            const response = await fetch(`/api/analytics/attendance?date=${formattedDate}`)
             if (!response.ok) throw new Error("Failed to fetch attendance data")
 
             const data = await response.json()
@@ -155,15 +243,40 @@ function AttendanceTable() {
         new Set(attendanceData.map((r) => r.employee_name))
     ).filter(Boolean)
 
-    // Filter data based on selected user and search query
-    const filteredData = attendanceData.filter((r) => {
-        const matchesUser = !selectedUser || r.employee_name === selectedUser
-        const matchesSearch = !searchQuery ||
-            r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            r.department?.toLowerCase().includes(searchQuery.toLowerCase())
-        return matchesUser && matchesSearch
-    })
+    // Filter data based on selected user, date, and search query.
+    // We always filter by the chosen date; we only show rows once an employee is selected.
+    const filteredData = selectedUser
+        ? attendanceData.filter((r) => {
+            const selectedDateStr = format(selectedDate, "dd/MM/yyyy")
+            const matchesDate = r.attendance_date === selectedDateStr
+            const matchesUser = r.employee_name === selectedUser
+            const matchesSearch = !searchQuery ||
+                r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                r.department?.toLowerCase().includes(searchQuery.toLowerCase())
+            
+            return matchesDate && matchesUser && matchesSearch
+        })
+        : []
+
+    // Summary stats now come directly from the API (already in HH:MM:SS format)
+    const summaryStats = (() => {
+        if (!selectedUser || filteredData.length === 0) {
+            return {
+                totalWorking: "00:00:00",
+                totalTimeSpent: "00:00:00",
+                idleTime: "00:00:00",
+            }
+        }
+
+        // All rows for a user+date share the same day-level totals; read from first row
+        const first = filteredData[0] as any
+        return {
+            totalWorking: first.total_working_time || "00:00:00",
+            totalTimeSpent: first.total_time_spent || "00:00:00",
+            idleTime: first.idle_time || "00:00:00",
+        }
+    })()
 
     // Pagination calculations
     const totalPages = Math.ceil(filteredData.length / itemsPerPage)
@@ -174,35 +287,144 @@ function AttendanceTable() {
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1)
-    }, [selectedUser, searchQuery])
+    }, [selectedUser, searchQuery, selectedDate])
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES]
+        const newSelected = { ...selectedColumns }
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked
+        })
+        setSelectedColumns(newSelected)
+    }
+
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES]
+        return category.columns.every(col => selectedColumns[col.key])
+    }
+
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES]
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length
+        return selectedCount > 0 && selectedCount < category.columns.length
+    }
+
+    const handleSelectAll = () => {
+        const newSelected: Record<string, boolean> = {}
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true
+            })
+        })
+        setSelectedColumns(newSelected)
+    }
+
+    const handleDeselectAll = () => {
+        const newSelected: Record<string, boolean> = {}
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false
+            })
+        })
+        setSelectedColumns(newSelected)
+    }
+
     const exportToExcel = () => {
-        const exportData = filteredData.map((r) => ({
-            "Department": r.department,
-            "Employee Name": r.employee_name,
-            "Role": r.role,
-            "Date": r.attendance_date,
-            "In": r.in_time,
-            "Out": r.out_time,
-            "Shift": r.shift,
-            "Work": r.work_duration,
-            "OT": r.ot,
-            "Status": r.status,
-        }))
+        const exportData = filteredData.map((r) => {
+            const row: Record<string, any> = {}
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        row[col.label] = r[col.key] || "N/A"
+                    }
+                })
+            })
+            
+            return row
+        })
 
         const ws = XLSX.utils.json_to_sheet(exportData)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, "Attendance Report")
-        XLSX.writeFile(wb, `Attendance_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`)
+        XLSX.writeFile(wb, `Attendance_Report_${format(selectedDate, "yyyy-MM-dd")}.xlsx`)
     }
 
-    /* -------------------- LOADING -------------------- */
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length
+
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean
+        onCheckedChange: (checked: boolean) => void
+        id: string
+        className?: string
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        )
+    }
+
+    // Timeline visualization component
+    const TimelineRow = ({ record }: { record: any }) => {
+        const shiftStart = record.shift_in_time ? parseInt(record.shift_in_time.split(':')[0]) : 0
+        const shiftEnd = record.shift_out_time ? parseInt(record.shift_out_time.split(':')[0]) : 24
+        const actualIn = record.in_time ? parseInt(record.in_time.split(':')[0]) + parseInt(record.in_time.split(':')[1])/60 : null
+        const actualOut = record.out_time ? parseInt(record.out_time.split(':')[0]) + parseInt(record.out_time.split(':')[1])/60 : null
+
+        return (
+            <div className="relative h-12 bg-gray-100 rounded-lg overflow-hidden">
+                {/* Shift time background */}
+                <div 
+                    className="absolute top-0 h-full bg-blue-50 border-l-2 border-r-2 border-blue-200"
+                    style={{
+                        left: `${(shiftStart / 24) * 100}%`,
+                        width: `${((shiftEnd - shiftStart) / 24) * 100}%`
+                    }}
+                />
+                
+                {/* Actual working time */}
+                {actualIn && actualOut && (
+                    <div 
+                        className="absolute top-1 h-10 bg-green-400 rounded"
+                        style={{
+                            left: `${(actualIn / 24) * 100}%`,
+                            width: `${((actualOut - actualIn) / 24) * 100}%`
+                        }}
+                    />
+                )}
+
+                {/* Time markers */}
+                <div className="absolute inset-0 flex items-center justify-between px-2 text-xs text-gray-600">
+                    <span>00:00</span>
+                    <span>06:00</span>
+                    <span>12:00</span>
+                    <span>18:00</span>
+                    <span>24:00</span>
+                </div>
+            </div>
+        )
+    }
+
     if (isLoading) {
         return <Skeleton className="h-[400px] w-full rounded-lg" />
     }
 
-    /* -------------------- ERROR -------------------- */
     if (error) {
         return (
             <Alert variant="destructive">
@@ -216,11 +438,51 @@ function AttendanceTable() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
+            {/* -------------------- HEADER WITH STATS -------------------- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-blue-600 uppercase">Total Working Time</p>
+                                <p className="text-2xl font-bold text-blue-900 mt-1">{summaryStats.totalWorking}</p>
+                            </div>
+                            <Clock className="h-8 w-8 text-blue-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-purple-600 uppercase">Total Time</p>
+                                <p className="text-2xl font-bold text-purple-900 mt-1">{summaryStats.totalTimeSpent}</p>
+                            </div>
+                            <Timer className="h-8 w-8 text-purple-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-yellow-600 uppercase">Idle Time</p>
+                                <p className="text-2xl font-bold text-yellow-900 mt-1">{summaryStats.idleTime}</p>
+                            </div>
+                            <Coffee className="h-8 w-8 text-yellow-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+            </div>
+
             {/* -------------------- FILTERS BAR -------------------- */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                    <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
                         {/* Search Bar */}
                         <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -233,123 +495,413 @@ function AttendanceTable() {
                             />
                         </div>
 
-                        {/* Employee Dropdown */}
+                        {/* Employee Dropdown - required to view records */}
                         <Select
-                            value={selectedUser || "all"}
-                            onValueChange={(value) => setSelectedUser(value === "all" ? null : value)}
+                            value={selectedUser || ""}
+                            onValueChange={(value) => setSelectedUser(value || null)}
                         >
-                            <SelectTrigger className="w-full sm:w-[250px]">
-                                <SelectValue placeholder="Filter by Employee" />
+                            <SelectTrigger className="w-full lg:w-[250px]">
+                                <SelectValue placeholder="Select employee..." />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">
-                                    All
-                                </SelectItem>
-                                {uniqueUsers.map((user) => {
-                                    return (
-                                        <SelectItem key={user} value={user}>
-                                            {user}
-                                        </SelectItem>
-                                    )
-                                })}
+                                {uniqueUsers.map((user) => (
+                                    <SelectItem key={user} value={user}>
+                                        {user}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
+
+                        {/* Date Picker */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full lg:w-[240px] justify-start text-left font-normal"
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedDate}
+                                    onSelect={(date) => date && setSelectedDate(date)}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+
+                        {/* View Mode Toggle */}
+                        <div className="flex gap-2">
+                            <Button
+                                variant={viewMode === 'table' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setViewMode('table')}
+                                className={viewMode === 'table' ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                            >
+                                <TableIcon className="h-4 w-4 mr-2" />
+                                Table
+                            </Button>
+                            <Button
+                                variant={viewMode === 'timeline' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setViewMode('timeline')}
+                                className={viewMode === 'timeline' ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                            >
+                                <BarChart3 className="h-4 w-4 mr-2" />
+                                Timeline
+                            </Button>
+                        </div>
 
                         {/* Refresh Button */}
                         <Button
                             onClick={fetchAttendanceData}
-                            className="bg-blue-600 text-white hover:bg-blue-700 w-full sm:w-auto"
+                            disabled={isLoading}
+                            className="bg-blue-600 text-white hover:bg-blue-700 w-full lg:w-auto"
                         >
                             Refresh
                         </Button>
 
-                        {/* Download Excel Button */}
-                        <Button
-                            onClick={exportToExcel}
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export Excel
-                        </Button>
+                        {/* Export Excel Button */}
+                        <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={filteredData.length === 0}
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>Select Columns for Export</DialogTitle>
+                                    <DialogDescription>
+                                        Choose which columns to include in the Excel export
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleSelectAll}
+                                    >
+                                        Select All
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleDeselectAll}
+                                    >
+                                        Deselect All
+                                    </Button>
+                                </div>
+
+                                <ScrollArea className="h-[400px] pr-4">
+                                    <div className="space-y-6">
+                                        {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                            <div key={categoryKey} className="space-y-3">
+                                                <div className="flex items-center space-x-2 pb-2 border-b">
+                                                    <CustomCheckbox
+                                                        id={`category-${categoryKey}`}
+                                                        checked={isCategoryFullySelected(categoryKey)}
+                                                        onCheckedChange={(checked) => 
+                                                            handleCategoryToggle(categoryKey, checked)
+                                                        }
+                                                        className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                    />
+                                                    <label
+                                                        htmlFor={`category-${categoryKey}`}
+                                                        className="text-sm font-semibold cursor-pointer"
+                                                    >
+                                                        {category.label}
+                                                    </label>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3 pl-6">
+                                                    {category.columns.map((column) => (
+                                                        <div key={column.key} className="flex items-center space-x-2">
+                                                            <CustomCheckbox
+                                                                id={column.key}
+                                                                checked={selectedColumns[column.key]}
+                                                                onCheckedChange={(checked) =>
+                                                                    setSelectedColumns(prev => ({
+                                                                        ...prev,
+                                                                        [column.key]: checked
+                                                                    }))
+                                                                }
+                                                            />
+                                                            <label
+                                                                htmlFor={column.key}
+                                                                className="text-sm cursor-pointer"
+                                                            >
+                                                                {column.label}
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+
+                                <DialogFooter>
+                                    <div className="flex justify-between w-full items-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            {selectedColumnsCount} columns selected
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => setIsColumnDialogOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                onClick={() => {
+                                                    exportToExcel()
+                                                    setIsColumnDialogOpen(false)
+                                                }}
+                                                className="bg-blue-600 text-white hover:bg-blue-700"
+                                                disabled={selectedColumnsCount === 0}
+                                            >
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Export ({selectedColumnsCount} columns)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* -------------------- TABLE -------------------- */}
-            <Card>
-                <CardHeader>
-                    <div>
-                        <CardTitle>Attendance Report</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {selectedUser ?? "All employees"} · {filteredData.length} records
-                        </p>
-                    </div>
-                </CardHeader>
-
-                <CardContent className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="text-center">Department</TableHead>
-                                <TableHead className="text-center">Employee Name</TableHead>
-                                <TableHead className="text-center">Role</TableHead>
-                                <TableHead className="text-center">Date</TableHead>
-                                <TableHead className="text-center">In</TableHead>
-                                <TableHead className="text-center">Out</TableHead>
-                                <TableHead className="text-center">Shift</TableHead>
-                                <TableHead className="text-center">Work</TableHead>
-                                <TableHead className="text-center">OT</TableHead>
-                                <TableHead className="text-center">Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-
-                        <TableBody>
-                            {paginatedData.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={11} className="text-center">
-                                        No data found
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                paginatedData.map((r, i) => (
-                                    <TableRow key={r.id ?? i}>
-                                        <TableCell className="text-center">{r.department}</TableCell>
-                                        <TableCell className="text-center font-medium">
-                                            {r.employee_name}
-                                        </TableCell>
-                                        <TableCell className="text-center">{r.role}</TableCell>
-                                        <TableCell className="text-center">{r.attendance_date}</TableCell>
-                                        <TableCell className="text-center">{r.in_time}</TableCell>
-                                        <TableCell className="text-center">{r.out_time}</TableCell>
-                                        <TableCell className="text-center">{r.shift}</TableCell>
-                                        <TableCell className="text-center">{r.work_duration}</TableCell>
-                                        <TableCell className="text-center">{r.ot}</TableCell>
-                                        <TableCell className="text-center">
+            {/* -------------------- TIMELINE VIEW -------------------- */}
+            {viewMode === 'timeline' && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>Timeline View</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
+                                </p>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {filteredData.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                <p className="text-lg font-medium">No attendance records found</p>
+                                <p className="text-sm mt-1">Try selecting a different date or employee</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {paginatedData.map((record, index) => (
+                                    <div key={index} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                                    <User className="h-5 w-5 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-900">{record.employee_name}</p>
+                                                    <p className="text-sm text-gray-500">{record.department} · {record.role}</p>
+                                                </div>
+                                            </div>
                                             <Badge
                                                 className={
-                                                    r.status === "Present"
-                                                        ? "bg-white-100 text-black-700 hover:bg-green-200 border-transparent"
-                                                        : "bg-white-100 text-black-700 hover:bg-red-200 border-transparent"
+                                                    record.status === "Present"
+                                                        ? "bg-green-50 text-green-700 border-green-200"
+                                                        : record.status === "Half Day"
+                                                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                                        : "bg-red-50 text-red-700 border-red-200"
                                                 }
                                             >
-                                                <span
-                                                    className={`inline-block w-2 h-2 rounded-full mr-1.5 ${r.status === "Present" ? "bg-green-500" : "bg-red-500"
-                                                        }`}
-                                                />
-                                                {r.status}
+                                                {record.status || "N/A"}
                                             </Badge>
+                                        </div>
+                                        
+                                        <TimelineRow record={record} />
+                                        
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                            <div>
+                                                <p className="text-xs text-gray-500">Check In</p>
+                                                <p className="font-mono font-semibold text-green-600">{record.in_time || "N/A"}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Check Out</p>
+                                                <p className="font-mono font-semibold text-red-600">{record.out_time || "N/A"}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Work Duration</p>
+                                                <p className="font-mono font-semibold">{record.work_duration || "00:00:00"}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Overtime</p>
+                                                <p className="font-mono font-semibold text-purple-600">{record.ot || "00:00:00"}</p>
+                                            </div>
+                                        </div>
+
+                                        {(record.late_by !== "00:00:00" || record.early_going_by !== "00:00:00") && (
+                                            <div className="flex gap-4 mt-3 pt-3 border-t">
+                                                {record.late_by !== "00:00:00" && (
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                                        <span className="text-gray-600">Late by:</span>
+                                                        <span className="font-mono font-semibold text-red-600">{record.late_by}</span>
+                                                    </div>
+                                                )}
+                                                {record.early_going_by !== "00:00:00" && (
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                                                        <span className="text-gray-600">Early by:</span>
+                                                        <span className="font-mono font-semibold text-orange-600">{record.early_going_by}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* -------------------- TABLE VIEW -------------------- */}
+            {viewMode === 'table' && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>Attendance Records</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
+                                </p>
+                            </div>
+                        </div>
+                    </CardHeader>
+
+                    <CardContent className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    {selectedColumns.department && <TableHead className="text-center min-w-[150px]">Department</TableHead>}
+                                    {selectedColumns.employee_name && <TableHead className="text-center min-w-[150px]">Employee Name</TableHead>}
+                                    {selectedColumns.role && <TableHead className="text-center min-w-[150px]">Role</TableHead>}
+                                    {selectedColumns.attendance_date && <TableHead className="text-center min-w-[120px]">Date</TableHead>}
+                                    {selectedColumns.in_time && <TableHead className="text-center min-w-[100px]">In</TableHead>}
+                                    {selectedColumns.out_time && <TableHead className="text-center min-w-[100px]">Out</TableHead>}
+                                    {selectedColumns.shift && <TableHead className="text-center min-w-[100px]">Shift</TableHead>}
+                                    {selectedColumns.shift_in_time && <TableHead className="text-center min-w-[120px]">Shift In Time</TableHead>}
+                                    {selectedColumns.shift_out_time && <TableHead className="text-center min-w-[120px]">Shift Out Time</TableHead>}
+                                    {selectedColumns.work_duration && <TableHead className="text-center min-w-[100px]">Work</TableHead>}
+                                    {selectedColumns.ot && <TableHead className="text-center min-w-[100px]">OT</TableHead>}
+                                    {selectedColumns.total_duration && <TableHead className="text-center min-w-[120px]">Total Duration</TableHead>}
+                                    {selectedColumns.late_by && <TableHead className="text-center min-w-[100px]">Late By</TableHead>}
+                                    {selectedColumns.early_going_by && <TableHead className="text-center min-w-[130px]">Early Going By</TableHead>}
+                                    {selectedColumns.status && <TableHead className="text-center min-w-[100px]">Status</TableHead>}
+                                    {selectedColumns.punch_records && <TableHead className="text-center min-w-[120px]">Punch Records</TableHead>}
+                                </TableRow>
+                            </TableHeader>
+
+                            <TableBody>
+                                {paginatedData.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={16} className="text-center py-12">
+                                            <div className="flex flex-col items-center justify-center text-muted-foreground">
+                                                <p className="text-lg font-medium">No attendance records found</p>
+                                                <p className="text-sm mt-1">Try selecting a different date or employee</p>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+                                ) : (
+                                    paginatedData.map((r, i) => (
+                                        <TableRow key={r.id ?? i} className="hover:bg-muted/50">
+                                            {selectedColumns.department && (
+                                                <TableCell className="text-center font-medium">{r.department || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.employee_name && (
+                                                <TableCell className="text-center font-semibold">
+                                                    {r.employee_name || "N/A"}
+                                                </TableCell>
+                                            )}
+                                            {selectedColumns.role && (
+                                                <TableCell className="text-center">{r.role || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.attendance_date && (
+                                                <TableCell className="text-center">{r.attendance_date || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.in_time && (
+                                                <TableCell className="text-center">{r.in_time || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.out_time && (
+                                                <TableCell className="text-center">{r.out_time || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.shift && (
+                                                <TableCell className="text-center">{r.shift || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.shift_in_time && (
+                                                <TableCell className="text-center">{r.shift_in_time || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.shift_out_time && (
+                                                <TableCell className="text-center">{r.shift_out_time || "N/A"}</TableCell>
+                                            )}
+                                            {selectedColumns.work_duration && (
+                                                <TableCell className="text-center">{r.work_duration || "00:00:00"}</TableCell>
+                                            )}
+                                            {selectedColumns.ot && (
+                                                <TableCell className="text-center">{r.ot || "00:00:00"}</TableCell>
+                                            )}
+                                            {selectedColumns.total_duration && (
+                                                <TableCell className="text-center">{r.total_duration || "00:00:00"}</TableCell>
+                                            )}
+                                            {selectedColumns.late_by && (
+                                                <TableCell className="text-center">{r.late_by || "00:00:00"}</TableCell>
+                                            )}
+                                            {selectedColumns.early_going_by && (
+                                                <TableCell className="text-center">{r.early_going_by || "00:00:00"}</TableCell>
+                                            )}
+                                            {selectedColumns.status && (
+                                                <TableCell className="text-center">
+                                                    <Badge
+                                                        className={`text-black-700 bg-white-100 border-transparent`
+                                                        }
+                                                    >
+                                                        <span
+                                                            className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                                                r.status === "Present" 
+                                                                    ? "bg-green-500" 
+                                                                    : r.status === "Half Day"
+                                                                    ? "bg-yellow-500"
+                                                                    : "bg-red-500"
+                                                            }`}
+                                                        />
+                                                        {r.status || "N/A"}
+                                                    </Badge>
+                                                </TableCell>
+                                            )}
+                                            {selectedColumns.punch_records && (
+                                                <TableCell className="text-center">{r.punch_records || "0"}</TableCell>
+                                            )}
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
 
-                {/* -------------------- PAGINATION -------------------- */}
-                {filteredData.length > 0 && (
-                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+            {/* -------------------- PAGINATION -------------------- */}
+            {filteredData.length > 0 && (
+                <Card>
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">
                                 Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
@@ -423,8 +975,8 @@ function AttendanceTable() {
                             </div>
                         </div>
                     </CardContent>
-                )}
-            </Card>
+                </Card>
+            )}
         </div>
     )
 }
@@ -443,25 +995,95 @@ function UserDailyReport() {
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [userSearchQuery, setUserSearchQuery] = useState("");
     const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
 
-    // Fetch available users
+    // State for selected columns (all selected by default)
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        s_no: true,
+        year: true,
+        month: true,
+        working_date: true,
+        name: true,
+        client_name: true,
+        task_name: true,
+        project_name: true,
+        file_no: true,
+        work_type: true,
+        no_of_pages: true,
+        start_time: true,
+        end_time: true,
+        total_working_time: true,
+    });
+
+    // Define column categories
+    const COLUMN_CATEGORIES = {
+        basicInfo: {
+            label: "Basic Information",
+            columns: [
+                { key: "s_no", label: "S.No" },
+                { key: "year", label: "Year" },
+                { key: "month", label: "Month" },
+                { key: "working_date", label: "Working Date" },
+                { key: "name", label: "Name" },
+            ],
+        },
+        projectDetails: {
+            label: "Project Details",
+            columns: [
+                { key: "client_name", label: "Client Name" },
+                { key: "task_name", label: "Task Name" },
+                { key: "project_name", label: "Project Name" },
+                { key: "file_no", label: "File No" },
+            ],
+        },
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "work_type", label: "Work Type" },
+                { key: "no_of_pages", label: "No of Pages" },
+            ],
+        },
+        timeTracking: {
+            label: "Time Tracking",
+            columns: [
+                { key: "start_time", label: "Start Time" },
+                { key: "end_time", label: "End Time" },
+                { key: "total_working_time", label: "Total Working Time" },
+            ],
+        },
+    };
+
+    // Fetch available users based on selected date
     useEffect(() => {
         fetchAvailableUsers();
-    }, []);
+    }, [selectedDate]);
 
     const fetchAvailableUsers = async () => {
         try {
-            const response = await fetch("/api/analytics/attendance");
+            const response = await fetch(`/api/analytics/attendance?date=${selectedDate}`);
             if (response.ok) {
                 const data = await response.json();
-                // Get unique users from attendance data
+                // Get unique users from attendance data using name as the unique key
                 const uniqueUsers = Array.from(
-                    new Map(data.map((record: any) => [record.employee_id, {
-                        id: record.employee_id,
-                        name: record.employee_name
-                    }])).values()
-                );
+                    new Map(data.map((record: any) => {
+                        const userName = record.employee_name || record.name;
+                        const userId = record.employee_id || record.id || userName;
+                        return [
+                            userName, // Use name as the unique key to prevent duplicates
+                            {
+                                id: userId,
+                                name: userName
+                            }
+                        ];
+                    })).values()
+                ).sort((a: any, b: any) => a.name.localeCompare(b.name)); // Sort alphabetically
+                
                 setAvailableUsers(uniqueUsers);
+                
+                // Reset selected user if they're not in the new list
+                if (selectedUserId && !uniqueUsers.find((u: any) => u.id === selectedUserId)) {
+                    setSelectedUserId(null);
+                }
             }
         } catch (err) {
             console.error("Error fetching users:", err);
@@ -536,29 +1158,105 @@ function UserDailyReport() {
         setCurrentPage(1);
     }, [searchQuery, selectedUserId, selectedDate]);
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAll = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAll = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "S.No": entry.s_no,
-            "Year": entry.year,
-            "Month": entry.month,
-            "Working Date": entry.working_date,
-            "Name": entry.name,
-            "Client Name": entry.client_name,
-            "Task Name": entry.task_name,
-            "Project Name": entry.project_name,
-            "File No": entry.file_no,
-            "Work Type": entry.work_type,
-            "No of Pages": entry.no_of_pages,
-            "Start Time": entry.start_time,
-            "End Time": entry.end_time,
-            "Total Working Time": entry.total_working_time,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "User Daily Report");
         XLSX.writeFile(wb, `User_Daily_Report_${selectedDate}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     // Filter users for dropdown search
@@ -602,30 +1300,7 @@ function UserDailyReport() {
                             />
                         </div>
 
-                        {/* User Selection */}
-                        <Select
-                            value={selectedUserId || ""}
-                            onValueChange={(value) => setSelectedUserId(value || null)}
-                        >
-                            <SelectTrigger className="w-full sm:w-[200px]">
-                                <SelectValue placeholder="Select user..." />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                                {availableUsers.length === 0 ? (
-                                    <SelectItem value="no-users" disabled>
-                                        No users available
-                                    </SelectItem>
-                                ) : (
-                                    availableUsers.map((user) => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                            {user.name}
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Date Selection */}
+                        {/* Date Selection - Now comes before User Selection */}
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
@@ -650,6 +1325,29 @@ function UserDailyReport() {
                             </PopoverContent>
                         </Popover>
 
+                        {/* User Selection */}
+                        <Select
+                            value={selectedUserId || ""}
+                            onValueChange={(value) => setSelectedUserId(value || null)}
+                        >
+                            <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectValue placeholder="Select user..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                                {availableUsers.length === 0 ? (
+                                    <SelectItem value="no-users" disabled>
+                                        No users available
+                                    </SelectItem>
+                                ) : (
+                                    availableUsers.map((user) => (
+                                        <SelectItem key={user.id} value={user.id}>
+                                            {user.name}
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
+
                         {/* Refresh Button */}
                         <Button
                             onClick={fetchDailyReport}
@@ -659,16 +1357,118 @@ function UserDailyReport() {
                             Refresh
                         </Button>
 
-                        {/* Download Excel Button */}
-                        <Button
-                            onClick={exportToExcel}
-                            variant="outline"
-                            disabled={filteredData.length === 0}
-                            className="w-full sm:w-auto"
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export Excel
-                        </Button>
+                        {/* Export Excel Button with Column Selection Dialog */}
+                        <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    disabled={filteredData.length === 0}
+                                    className="w-full sm:w-auto"
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export Excel
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>Select Columns for Export</DialogTitle>
+                                    <DialogDescription>
+                                        Choose which columns to include in the Excel export
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleSelectAll}
+                                    >
+                                        Select All
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleDeselectAll}
+                                    >
+                                        Deselect All
+                                    </Button>
+                                </div>
+
+                                <ScrollArea className="h-[400px] pr-4">
+                                    <div className="space-y-6">
+                                        {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                            <div key={categoryKey} className="space-y-3">
+                                                <div className="flex items-center space-x-2 pb-2 border-b">
+                                                    <CustomCheckbox
+                                                        id={`category-${categoryKey}`}
+                                                        checked={isCategoryFullySelected(categoryKey)}
+                                                        onCheckedChange={(checked) => 
+                                                            handleCategoryToggle(categoryKey, checked)
+                                                        }
+                                                        className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                    />
+                                                    <label
+                                                        htmlFor={`category-${categoryKey}`}
+                                                        className="text-sm font-semibold cursor-pointer"
+                                                    >
+                                                        {category.label}
+                                                    </label>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3 pl-6">
+                                                    {category.columns.map((column) => (
+                                                        <div key={column.key} className="flex items-center space-x-2">
+                                                            <CustomCheckbox
+                                                                id={column.key}
+                                                                checked={selectedColumns[column.key]}
+                                                                onCheckedChange={(checked) =>
+                                                                    setSelectedColumns(prev => ({
+                                                                        ...prev,
+                                                                        [column.key]: checked
+                                                                    }))
+                                                                }
+                                                            />
+                                                            <label
+                                                                htmlFor={column.key}
+                                                                className="text-sm cursor-pointer"
+                                                            >
+                                                                {column.label}
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+
+                                <DialogFooter>
+                                    <div className="flex justify-between w-full items-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            {selectedColumnsCount} columns selected
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => setIsColumnDialogOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                onClick={() => {
+                                                    exportToExcel();
+                                                    setIsColumnDialogOpen(false);
+                                                }}
+                                                className="bg-blue-600 text-white hover:bg-blue-700"
+                                                disabled={selectedColumnsCount === 0}
+                                            >
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Export ({selectedColumnsCount} columns)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </CardContent>
             </Card>
@@ -710,7 +1510,7 @@ function UserDailyReport() {
                         <TableBody>
                             {paginatedData.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={12} className="text-center">
+                                    <TableCell colSpan={14} className="text-center">
                                         {selectedUserId
                                             ? "No data found for the selected date"
                                             : "Please select a user and date"}
@@ -718,7 +1518,7 @@ function UserDailyReport() {
                                 </TableRow>
                             ) : (
                                 paginatedData.map((entry, index) => (
-                                    <TableRow key={index}>
+                                    <TableRow key={`row-${index}`}>
                                         <TableCell className="text-center">{entry.s_no}</TableCell>
                                         <TableCell className="text-center">{entry.year}</TableCell>
                                         <TableCell className="text-center">{entry.month}</TableCell>
@@ -795,7 +1595,7 @@ function UserDailyReport() {
 
                                         return (
                                             <Button
-                                                key={pageNum}
+                                                key={`page-${i}`}
                                                 variant={currentPage === pageNum ? "default" : "outline"}
                                                 size="sm"
                                                 onClick={() => setCurrentPage(pageNum)}
@@ -840,6 +1640,33 @@ function UserMonthlyReport() {
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    // State for selected columns (all selected by default)
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        s_no: true,
+        name: true,
+        total_pages: true,
+        total_hours: true,
+    });
+
+    // Define column categories
+    const COLUMN_CATEGORIES = {
+        userInfo: {
+            label: "User Information",
+            columns: [
+                { key: "s_no", label: "S.No" },
+                { key: "name", label: "Name Of The User" },
+            ],
+        },
+        performance: {
+            label: "Performance Metrics",
+            columns: [
+                { key: "total_pages", label: "Page Count" },
+                { key: "total_hours", label: "PO Hours" },
+            ],
+        },
+    };
 
     // Fetch available users with roles
     useEffect(() => {
@@ -852,14 +1679,21 @@ function UserMonthlyReport() {
             const response = await fetch("/api/analytics/attendance");
             if (response.ok) {
                 const data = await response.json();
-                // Get unique users with roles from attendance data
+                // Get unique users with roles from attendance data - using name as unique key
                 const uniqueUsers = Array.from(
-                    new Map(data.map((record: any) => [record.employee_id, {
-                        id: record.employee_id,
-                        name: record.employee_name,
-                        role: record.role
-                    }])).values()
-                );
+                    new Map(data.map((record: any) => {
+                        const userName = record.employee_name || record.name;
+                        const userId = record.employee_id || record.id || userName;
+                        return [
+                            userName, // Use name as the unique key to prevent duplicates
+                            {
+                                id: userId,
+                                name: userName,
+                                role: record.role
+                            }
+                        ];
+                    })).values()
+                ).sort((a: any, b: any) => a.name.localeCompare(b.name)); // Sort alphabetically
 
                 // Filter by team type if selected
                 let filteredUsers = uniqueUsers;
@@ -1008,19 +1842,114 @@ function UserMonthlyReport() {
         return format(date, 'MMMM yyyy');
     };
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = tableData.map((entry: any) => ({
-            "S.No": entry.s_no,
-            "Name Of The User": entry.name,
-            "Page Count": entry.total_pages || 0,
-            "PO Hours": parseFloat(entry.total_hours || 0).toFixed(2),
-        }));
+        const exportData = tableData.map((entry: any) => {
+            const row: Record<string, any> = {};
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        let value = entry[col.key];
+                        
+                        // Format specific fields
+                        if (col.key === "total_hours") {
+                            value = parseFloat(value || 0).toFixed(2);
+                        } else if (col.key === "total_pages") {
+                            value = value || 0;
+                        }
+                        
+                        row[col.label] = value || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "User Monthly Report");
         XLSX.writeFile(wb, `User_Monthly_Report_${selectedMonth}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -1174,26 +2103,128 @@ function UserMonthlyReport() {
                             Refresh
                         </Button>
 
-                        {/* Download Excel Button */}
-                        <Button
-                            onClick={exportToExcel}
-                            variant="outline"
-                            disabled={tableData.length === 0}
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export Excel
-                        </Button>
+                        {/* Export Excel Button with Column Selection Dialog */}
+                        <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    disabled={tableData.length === 0}
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export Excel
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>Select Columns for Export</DialogTitle>
+                                    <DialogDescription>
+                                        Choose which columns to include in the Excel export
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleSelectAllColumns}
+                                    >
+                                        Select All
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleDeselectAllColumns}
+                                    >
+                                        Deselect All
+                                    </Button>
+                                </div>
+
+                                <ScrollArea className="h-[250px] pr-4">
+                                    <div className="space-y-6">
+                                        {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                            <div key={categoryKey} className="space-y-3">
+                                                <div className="flex items-center space-x-2 pb-2 border-b">
+                                                    <CustomCheckbox
+                                                        id={`category-${categoryKey}`}
+                                                        checked={isCategoryFullySelected(categoryKey)}
+                                                        onCheckedChange={(checked) => 
+                                                            handleCategoryToggle(categoryKey, checked)
+                                                        }
+                                                        className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                    />
+                                                    <label
+                                                        htmlFor={`category-${categoryKey}`}
+                                                        className="text-sm font-semibold cursor-pointer"
+                                                    >
+                                                        {category.label}
+                                                    </label>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3 pl-6">
+                                                    {category.columns.map((column) => (
+                                                        <div key={column.key} className="flex items-center space-x-2">
+                                                            <CustomCheckbox
+                                                                id={column.key}
+                                                                checked={selectedColumns[column.key]}
+                                                                onCheckedChange={(checked) =>
+                                                                    setSelectedColumns(prev => ({
+                                                                        ...prev,
+                                                                        [column.key]: checked
+                                                                    }))
+                                                                }
+                                                            />
+                                                            <label
+                                                                htmlFor={column.key}
+                                                                className="text-sm cursor-pointer"
+                                                            >
+                                                                {column.label}
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+
+                                <DialogFooter>
+                                    <div className="flex justify-between w-full items-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            {selectedColumnsCount} columns selected
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => setIsColumnDialogOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                onClick={() => {
+                                                    exportToExcel();
+                                                    setIsColumnDialogOpen(false);
+                                                }}
+                                                className="bg-blue-600 text-white hover:bg-blue-700"
+                                                disabled={selectedColumnsCount === 0}
+                                            >
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Export ({selectedColumnsCount} columns)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
 
                     {/* Selected Users Display */}
                     {selectedUserIds.length > 0 && selectedUserIds.length < availableUsers.length && (
                         <div className="mt-4">
                             <div className="flex flex-wrap gap-2">
-                                {getSelectedUserNames().map((name: string) => {
+                                {getSelectedUserNames().map((name: string, idx: number) => {
                                     const userId = availableUsers.find((u: any) => u.name === name)?.id;
                                     return (
                                         <Badge
-                                            key={userId}
+                                            key={`badge-${userId}-${idx}`}
                                             variant="secondary"
                                             className="inline-flex items-center gap-1 px-3 py-1"
                                         >
@@ -1249,8 +2280,8 @@ function UserMonthlyReport() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                paginatedData.map((entry: any) => (
-                                    <TableRow key={entry.user_id}>
+                                paginatedData.map((entry: any, index: number) => (
+                                    <TableRow key={`row-${entry.user_id || index}`}>
                                         <TableCell className="text-center">{entry.s_no}</TableCell>
                                         <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
@@ -1315,7 +2346,7 @@ function UserMonthlyReport() {
 
                                         return (
                                             <Button
-                                                key={pageNum}
+                                                key={`page-${i}`}
                                                 variant={currentPage === pageNum ? "default" : "outline"}
                                                 size="sm"
                                                 onClick={() => setCurrentPage(pageNum)}
@@ -1353,6 +2384,50 @@ function POReport() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        s_no: true,
+        received_date: true,
+        project_name: true,
+        received_pages: true,
+        process: true,
+        po_hours: true,
+        output_pages: true,
+        delivery_date: true,
+        status: true,
+        po_status: true,
+        po_number: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        projectInfo: {
+            label: "Project Information",
+            columns: [
+                { key: "s_no", label: "S. No" },
+                { key: "project_name", label: "Project Name" },
+                { key: "po_number", label: "PO Number" },
+            ],
+        },
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "received_pages", label: "Received Pages" },
+                { key: "process", label: "Process" },
+                { key: "po_hours", label: "PO Hours" },
+                { key: "output_pages", label: "Output Pages" },
+            ],
+        },
+        timeline: {
+            label: "Timeline & Status",
+            columns: [
+                { key: "received_date", label: "Received Date" },
+                { key: "delivery_date", label: "Delivery Date" },
+                { key: "status", label: "Status" },
+                { key: "po_status", label: "PO Status" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchPOReport();
@@ -1420,26 +2495,105 @@ function POReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "S. No": entry.s_no,
-            "Received Date": entry.received_date,
-            "Project Name": entry.project_name,
-            "Received Pages": entry.received_pages,
-            "Process": entry.process,
-            "PO Hours": entry.po_hours,
-            "Output Pages": entry.output_pages,
-            "Delivery Date": entry.delivery_date,
-            "Status": entry.status,
-            "PO Status": entry.po_status,
-            "PO Number": entry.po_number,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "PO Report");
         XLSX.writeFile(wb, `PO_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -1542,15 +2696,117 @@ function POReport() {
                                 Filter
                             </Button>
 
-                            {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            {/* Export Excel Button with Column Selection Dialog */}
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAllColumns}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAllColumns}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[300px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>
@@ -1723,6 +2979,43 @@ function QAReport() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        working_date: true,
+        name: true,
+        client_name: true,
+        file_name: true,
+        work_type: true,
+        page_no: true,
+        start_time: true,
+        end_time: true,
+        total_working_hours: true,
+        po: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "working_date", label: "Working Date" },
+                { key: "name", label: "Name" },
+                { key: "client_name", label: "Client Name" },
+                { key: "file_name", label: "File Name" },
+                { key: "work_type", label: "Work type" },
+                { key: "page_no", label: "Page Count" }
+            ],
+        },
+        timeline: {
+            label: "Timeline & Status",
+            columns: [
+                { key: "start_time", label: "Start Time" },
+                { key: "end_time", label: "End Time" },
+                { key: "total_working_hours", label: "Total Working Hours" },
+                { key: "po", label: "PO" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchQAReport();
@@ -1791,26 +3084,104 @@ function QAReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
     // Export to Excel function
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "Working Date": entry.working_date,
-            "Name": entry.name,
-            "Client Name": entry.client_name,
-            "File Name": entry.file_name,
-            "Work Type": entry.work_type,
-            "Page Count": entry.page_no,
-            "Start Time": entry.start_time,
-            "End Time": entry.end_time,
-            "Total Working Hours": entry.total_working_hours,
-            "PO": entry.po,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if(selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "QA Report");
         XLSX.writeFile(wb, `QA_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     };
+
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length,
+        0
+    );
+
+    const CustomCheckbox = ({
+        checked,
+        onCheckedChange,
+        id,
+        className = ""
+    }: {
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
+    }
 
     /* -------------------- LOADING -------------------- */
     if (isLoading) {
@@ -1913,14 +3284,116 @@ function QAReport() {
                             </Button>
 
                             {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAllColumns}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAllColumns}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[300px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>
@@ -2081,6 +3554,52 @@ function DTPMonthlyReport() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        s_no: true,
+        date: true,
+        name: true,
+        client_name: true,
+        job_no: true,
+        process: true,
+        page_count: true,
+        start_time: true,
+        end_time: true,
+        total_time: true,
+        shift: true,
+        po_hours: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        projectInfo: {
+            label: "Project Information",
+            columns: [
+                { key: "s_no", label: "S. No" },
+                { key: "date", label: "Date" },
+            ],
+        },
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "name", label: "Employee Name" },
+                { key: "client_name", label: "Client Name" },
+                { key: "job_no", label: "Job No." },
+                { key: "process", label: "Process" },
+                { key: "page_count", label: "Page Count" },
+                { key: "po_hours", label: "PO Hours" },
+            ],
+        },
+        timeline: {
+            label: "Timeline",
+            columns: [
+                { key: "start_time", label: "Start Time" },
+                { key: "end_time", label: "End Time" },
+                { key: "total_time", label: "Total Time" },
+                { key: "shift", label: "Shift" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchDTPMonthlyReport();
@@ -2150,27 +3669,106 @@ function DTPMonthlyReport() {
         return format(date, 'MMMM yyyy');
     };
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "S.No": entry.s_no,
-            "Date": entry.date,
-            "Employee Name": entry.name,
-            "Client Name": entry.client_name,
-            "Job No.": entry.job_no,
-            "Process": entry.process,
-            "Page Count": entry.page_count,
-            "Start Time": entry.start_time,
-            "End Time": entry.end_time,
-            "Total Time Taken": entry.total_time,
-            "Shift": entry.shift,
-            "PO Hours": entry.po_hours,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+            
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if (selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "DTP Monthly Report");
-        XLSX.writeFile(wb, `DTP_Monthly_Report_${selectedMonth}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "PO Report");
+        XLSX.writeFile(wb, `DTP_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -2248,14 +3846,116 @@ function DTPMonthlyReport() {
                             </Button>
 
                             {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAllColumns}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAllColumns}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[300px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>
@@ -2417,6 +4117,72 @@ function FeedbackReport() {
     const [error, setError] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        s_no: true,
+        date: true,
+        client: true,
+        task: true,
+        filename: true,
+        pages: true,
+        language: true,
+        task_type: true,
+        process: true,
+        qc: true,
+        qa: true,
+        delivery: true,
+        internal_auditor: true,
+        internal_comments: true,
+        external_comments: true,
+        total_errors: true,
+        remarks: true,
+        impact: true,
+        action_impact: true,
+        rca_impact: true,
+        action_rca: true,
+        rca: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        jobDetails: {
+            label: "Job Details",
+            columns: [
+                { key: "s_no", label: "S.No" },
+                { key: "date", label: "Date" },
+                { key: "client", label: "Client" },
+                { key: "task", label: "Task" },
+                { key: "filename", label: "Filename" },
+                { key: "pages", label: "Pages" },
+                { key: "language", label: "Language" },
+                { key: "task_type", label: "Task Type" },
+                { key: "process", label: "Process" },
+                { key: "qc", label: "QC" },
+            ],
+        },
+        qualityAssurance: {
+            label: "Quality Assurance",
+            columns: [
+                { key: "qa", label: "QA" },
+                { key: "delivery", label: "Delivery" },
+                { key: "internal_auditor", label: "Internal Auditor" },
+                { key: "internal_comments", label: "Internal Comments" },
+                { key: "external_comments", label: "External Comments" },
+                { key: "total_errors", label: "Total No. Errors" },
+                { key: "remarks", label: "Remarks" },
+            ],
+        },
+        impactAndRCA: {
+            label: "Impact and RCA",
+            columns: [
+                { key: "impact", label: "Impact" },
+                { key: "action_impact", label: "Action (Impact)" },
+                { key: "rca_impact", label: "RCA (Impact)" },
+                { key: "action_rca", label: "Action (RCA)" },
+                { key: "rca", label: "RCA" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchFeedbackReport();
@@ -2465,37 +4231,105 @@ function FeedbackReport() {
         }
     };
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = reportData.map((entry) => ({
-            "S.No": entry.s_no,
-            "Date": entry.date,
-            "Client": entry.client,
-            "Task": entry.task,
-            "Filename": entry.filename,
-            "Pages": entry.pages,
-            "Language": entry.language,
-            "Task Type": entry.task_type,
-            "Process": entry.process,
-            "QC": entry.qc,
-            "QA": entry.qa,
-            "Delivery": entry.delivery,
-            "Internal Auditor": entry.internal_auditor,
-            "Internal Comments": entry.internal_comments,
-            "External Comments": entry.external_comments,
-            "Total No. Errors": entry.total_errors,
-            "Remarks": entry.remarks,
-            "Impact": entry.impact,
-            "Action (Impact)": entry.action_impact,
-            "RCA (Impact)": entry.rca_impact,
-            "Action (RCA)": entry.action_rca,
-            "RCA": entry.rca,
-        }));
+        const exportData = reportData.map((entry) => {
+            const row: Record<string, any> = {};
+
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if(selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Feedback Report");
         XLSX.writeFile(wb, `Feedback_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -2563,14 +4397,116 @@ function FeedbackReport() {
                         <label className="block text-xs font-medium text-gray-700 mb-1.5 invisible">
                             Export
                         </label>
-                        <Button
-                            onClick={exportToExcel}
-                            variant="outline"
-                            disabled={reportData.length === 0}
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export Excel
-                        </Button>
+                        <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    disabled={reportData.length === 0}
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export Excel
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>Select Columns for Export</DialogTitle>
+                                    <DialogDescription>
+                                        Choose which columns to include in the Excel export
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleSelectAllColumns}
+                                    >
+                                        Select All
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={handleDeselectAllColumns}
+                                    >
+                                        Deselect All
+                                    </Button>
+                                </div>
+
+                                <ScrollArea className="h-[300px] pr-4">
+                                    <div className="space-y-6">
+                                        {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                            <div key={categoryKey} className="space-y-3">
+                                                <div className="flex items-center space-x-2 pb-2 border-b">
+                                                    <CustomCheckbox
+                                                        id={`category-${categoryKey}`}
+                                                        checked={isCategoryFullySelected(categoryKey)}
+                                                        onCheckedChange={(checked) => 
+                                                            handleCategoryToggle(categoryKey, checked)
+                                                        }
+                                                        className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                    />
+                                                    <label
+                                                        htmlFor={`category-${categoryKey}`}
+                                                        className="text-sm font-semibold cursor-pointer"
+                                                    >
+                                                        {category.label}
+                                                    </label>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3 pl-6">
+                                                    {category.columns.map((column) => (
+                                                        <div key={column.key} className="flex items-center space-x-2">
+                                                            <CustomCheckbox
+                                                                id={column.key}
+                                                                checked={selectedColumns[column.key]}
+                                                                onCheckedChange={(checked) =>
+                                                                    setSelectedColumns(prev => ({
+                                                                        ...prev,
+                                                                        [column.key]: checked
+                                                                    }))
+                                                                }
+                                                            />
+                                                            <label
+                                                                htmlFor={column.key}
+                                                                className="text-sm cursor-pointer"
+                                                            >
+                                                                {column.label}
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+
+                                <DialogFooter>
+                                    <div className="flex justify-between w-full items-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            {selectedColumnsCount} columns selected
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => setIsColumnDialogOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                onClick={() => {
+                                                    exportToExcel();
+                                                    setIsColumnDialogOpen(false);
+                                                }}
+                                                className="bg-blue-600 text-white hover:bg-blue-700"
+                                                disabled={selectedColumnsCount === 0}
+                                            >
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Export ({selectedColumnsCount} columns)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
             </CardHeader>
@@ -2659,6 +4595,43 @@ function QCReport() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        working_date: true,
+        name: true,
+        client_name: true,
+        file_name: true,
+        work_type: true,
+        page_no: true,
+        start_time: true,
+        end_time: true,
+        total_working_hours: true,
+        po: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "working_date", label: "Working Date" },
+                { key: "name", label: "Name" },
+                { key: "client_name", label: "Client Name" },
+                { key: "file_name", label: "File Name" },
+                { key: "work_type", label: "Work type" },
+                { key: "page_no", label: "Page Count" }
+            ],
+        },
+        timeline: {
+            label: "Timeline & Performance",
+            columns: [
+                { key: "start_time", label: "Start Time" },
+                { key: "end_time", label: "End Time" },
+                { key: "total_working_hours", label: "Total Working Hours" },
+                { key: "po", label: "PO" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchQCReport();
@@ -2727,25 +4700,105 @@ function QCReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "Working Date": entry.working_date,
-            "Name": entry.name,
-            "Client Name": entry.client_name,
-            "File Name": entry.file_name,
-            "Work Type": entry.work_type,
-            "Page Count": entry.page_no,
-            "Start Time": entry.start_time,
-            "End Time": entry.end_time,
-            "Total Working Hours": entry.total_working_hours,
-            "PO": entry.po,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if(selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "QC Report");
+        XLSX.utils.book_append_sheet(wb, ws, "QA Report");
         XLSX.writeFile(wb, `QC_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -2849,14 +4902,116 @@ function QCReport() {
                             </Button>
 
                             {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAllColumns}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAllColumns}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[300px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>
@@ -3015,6 +5170,43 @@ function ProcessorReport() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>({
+        working_date: true,
+        name: true,
+        client_name: true,
+        file_name: true,
+        work_type: true,
+        page_no: true,
+        start_time: true,
+        end_time: true,
+        total_working_hours: true,
+        po: true,
+    });
+
+    const COLUMN_CATEGORIES = {
+        workDetails: {
+            label: "Work Details",
+            columns: [
+                { key: "working_date", label: "Working Date" },
+                { key: "name", label: "Name" },
+                { key: "client_name", label: "Client Name" },
+                { key: "file_name", label: "File Name" },
+                { key: "work_type", label: "Work type" },
+                { key: "page_no", label: "Page Count" }
+            ],
+        },
+        timeline: {
+            label: "Timeline & Performance",
+            columns: [
+                { key: "start_time", label: "Start Time" },
+                { key: "end_time", label: "End Time" },
+                { key: "total_working_hours", label: "Total Working Hours" },
+                { key: "po", label: "PO" },
+            ],
+        },
+    };
 
     useEffect(() => {
         fetchProcessorReport();
@@ -3083,25 +5275,105 @@ function ProcessorReport() {
         setCurrentPage(1);
     }, [searchQuery, startDate, endDate]);
 
-    // Export to Excel function
+    // Handle category selection
+    const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const newSelected = { ...selectedColumns };
+        category.columns.forEach(col => {
+            newSelected[col.key] = checked;
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Check if all columns in a category are selected
+    const isCategoryFullySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        return category.columns.every(col => selectedColumns[col.key]);
+    };
+
+    // Check if some (but not all) columns in a category are selected
+    const isCategoryPartiallySelected = (categoryKey: string) => {
+        const category = COLUMN_CATEGORIES[categoryKey as keyof typeof COLUMN_CATEGORIES];
+        const selectedCount = category.columns.filter(col => selectedColumns[col.key]).length;
+        return selectedCount > 0 && selectedCount < category.columns.length;
+    };
+
+    // Handle select/deselect all columns
+    const handleSelectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = true;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    const handleDeselectAllColumns = () => {
+        const newSelected: Record<string, boolean> = {};
+        Object.values(COLUMN_CATEGORIES).forEach(category => {
+            category.columns.forEach(col => {
+                newSelected[col.key] = false;
+            });
+        });
+        setSelectedColumns(newSelected);
+    };
+
+    // Export to Excel function with selected columns
     const exportToExcel = () => {
-        const exportData = filteredData.map((entry) => ({
-            "Working Date": entry.working_date,
-            "Name": entry.name,
-            "Client Name": entry.client_name,
-            "File Name": entry.file_name,
-            "Work Type": entry.work_type,
-            "Page Count": entry.page_no,
-            "Start Time": entry.start_time,
-            "End Time": entry.end_time,
-            "Total Working Hours": entry.total_working_hours,
-            "PO": entry.po,
-        }));
+        const exportData = filteredData.map((entry) => {
+            const row: Record<string, any> = {};
+
+            Object.values(COLUMN_CATEGORIES).forEach(category => {
+                category.columns.forEach(col => {
+                    if(selectedColumns[col.key]) {
+                        row[col.label] = entry[col.key] || "N/A";
+                    }
+                });
+            });
+            
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Processor Report");
+        XLSX.utils.book_append_sheet(wb, ws, "QA Report");
         XLSX.writeFile(wb, `Processor_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    };
+
+    // Count selected columns
+    const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length;
+    const totalColumnsCount = Object.values(COLUMN_CATEGORIES).reduce(
+        (acc, cat) => acc + cat.columns.length, 
+        0
+    );
+
+    // Custom Checkbox component
+    const CustomCheckbox = ({ 
+        checked, 
+        onCheckedChange, 
+        id, 
+        className = "" 
+    }: { 
+        checked: boolean;
+        onCheckedChange: (checked: boolean) => void;
+        id: string;
+        className?: string;
+    }) => {
+        return (
+            <button
+                id={id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                onClick={() => onCheckedChange(!checked)}
+                className={`h-4 w-4 rounded border border-gray-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    checked ? "bg-blue-600 border-blue-600" : "bg-white"
+                } ${className}`}
+            >
+                {checked && <Check className="h-3 w-3 text-white" />}
+            </button>
+        );
     };
 
     /* -------------------- LOADING -------------------- */
@@ -3205,14 +5477,116 @@ function ProcessorReport() {
                             </Button>
 
                             {/* Download Excel Button */}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                                disabled={filteredData.length === 0}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Excel
-                            </Button>
+                            <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        disabled={filteredData.length === 0}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export Excel
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Columns for Export</DialogTitle>
+                                        <DialogDescription>
+                                            Choose which columns to include in the Excel export
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleSelectAllColumns}
+                                        >
+                                            Select All
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={handleDeselectAllColumns}
+                                        >
+                                            Deselect All
+                                        </Button>
+                                    </div>
+
+                                    <ScrollArea className="h-[300px] pr-4">
+                                        <div className="space-y-6">
+                                            {Object.entries(COLUMN_CATEGORIES).map(([categoryKey, category]) => (
+                                                <div key={categoryKey} className="space-y-3">
+                                                    <div className="flex items-center space-x-2 pb-2 border-b">
+                                                        <CustomCheckbox
+                                                            id={`category-${categoryKey}`}
+                                                            checked={isCategoryFullySelected(categoryKey)}
+                                                            onCheckedChange={(checked) => 
+                                                                handleCategoryToggle(categoryKey, checked)
+                                                            }
+                                                            className={isCategoryPartiallySelected(categoryKey) ? "bg-blue-400 border-blue-400" : ""}
+                                                        />
+                                                        <label
+                                                            htmlFor={`category-${categoryKey}`}
+                                                            className="text-sm font-semibold cursor-pointer"
+                                                        >
+                                                            {category.label}
+                                                        </label>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 pl-6">
+                                                        {category.columns.map((column) => (
+                                                            <div key={column.key} className="flex items-center space-x-2">
+                                                                <CustomCheckbox
+                                                                    id={column.key}
+                                                                    checked={selectedColumns[column.key]}
+                                                                    onCheckedChange={(checked) =>
+                                                                        setSelectedColumns(prev => ({
+                                                                            ...prev,
+                                                                            [column.key]: checked
+                                                                        }))
+                                                                    }
+                                                                />
+                                                                <label
+                                                                    htmlFor={column.key}
+                                                                    className="text-sm cursor-pointer"
+                                                                >
+                                                                    {column.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+
+                                    <DialogFooter>
+                                        <div className="flex justify-between w-full items-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                {selectedColumnsCount} columns selected
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="outline"
+                                                    onClick={() => setIsColumnDialogOpen(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => {
+                                                        exportToExcel();
+                                                        setIsColumnDialogOpen(false);
+                                                    }}
+                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                    disabled={selectedColumnsCount === 0}
+                                                >
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                    Export ({selectedColumnsCount} columns)
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </CardContent>

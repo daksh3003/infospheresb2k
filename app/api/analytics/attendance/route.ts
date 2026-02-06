@@ -312,6 +312,8 @@ export async function GET() {
 
             return {
                 id: session.id,
+                employee_id: session.user_id,
+                name: profile?.name || 'Unknown',
                 department: profile?.role || 'Unknown',
                 employee_name: profile?.name || 'Unknown',
                 role: profile?.role || 'Unknown',
@@ -331,7 +333,68 @@ export async function GET() {
             };
         });
 
-        return NextResponse.json(attendanceData);
+        // -------- Aggregate per employee + date for summary fields --------
+        const parseHHMMSSToMinutes = (time: string | null | undefined) => {
+            if (!time || typeof time !== "string" || time === "N/A") return 0;
+            const parts = time.split(":").map(Number);
+            if (parts.length < 2 || parts.some(isNaN)) return 0;
+            const [hours, minutes, seconds] = [parts[0], parts[1], parts[2] ?? 0];
+            return hours * 60 + minutes + Math.floor(seconds / 60);
+        };
+
+        type DayKey = string;
+        const dayAggregates = new Map<
+            DayKey,
+            { totalWorkingMinutes: number; firstInMinutes: number | null; lastOutMinutes: number | null }
+        >();
+
+        attendanceData.forEach((row: any) => {
+            const key: DayKey = `${row.employee_id || row.employee_name || ""}_${row.attendance_date || ""}`;
+            if (!dayAggregates.has(key)) {
+                dayAggregates.set(key, { totalWorkingMinutes: 0, firstInMinutes: null, lastOutMinutes: null });
+            }
+            const agg = dayAggregates.get(key)!;
+
+            // Per-session working minutes come from total_duration
+            agg.totalWorkingMinutes += parseHHMMSSToMinutes(row.total_duration);
+
+            const inM = parseHHMMSSToMinutes(row.in_time);
+            const outM = parseHHMMSSToMinutes(row.out_time);
+
+            if (inM > 0) {
+                agg.firstInMinutes = agg.firstInMinutes === null ? inM : Math.min(agg.firstInMinutes, inM);
+            }
+            if (outM > 0) {
+                agg.lastOutMinutes = agg.lastOutMinutes === null ? outM : Math.max(agg.lastOutMinutes, outM);
+            }
+        });
+
+        const enhancedAttendance = attendanceData.map((row: any) => {
+            const key: DayKey = `${row.employee_id || row.employee_name || ""}_${row.attendance_date || ""}`;
+            const agg = dayAggregates.get(key);
+
+            if (!agg || agg.firstInMinutes === null || agg.lastOutMinutes === null || agg.lastOutMinutes <= agg.firstInMinutes) {
+                return {
+                    ...row,
+                    total_working_time: minutesToTimeString(0),
+                    total_time_spent: minutesToTimeString(0),
+                    idle_time: minutesToTimeString(0),
+                };
+            }
+
+            const totalWorking = agg.totalWorkingMinutes;
+            const totalTimeSpent = agg.lastOutMinutes - agg.firstInMinutes;
+            const idle = Math.max(totalTimeSpent - totalWorking, 0);
+
+            return {
+                ...row,
+                total_working_time: minutesToTimeString(totalWorking),
+                total_time_spent: minutesToTimeString(totalTimeSpent),
+                idle_time: minutesToTimeString(idle),
+            };
+        });
+
+        return NextResponse.json(enhancedAttendance);
     } catch(error) {
         console.error("API error:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';

@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
                     date = `${day}-${month}-${year}`;
                 }
 
-                // Format delivery time
+                // Format delivery time (HH:MM:SS)
                 let deliveryTime = "N/A";
                 if (project.delivery_time) {
                     try {
@@ -203,7 +203,8 @@ export async function GET(request: NextRequest) {
                             deliveryTime = timeObj.toLocaleTimeString('en-US', {
                                 hour12: false,
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                second: '2-digit'
                             });
                         } else {
                             const timeStr = String(project.delivery_time);
@@ -211,7 +212,8 @@ export async function GET(request: NextRequest) {
                             if (timeMatch) {
                                 const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
                                 const minutes = timeMatch[2];
-                                deliveryTime = `${hours}:${minutes}`;
+                                const seconds = timeMatch[3] || "00";
+                                deliveryTime = `${hours}:${minutes}:${seconds}`;
                             }
                         }
                     } catch (e) {
@@ -220,7 +222,8 @@ export async function GET(request: NextRequest) {
                         if (timeMatch) {
                             const hours = String(parseInt(timeMatch[1])).padStart(2, '0');
                             const minutes = timeMatch[2];
-                            deliveryTime = `${hours}:${minutes}`;
+                            const seconds = timeMatch[3] || "00";
+                            deliveryTime = `${hours}:${minutes}:${seconds}`;
                         }
                     }
                 }
@@ -230,6 +233,7 @@ export async function GET(request: NextRequest) {
 
                 reportEntries.push({
                     job_no: jobNo++,
+                    project_id: project.project_id,
                     delivered_by: deliveredBy,
                     po: poHours || 0,
                     mail_instruction: project.mail_instruction || "N/A",
@@ -359,8 +363,8 @@ export async function GET(request: NextRequest) {
                     if (dtpActions.length > 0) {
                         // Get the person who took it up (first action's user_id)
                         dtpPersonId = dtpActions[0].user_id;
-                        dtpStartTime = new Date(dtpActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-                        dtpEndTime = new Date(dtpActions[dtpActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                        dtpStartTime = new Date(dtpActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        dtpEndTime = new Date(dtpActions[dtpActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     } else {
                         // Fallback: check iterations for assigned processor
                         const processorIteration = iterations.find((it: any) =>
@@ -387,9 +391,9 @@ export async function GET(request: NextRequest) {
                 const qcPerson = qcPersonId ? userIdToNameMap.get(qcPersonId) : "N/A";
 
                 const qcStartTime = qcActions[0]?.created_at ?
-                    new Date(qcActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
+                    new Date(qcActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A";
                 const qcEndTime = qcActions[qcActions.length - 1]?.created_at ?
-                    new Date(qcActions[qcActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
+                    new Date(qcActions[qcActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A";
 
                 // Get QA person - find from actions where current_stage is "QA"
                 const qaActions = actions.filter((a: any) => {
@@ -403,9 +407,9 @@ export async function GET(request: NextRequest) {
                 const qaPerson = qaPersonId ? userIdToNameMap.get(qaPersonId) : "N/A";
 
                 const qaStartTime = qaActions[0]?.created_at ?
-                    new Date(qaActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
+                    new Date(qaActions[0].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A";
                 const qaEndTime = qaActions[qaActions.length - 1]?.created_at ?
-                    new Date(qaActions[qaActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : "N/A";
+                    new Date(qaActions[qaActions.length - 1].created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "N/A";
 
                 const poHours = projectToPOHoursMap.get(project.project_id) ?? 0;
 
@@ -465,6 +469,7 @@ export async function GET(request: NextRequest) {
                 reportEntries.push({
                     // Job Details
                     job_no: jobNo++,
+                    project_id: project.project_id,
                     delivered_by: deliveredBy,
                     po: poHours || 0,
                     mail_instruction: project.mail_instruction || "N/A",
@@ -510,9 +515,37 @@ export async function GET(request: NextRequest) {
             });
         });
 
+        // Aggregate to one row per project_id to avoid duplicates
+        const projectMap = new Map<string, any>();
 
+        reportEntries.forEach((entry: any) => {
+            const key = String(entry.project_id ?? entry.job_no);
+            if (!projectMap.has(key)) {
+                projectMap.set(key, { ...entry });
+            } else {
+                const agg = projectMap.get(key);
 
-        return NextResponse.json(reportEntries);
+                // Sum file and page counts
+                agg.file_count = (agg.file_count || 0) + (entry.file_count || 0);
+                agg.page_count = (agg.page_count || 0) + (entry.page_count || 0);
+
+                // If any task says "Yes" for Abbyy/CXN, keep "Yes" at project level
+                ["abbyy_compare_dtp", "abbyy_compare_qc", "abbyy_compare_qa", "cxn_status"].forEach((field) => {
+                    if (entry[field] === "Yes") {
+                        agg[field] = "Yes";
+                    }
+                });
+            }
+        });
+
+        const aggregatedEntries = Array.from(projectMap.values());
+
+        // Reassign job numbers sequentially
+        aggregatedEntries.forEach((entry: any, index: number) => {
+            entry.job_no = index + 1;
+        });
+
+        return NextResponse.json(aggregatedEntries);
     } catch (error) {
         console.error("Error fetching DTP Tracking report:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';

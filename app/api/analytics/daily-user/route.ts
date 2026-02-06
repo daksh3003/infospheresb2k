@@ -132,8 +132,24 @@ export async function GET(request: NextRequest) {
 
                 // Process actions that have work information (start, complete, upload, etc.)
                 if (['start', 'complete', 'pause', 'resume', 'upload'].includes(action.action_type)) {
-                    // Get current_stage from metadata - this is the work_type
+                    // Get current_stage from metadata - this is the base work_type
                     const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
+                    const sentBy = metadata.sent_by || "";
+
+                    // For Processor entries in User Daily, mirror CXN logic from DTP Tracking:
+                    // If the previous stage (sent_by) was QC/QA and the current stage is Processor,
+                    // then show work type as "QC CXN" or "QA CXN".
+                    let displayWorkType = currentStage;
+                    const currentStageUpper = String(currentStage).toUpperCase();
+                    const sentByUpper = String(sentBy).toUpperCase().trim();
+
+                    if (currentStageUpper === "PROCESSOR") {
+                        if (sentByUpper === "QC") {
+                            displayWorkType = "QC CXN";
+                        } else if (sentByUpper === "QA") {
+                            displayWorkType = "QA CXN";
+                        }
+                    }
                     
                     // Get page count from files_info array
                     let pageCount = 0;
@@ -172,7 +188,8 @@ export async function GET(request: NextRequest) {
                     // Format as HH:MM
                     const hours = Math.floor(totalWorkingHours);
                     const minutes = Math.floor((totalWorkingHours - hours) * 60);
-                    const totalWorkingTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    const seconds = Math.floor((totalWorkingHours - hours - minutes / 60) * 3600);
+                    const totalWorkingTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
                     reportEntries.push({
                         s_no: reportEntries.length + 1,
@@ -188,7 +205,7 @@ export async function GET(request: NextRequest) {
                         task_name: taskName,
                         project_name: projectName,
                         file_no: fileId,
-                        work_type: currentStage, 
+                        work_type: displayWorkType, 
                         no_of_pages: pageCount,
                         start_time: actionDate.toLocaleTimeString('en-US', {
                             hour12: false,

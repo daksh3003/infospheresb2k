@@ -195,7 +195,8 @@ export async function GET(request: NextRequest) {
                     const diffMins = Math.floor(diffMs / (1000 * 60));
                     const hours = Math.floor(diffMins / 60);
                     const minutes = diffMins % 60;
-                    const totalWorkingHours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+                    const totalWorkingHours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
                     const day = String(actionDate.getDate()).padStart(2, '0');
                     const month = String(actionDate.getMonth() + 1).padStart(2, '0');
