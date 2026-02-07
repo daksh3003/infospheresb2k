@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
         const projectIds = [...new Set(Array.from(taskToProjectMap.values()))].filter(Boolean);
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name, po_hours")  // Removed client_name since it doesn't exist
+            .select("project_id, project_name, po_hours")
             .in("project_id", projectIds);
 
         if(projectsError) {
@@ -115,7 +115,6 @@ export async function GET(request: NextRequest) {
         const taskToFileMap = new Map();
         if(files) {
             files.forEach((file: any) => {
-                // Store file_name instead of file_id
                 if(!taskToFileMap.has(file.task_id)) {
                     taskToFileMap.set(file.task_id, file.file_name);
                 }
@@ -176,7 +175,7 @@ export async function GET(request: NextRequest) {
                     }
 
                     const projectId = taskToProjectMap.get(taskId);
-                    const clientName = "N/A";  // Set to N/A for all records since client_name column doesn't exist
+                    const clientName = "N/A";
                     const filename = taskToFileMap.get(taskId) || "N/A";
                     const poHours = projectId ? (projectToPOHoursMap.get(projectId) || 0) : 0;
                     const username = metadata.user_name || userIdToNameMap.get(action.user_id) || "N/A";
@@ -186,8 +185,6 @@ export async function GET(request: NextRequest) {
                         const nextAction = actions[i + 1];
                         endTime = nextAction.metadata?.timestamp || nextAction.created_at;
                     } else {
-                        // If this is the last action, use a default duration (e.g., 10 minutes)
-                        // or you could use the current timestamp
                         const defaultEndTime = new Date(timestamp);
                         defaultEndTime.setMinutes(defaultEndTime.getMinutes() + 10);
                         endTime = defaultEndTime.toISOString();
@@ -202,7 +199,6 @@ export async function GET(request: NextRequest) {
                     const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
                     const totalWorkingHours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                     
-                    // Format working date as "DD-MM-YYYY" (manually format to ensure hyphens)
                     const day = String(actionDate.getDate()).padStart(2, '0');
                     const month = String(actionDate.getMonth() + 1).padStart(2, '0');
                     const year = actionDate.getFullYear();
@@ -248,48 +244,81 @@ export async function GET(request: NextRequest) {
             return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
         });
 
-        // Merge consecutive entries with same file_name (same task), regardless of work_type/phases
-        const mergedEntries: any[] = [];
-        const mergeKey = (entry: any) => `${entry.file_name}_${entry.working_date}`;
-        
+        // Group entries by file and date first, then merge within each group
+        const groupedByFile = new Map<string, any[]>();
+
+        reportEntries.forEach(entry => {
+            const key = `${entry.file_name}_${entry.working_date}`;
+            if (!groupedByFile.has(key)) {
+                groupedByFile.set(key, []);
+            }
+            groupedByFile.get(key)!.push(entry);
+        });
+
         const parseTimeToSeconds = (timeStr: string) => {
             const parts = timeStr.split(':').map(Number);
             return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
         };
 
-        for (let i = 0; i < reportEntries.length; i++) {
-            const current = reportEntries[i];
-            const currentKey = mergeKey(current);
-            
-            if (mergedEntries.length > 0) {
-                const last = mergedEntries[mergedEntries.length - 1];
-                const lastKey = mergeKey(last);
+        const mergedEntries: any[] = [];
+
+        // Process each file group
+        groupedByFile.forEach((entries, key) => {
+            // Sort entries within this file group by start time
+            entries.sort((a, b) => {
+                const timeA = parseTimeToSeconds(a.start_time);
+                const timeB = parseTimeToSeconds(b.start_time);
+                return timeA - timeB;
+            });
+
+            // Merge consecutive entries within this file group
+            for (let i = 0; i < entries.length; i++) {
+                const current = entries[i];
                 
-                if (currentKey === lastKey) {
-                    const lastEndSeconds = parseTimeToSeconds(last.end_time);
-                    const currentStartSeconds = parseTimeToSeconds(current.start_time);
-                    const timeGap = currentStartSeconds - lastEndSeconds;
+                if (mergedEntries.length > 0) {
+                    const last = mergedEntries[mergedEntries.length - 1];
+                    const lastKey = `${last.file_name}_${last.working_date}`;
                     
-                    if (timeGap >= 0 && timeGap <= 5) {
-                        last.end_time = current.end_time;
-                        const startSeconds = parseTimeToSeconds(last.start_time);
-                        const endSeconds = parseTimeToSeconds(current.end_time);
-                        const totalSeconds = endSeconds - startSeconds;
-                        const hours = Math.floor(totalSeconds / 3600);
-                        const minutes = Math.floor((totalSeconds % 3600) / 60);
-                        const seconds = totalSeconds % 60;
-                        last.total_working_hours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                        last.work_type = current.work_type;
-                        if (current.page_no > 0 && last.page_no !== current.page_no) {
-                            last.page_no = Math.max(last.page_no, current.page_no);
+                    // Only merge if it's the same file and date
+                    if (lastKey === key) {
+                        const lastEndSeconds = parseTimeToSeconds(last.end_time);
+                        const currentStartSeconds = parseTimeToSeconds(current.start_time);
+                        const timeGap = currentStartSeconds - lastEndSeconds;
+                        
+                        // Merge if gap is 5 seconds or less
+                        if (timeGap >= 0 && timeGap <= 5) {
+                            last.end_time = current.end_time;
+                            const startSeconds = parseTimeToSeconds(last.start_time);
+                            const endSeconds = parseTimeToSeconds(current.end_time);
+                            const totalSeconds = endSeconds - startSeconds;
+                            const hours = Math.floor(totalSeconds / 3600);
+                            const minutes = Math.floor((totalSeconds % 3600) / 60);
+                            const seconds = totalSeconds % 60;
+                            last.total_working_hours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                            last.work_type = current.work_type;
+                            if (current.page_no > 0 && last.page_no !== current.page_no) {
+                                last.page_no = Math.max(last.page_no, current.page_no);
+                            }
+                            continue;
                         }
-                        continue;
                     }
                 }
+                
+                mergedEntries.push({ ...current });
             }
-            
-            mergedEntries.push({ ...current });
-        }
+        });
+
+        // Final sort by date and time across all entries
+        mergedEntries.sort((a, b) => {
+            const dateA = new Date(a.working_date.split('-').reverse().join('-'));
+            const dateB = new Date(b.working_date.split('-').reverse().join('-'));
+            if(dateA.getTime() !== dateB.getTime()) {
+                return dateA.getTime() - dateB.getTime();
+            }
+            const timeA = parseTimeToSeconds(a.start_time);
+            const timeB = parseTimeToSeconds(b.start_time);
+            return timeA - timeB;
+        });
         
         return NextResponse.json(mergedEntries);
     } catch (error) {

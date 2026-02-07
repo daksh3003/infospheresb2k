@@ -132,7 +132,6 @@ export async function GET(request: NextRequest) {
         });
         
         const reportEntries: any[] = [];
-        let serialNumber = 1;
 
         taskGroups.forEach((actions, taskId) => {
             actions.sort((a, b) => {
@@ -213,7 +212,6 @@ export async function GET(request: NextRequest) {
                     });
 
                     reportEntries.push({
-                        s_no: serialNumber++,
                         date: date,
                         name: username,
                         client: clientName,
@@ -241,11 +239,88 @@ export async function GET(request: NextRequest) {
             return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
         });
 
-        reportEntries.forEach((entry, index) => {
+        // Group entries by job_no and date first, then merge within each group
+        const groupedByFile = new Map<string, any[]>();
+
+        reportEntries.forEach(entry => {
+            const key = `${entry.job_no}_${entry.date}`;
+            if (!groupedByFile.has(key)) {
+                groupedByFile.set(key, []);
+            }
+            groupedByFile.get(key)!.push(entry);
+        });
+
+        const parseTimeToSeconds = (timeStr: string) => {
+            const parts = timeStr.split(':').map(Number);
+            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+        };
+
+        const mergedEntries: any[] = [];
+
+        // Process each job group
+        groupedByFile.forEach((entries, key) => {
+            // Sort entries within this job group by start time
+            entries.sort((a, b) => {
+                const timeA = parseTimeToSeconds(a.start_time);
+                const timeB = parseTimeToSeconds(b.start_time);
+                return timeA - timeB;
+            });
+
+            // Merge consecutive entries within this job group
+            for (let i = 0; i < entries.length; i++) {
+                const current = entries[i];
+                
+                if (mergedEntries.length > 0) {
+                    const last = mergedEntries[mergedEntries.length - 1];
+                    const lastKey = `${last.job_no}_${last.date}`;
+                    
+                    // Only merge if it's the same job and date
+                    if (lastKey === key) {
+                        const lastEndSeconds = parseTimeToSeconds(last.end_time);
+                        const currentStartSeconds = parseTimeToSeconds(current.start_time);
+                        const timeGap = currentStartSeconds - lastEndSeconds;
+                        
+                        // Merge if gap is 5 seconds or less
+                        if (timeGap >= 0 && timeGap <= 5) {
+                            last.end_time = current.end_time;
+                            const startSeconds = parseTimeToSeconds(last.start_time);
+                            const endSeconds = parseTimeToSeconds(current.end_time);
+                            const totalSeconds = endSeconds - startSeconds;
+                            const hours = Math.floor(totalSeconds / 3600);
+                            const minutes = Math.floor((totalSeconds % 3600) / 60);
+                            const seconds = totalSeconds % 60;
+                            last.total_time_taken = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                            last.process = current.process;
+                            if (current.page_count > 0 && last.page_count !== current.page_count) {
+                                last.page_count = Math.max(last.page_count, current.page_count);
+                            }
+                            continue;
+                        }
+                    }
+                }
+                
+                mergedEntries.push({ ...current });
+            }
+        });
+
+        // Final sort by date and time across all entries
+        mergedEntries.sort((a, b) => {
+            const dateA = new Date(a.date.split('-').reverse().join('-'));
+            const dateB = new Date(b.date.split('-').reverse().join('-'));
+            if(dateA.getTime() !== dateB.getTime()) {
+                return dateA.getTime() - dateB.getTime();
+            }
+            const timeA = parseTimeToSeconds(a.start_time);
+            const timeB = parseTimeToSeconds(b.start_time);
+            return timeA - timeB;
+        });
+
+        // Add serial numbers after all merging and sorting
+        mergedEntries.forEach((entry, index) => {
             entry.s_no = index + 1;
         });
 
-        return NextResponse.json(reportEntries);
+        return NextResponse.json(mergedEntries);
     } catch (error) {
         console.error("Error fetching DTP report:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';
