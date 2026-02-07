@@ -3,10 +3,10 @@ import { createClient } from '@/lib/server';
 
 export async function GET() {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    const { data: iterations, error: iterationsError } = await supabase
         .from("task_iterations")
         .select(
-          `
+            `
           id, 
           current_stage, 
           status, 
@@ -17,12 +17,33 @@ export async function GET() {
         )
         .eq("current_stage", "QC");
 
-    if (error) {
+    if (iterationsError) {
         return NextResponse.json(
-            { error: error.message },
+            { error: iterationsError.message },
             { status: 400 }
         );
     }
 
-    return NextResponse.json(data); 
-}   
+    const taskIds = iterations.map(i => i.task_id);
+    const { data: actions, error: actionsError } = await supabase
+        .from("task_actions")
+        .select("task_id, action_type")
+        .in("task_id", taskIds)
+        .order("created_at", { ascending: false });
+
+    if (actionsError) throw actionsError;
+
+    const latestActionMap = new Map();
+    actions?.forEach(a => {
+        if (!latestActionMap.has(a.task_id)) {
+            latestActionMap.set(a.task_id, a.action_type);
+        }
+    });
+
+    const dataWithActions = iterations.map(item => ({
+        ...item,
+        latest_action: latestActionMap.get(item.task_id) || null
+    }));
+
+    return NextResponse.json(dataWithActions);
+}

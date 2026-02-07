@@ -22,7 +22,7 @@ export async function GET(
 
     const stagesArray = stages.stages;
     const len = stagesArray.length;
-    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number; uploaded_by_name: string, uploaded_by_role : string }[]; completed: boolean; date: string }[] = [];
+    const timelineItems: { id: string; title: string; content: { name: string; storage_name: string; folder_path: string; index: number; uploaded_by_name: string, uploaded_by_role: string }[]; completed: boolean; date: string }[] = [];
     let cnt_of_processor = 1;
     let latest_processor_folder_path = "";
 
@@ -72,50 +72,124 @@ export async function GET(
         current_stage = "Delivery";
       }
 
-      // Get files from storage
-      const { data: uploadedFiles, error: uploadedFilesError } =
-        await supabase.storage.from(storage_name).list(folder_path);
+      console.log("folder_path", folder_path);
+      console.log("storage_name", storage_name);
+      console.log("stagesArray", stagesArray);
+      console.log("i : ", i)
 
-      if (uploadedFilesError) {
-        return NextResponse.json({ error: 'Failed to fetch uploaded files' }, { status: 500 });
+      // Helper function to fetch files with uploader info from a specific storage
+      const fetchFilesFromStorage = async (
+        storageName: string,
+        folderPath: string,
+        startIndex: number = 0
+      ) => {
+        const { data: files, error: filesError } =
+          await supabase.storage.from(storageName).list(folderPath);
+
+        if (filesError || !files) {
+          return [];
+        }
+
+        const filesWithUploader = await Promise.all(
+          files.map(async (file: { name: string }, index: number) => {
+            const storagePath = `${folderPath}/${file.name}`;
+
+            const { data: fileTestData, error: fileTestError } = await supabase
+              .from('files_test')
+              .select('uploaded_by, file_name')
+              .eq('task_id', taskId)
+              .eq('file_path', storagePath)
+              .maybeSingle();
+
+            let uploaderName = null;
+            let uploaderRole = null;
+            let originalFileName = file.name;
+
+            if (!fileTestError && fileTestData) {
+              originalFileName = fileTestData.file_name || file.name;
+
+              if (fileTestData.uploaded_by) {
+                uploaderName = fileTestData.uploaded_by.name || "Unknown";
+                uploaderRole = fileTestData.uploaded_by.role || "Unknown";
+              }
+            }
+
+            return {
+              name: originalFileName,
+              storage_name: storageName,
+              folder_path: folderPath,
+              index: startIndex + index,
+              uploaded_by_name: uploaderName,
+              uploaded_by_role: uploaderRole,
+            };
+          })
+        );
+
+        return filesWithUploader.filter(item => item !== undefined);
+      };
+
+      // For Delivery stage, fetch files from processor, QC, and QA storages
+      let validContent: any[] = [];
+
+      if (current_stage === "Delivery") {
+        // Fetch processor files
+        const processorFiles = await fetchFilesFromStorage(storage_name, folder_path, 0);
+
+        // Fetch QC files if they exist
+        const qcFiles = await fetchFilesFromStorage("qc-files", taskId, processorFiles.length);
+
+        // Fetch QA files if they exist
+        const qaFiles = await fetchFilesFromStorage("qa-files", taskId, processorFiles.length + qcFiles.length);
+
+        // Combine all files
+        validContent = [...processorFiles, ...qcFiles, ...qaFiles];
+      } else {
+        // For non-Delivery stages, use original logic
+        const { data: uploadedFiles, error: uploadedFilesError } =
+          await supabase.storage.from(storage_name).list(folder_path);
+
+        if (uploadedFilesError) {
+          return NextResponse.json({ error: 'Failed to fetch uploaded files' }, { status: 500 });
+        }
+
+        const contentWithUploader = await Promise.all(
+          uploadedFiles.map(async (file: { name: string }, index: number) => {
+            const storagePath = `${folder_path}/${file.name}`;
+
+            const { data: fileTestData, error: fileTestError } = await supabase
+              .from('files_test')
+              .select('uploaded_by, file_name')
+              .eq('task_id', taskId)
+              .eq('file_path', storagePath)
+              .maybeSingle();
+
+            let uploaderName = null;
+            let uploaderRole = null;
+            let originalFileName = file.name;
+
+            if (!fileTestError && fileTestData) {
+              originalFileName = fileTestData.file_name || file.name;
+
+              if (fileTestData.uploaded_by) {
+                uploaderName = fileTestData.uploaded_by.name || "Unknown";
+                uploaderRole = fileTestData.uploaded_by.role || "Unknown";
+              }
+            }
+
+            return {
+              name: originalFileName,
+              storage_name,
+              folder_path,
+              index,
+              uploaded_by_name: uploaderName,
+              uploaded_by_role: uploaderRole,
+            };
+          })
+        );
+
+        validContent = contentWithUploader.filter(item => item !== undefined);
       }
 
-      // For each file, fetch uploaded_by from files_test
-      const contentWithUploader = await Promise.all(
-        uploadedFiles.map(async (file: { name: string }, index: number) => {
-          // Query files_test for this file
-          const { data: fileTestData, error: fileTestError } = await supabase
-            .from('files_test')
-            .select('uploaded_by')
-            .eq('task_id', taskId)
-            .eq('file_name', file.name)
-            .maybeSingle();
-
-          let uploaderName = null;
-          let uploaderRole = null;
-          
-          if (!fileTestError && fileTestData && fileTestData.uploaded_by) {
-            uploaderName = fileTestData.uploaded_by.name || "Unknown";
-            uploaderRole = fileTestData.uploaded_by.role || "Unknown";
-          } else if (fileTestError) {
-            // Error fetching file test data - non-critical
-          }
-
-          // Always return a valid object, never undefined
-          return {
-            name: file.name,
-            storage_name,
-            folder_path,
-            index,
-            uploaded_by_name: uploaderName,
-            uploaded_by_role: uploaderRole,
-          };
-        })
-      );
-
-      // Filter out any potential undefined values (though we shouldn't have any now)
-      const validContent = contentWithUploader.filter(item => item !== undefined);
-      
       const timelineItem = {
         id: taskId,
         title: current_stage,

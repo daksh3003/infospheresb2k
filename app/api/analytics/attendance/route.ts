@@ -62,79 +62,145 @@ function formatDate(timestamp: string | null): string {
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function determineShift(loginTime: string | null, logoutTime: string | null): { shift: string; shiftInTime: string; shiftOutTime: string } {
-    // Default values
+function normalizeTimeString(time: string | null | undefined): string {
+    if (!time) return "00:00:00";
+    
+    // If already in HH:MM:SS format, return as is
+    if (time.match(/^\d{2}:\d{2}:\d{2}$/)) {
+        return time;
+    }
+    
+    // If in HH:MM format, add seconds
+    if (time.match(/^\d{1,2}:\d{2}$/)) {
+        const parts = time.split(':');
+        return `${parts[0].padStart(2, '0')}:${parts[1]}:00`;
+    }
+    
+    // Try to parse as datetime and extract time
+    try {
+        const date = new Date(time);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+        }
+    } catch (e) {
+        // If parsing fails, return default
+    }
+    
+    return "00:00:00";
+}
+
+function extractTimeFromShiftDate(shiftDate: string | null | undefined): string {
+    if (!shiftDate) return "10:00:00"; // Default
+    
+    // If it's already a time string (HH:MM:SS or HH:MM)
+    if (shiftDate.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+        // Ensure it has seconds
+        const parts = shiftDate.split(':');
+        if (parts.length === 2) {
+            return `${parts[0].padStart(2, '0')}:${parts[1]}:00`;
+        }
+        return shiftDate;
+    }
+    
+    // Check if it's a date-only string (yyyy-MM-dd) - if so, return default
+    // because date-only fields shouldn't be used for time extraction
+    if (shiftDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // This is a date-only field, not a time field
+        // Return default as we can't extract time from a date
+        return "10:00:00";
+    }
+    
+    // If it's a datetime string with time, extract the time portion
+    try {
+        const date = new Date(shiftDate);
+        if (!isNaN(date.getTime())) {
+            // Check if the date string actually contains time information
+            // If it's just a date, the time will be midnight which might be wrong due to timezone
+            const timeStr = date.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            
+            // If the time is 00:00:00 or close to midnight, it might be a date-only field
+            // Check if the original string contains time info
+            if (timeStr === "00:00:00" && !shiftDate.includes('T') && !shiftDate.includes(' ')) {
+                // Likely a date-only field, return default
+                return "10:00:00";
+            }
+            
+            return timeStr;
+        }
+    } catch (e) {
+        // If parsing fails, return default
+    }
+    
+    return "10:00:00"; // Default fallback
+}
+
+function getShiftFromProfile(profile: any, loginTime: string | null): { shift: string; shiftInTime: string; shiftOutTime: string } {
+    // Default values for General shift
     let shift = "General";
     let shiftInTime = "10:00:00";
     let shiftOutTime = "19:00:00";
     
-    if (!loginTime) {
+    // If no profile, return defaults
+    if (!profile) {
         return { shift, shiftInTime, shiftOutTime };
     }
     
-    const loginDate = new Date(loginTime);
-    const loginHour = loginDate.getHours();
-    const loginMinute = loginDate.getMinutes();
-    const loginSecond = loginDate.getSeconds();
-    const loginTimeMinutes = loginHour * 60 + loginMinute + loginSecond / 60;
+    // Use shift from profile if available
+    if (profile.shift) {
+        shift = String(profile.shift).trim();
+    }
     
-    // Define all shifts with their time ranges
-    const shifts = [
-        { name: "Night", start: 22 * 60, end: 6 * 60, startTime: "22:00", endTime: "06:00", spansMidnight: true },
-        { name: "Evening", start: 18 * 60, end: 2 * 60, startTime: "18:00", endTime: "02:00", spansMidnight: true },
-        { name: "Afternoon", start: 14 * 60, end: 22 * 60, startTime: "14:00", endTime: "22:00", spansMidnight: false },
-        { name: "Middle", start: 11 * 60, end: 20 * 60, startTime: "11:00", endTime: "20:00", spansMidnight: false },
-        { name: "General", start: 10 * 60, end: 19 * 60, startTime: "10:00", endTime: "19:00", spansMidnight: false },
-    ];
+    // Check if shift_start_date and shift_end_date contain time information
+    const startDateStr = profile.shift_start_date ? String(profile.shift_start_date).trim() : "";
+    const endDateStr = profile.shift_end_date ? String(profile.shift_end_date).trim() : "";
     
-    // Find all shifts that the login time falls into
-    const matchingShifts = shifts.filter(s => {
-        if (s.spansMidnight) {
-            // For shifts that span midnight, check if login is after start OR before end
-            return loginTimeMinutes >= s.start || loginTimeMinutes < s.end;
+    // Check if these are date-only fields (yyyy-MM-dd) or contain time info
+    // Date-only fields don't have time info, so we'll use shift-based defaults
+    const isDateOnly = (str: string) => str.match(/^\d{4}-\d{2}-\d{2}$/) !== null;
+    const startHasTime = startDateStr && !isDateOnly(startDateStr) && (startDateStr.includes('T') || startDateStr.includes(' ') || startDateStr.match(/^\d{1,2}:\d{2}/));
+    const endHasTime = endDateStr && !isDateOnly(endDateStr) && (endDateStr.includes('T') || endDateStr.includes(' ') || endDateStr.match(/^\d{1,2}:\d{2}/));
+    
+    // Use shift_start_date and shift_end_date from profile ONLY if they contain time information
+    // If they're date-only, we'll use shift-based defaults below
+    if (startHasTime) {
+        shiftInTime = extractTimeFromShiftDate(profile.shift_start_date);
+    }
+    
+    if (endHasTime) {
+        shiftOutTime = extractTimeFromShiftDate(profile.shift_end_date);
+    }
+    
+    // If shift is set but times are not provided or are date-only, use defaults based on shift name
+    // This ensures General shift uses 10:00:00 - 19:00:00, Night uses 22:00:00 - 06:00:00, etc.
+    if (shift && (!startHasTime || !endHasTime)) {
+        const shiftName = String(shift).toLowerCase();
+        if (shiftName.includes("night")) {
+            if (!startHasTime) shiftInTime = "22:00:00";
+            if (!endHasTime) shiftOutTime = "06:00:00";
+        } else if (shiftName.includes("evening")) {
+            if (!startHasTime) shiftInTime = "18:00:00";
+            if (!endHasTime) shiftOutTime = "02:00:00";
+        } else if (shiftName.includes("afternoon")) {
+            if (!startHasTime) shiftInTime = "14:00:00";
+            if (!endHasTime) shiftOutTime = "22:00:00";
+        } else if (shiftName.includes("middle")) {
+            if (!startHasTime) shiftInTime = "11:00:00";
+            if (!endHasTime) shiftOutTime = "20:00:00";
         } else {
-            // For regular shifts, check if login is between start and end
-            return loginTimeMinutes >= s.start && loginTimeMinutes < s.end;
+            // Default: General or Day shift (10am to 7pm)
+            if (!startHasTime) shiftInTime = "10:00:00";
+            if (!endHasTime) shiftOutTime = "19:00:00";
         }
-    });
-    
-    // If multiple shifts match, prioritize:
-    // 1. Shifts that span midnight (Night, Evening)
-    // 2. Shifts whose start time is closest to login time
-    if (matchingShifts.length > 0) {
-        // First, prefer shifts that span midnight
-        const midnightShifts = matchingShifts.filter(s => s.spansMidnight);
-        if (midnightShifts.length > 0) {
-            // Among midnight shifts, pick the one whose start is closest to login time
-            midnightShifts.sort((a, b) => {
-                const distA = Math.min(
-                    Math.abs(loginTimeMinutes - a.start),
-                    loginTimeMinutes < a.end ? Math.abs(loginTimeMinutes - (a.start - 1440)) : Infinity
-                );
-                const distB = Math.min(
-                    Math.abs(loginTimeMinutes - b.start),
-                    loginTimeMinutes < b.end ? Math.abs(loginTimeMinutes - (b.start - 1440)) : Infinity
-                );
-                return distA - distB;
-            });
-            const selected = midnightShifts[0];
-            shift = selected.name;
-            shiftInTime = selected.startTime;
-            shiftOutTime = selected.endTime;
-        } else {
-            // No midnight shifts, pick the one whose start is closest to login time
-            matchingShifts.sort((a, b) => Math.abs(loginTimeMinutes - a.start) - Math.abs(loginTimeMinutes - b.start));
-            const selected = matchingShifts[0];
-            shift = selected.name;
-            shiftInTime = selected.startTime;
-            shiftOutTime = selected.endTime;
-        }
-    } else {
-        // No matching shift found, assign to General as default
-        // This handles edge cases like login before 10am
-        shift = "General";
-        shiftInTime = "10:00:00";
-        shiftOutTime = "19:00:00";
     }
     
     return { shift, shiftInTime, shiftOutTime };
@@ -164,7 +230,7 @@ export async function GET() {
         // Fetch profiles data for all users
         const { data: profiles, error: profilesError } = await supabase
             .from("profiles")
-            .select("id, name, email, role")
+            .select("id, name, email, role, shift, shift_start_date, shift_end_date")
             .in("id", userIds);
 
         if (profilesError) {
@@ -189,58 +255,51 @@ export async function GET() {
             const logoutTime = session.logout_time;
             const attendanceDate = session.session_date || (loginTime ? loginTime.split('T')[0] : null);
             
-            // Determine shift based on login and logout times
-            const shiftInfo = determineShift(loginTime, logoutTime);
+            // Get shift information from profile
+            const shiftInfo = getShiftFromProfile(profile, loginTime);
             const shift = shiftInfo.shift;
-            const shiftInTime = shiftInfo.shiftInTime;
-            const shiftOutTime = shiftInfo.shiftOutTime;
+            const shiftInTime = normalizeTimeString(shiftInfo.shiftInTime);
+            const shiftOutTime = normalizeTimeString(shiftInfo.shiftOutTime);
             
             // Calculate shift in datetime
             const shiftInDateTime = attendanceDate && shiftInTime 
-                ? `${attendanceDate}T${shiftInTime}:00`
+                ? `${attendanceDate}T${shiftInTime}`
                 : null;
             
             // Calculate shift out datetime - handle shifts that span midnight
             let shiftOutDateTime = null;
-            if (attendanceDate && shiftOutTime && loginTime) {
+            if (attendanceDate && shiftOutTime && shiftInTime && loginTime) {
                 const loginDate = new Date(loginTime);
                 const loginHour = loginDate.getHours();
                 const loginMinute = loginDate.getMinutes();
                 const loginSecond = loginDate.getSeconds();
                 const loginTimeMinutes = loginHour * 60 + loginMinute + loginSecond / 60;
                 
-                // Parse shift out time to minutes
+                // Parse shift times to minutes
+                const [inHour, inMinute, inSecond] = shiftInTime.split(':').map(Number);
+                const shiftInTimeMinutes = inHour * 60 + inMinute + inSecond / 60;
+                
                 const [outHour, outMinute, outSecond] = shiftOutTime.split(':').map(Number);
                 const shiftOutTimeMinutes = outHour * 60 + outMinute + outSecond / 60;
                 
-                // Shifts that span midnight: Night (22:00-06:00) and Evening (18:00-02:00)
-                if (shift === "Night") {
-                    // Night shift: 22:00 - 06:00
-                    if (loginTimeMinutes >= 1320) {
-                        // Login between 22:00-23:59, shift ends next day at 06:00
+                // Check if shift spans midnight (end time is earlier than start time)
+                const spansMidnight = shiftOutTimeMinutes < shiftInTimeMinutes;
+                
+                if (spansMidnight) {
+                    // Shift spans midnight
+                    if (loginTimeMinutes >= shiftInTimeMinutes) {
+                        // Login after shift start (e.g., 22:00), shift ends next day
                         const nextDay = new Date(attendanceDate);
                         nextDay.setDate(nextDay.getDate() + 1);
                         const nextDayStr = nextDay.toISOString().split('T')[0];
-                        shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
+                        shiftOutDateTime = `${nextDayStr}T${shiftOutTime}`;
                     } else {
-                        // Login between 00:00-05:59, shift ends same day at 06:00
-                        shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
-                    }
-                } else if (shift === "Evening") {
-                    // Evening shift: 18:00 - 02:00
-                    if (loginTimeMinutes >= 1080) {
-                        // Login between 18:00-23:59, shift ends next day at 02:00
-                        const nextDay = new Date(attendanceDate);
-                        nextDay.setDate(nextDay.getDate() + 1);
-                        const nextDayStr = nextDay.toISOString().split('T')[0];
-                        shiftOutDateTime = `${nextDayStr}T${shiftOutTime}:00`;
-                    } else {
-                        // Login between 00:00-01:59, shift ends same day at 02:00
-                        shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
+                        // Login before shift start (e.g., 00:00-05:59), shift ends same day
+                        shiftOutDateTime = `${attendanceDate}T${shiftOutTime}`;
                     }
                 } else {
-                    // All other shifts end same day
-                    shiftOutDateTime = `${attendanceDate}T${shiftOutTime}:00`;
+                    // Shift does not span midnight, ends same day
+                    shiftOutDateTime = `${attendanceDate}T${shiftOutTime}`;
                 }
             }
             
@@ -320,9 +379,9 @@ export async function GET() {
                 attendance_date: attendanceDate ? formatDate(attendanceDate) : 'Unknown',
                 in_time: formatTime(loginTime),
                 out_time: formatTime(logoutTime),
-                shift: shift,
-                shift_in_time: shiftInTime,
-                shift_out_time: shiftOutTime,
+                shift: shift || 'General',
+                shift_in_time: normalizeTimeString(shiftInTime),
+                shift_out_time: normalizeTimeString(shiftOutTime),
                 work_duration: workDuration,
                 ot: overtime,
                 total_duration: totalDuration,

@@ -26,6 +26,8 @@ export const FileUpload = ({
   onDeleteUploadedFile,
   onReplaceUploadedFile,
   fileEdits,
+  extraButtons,
+  isSubmitting = false,
 }: {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   uploadedFiles: { name: string; pageCount: number | null }[] | null;
@@ -38,6 +40,8 @@ export const FileUpload = ({
   onDeleteUploadedFile?: (fileName: string) => void;
   onReplaceUploadedFile?: (fileName: string, pageCount: number | null) => void;
   fileEdits?: Record<string, FileEditInfo>;
+  extraButtons?: React.ReactNode;
+  isSubmitting?: boolean;
 }) => {
   // Helper function to format time difference
   const getTimeAgo = (dateString: string) => {
@@ -230,13 +234,15 @@ export const FileUpload = ({
           </div>
         )}
       </div>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-4">
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto"
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 w-full sm:w-auto disabled:opacity-50"
           onClick={handleSubmitFileUpload}
+          disabled={isSubmitting}
         >
-          Submit Files
+          {isSubmitting ? "Submitting..." : "Submit Files"}
         </button>
+        {extraButtons}
       </div>
     </div>
   );

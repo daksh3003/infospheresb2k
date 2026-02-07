@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
   .from("projects_test")
-  .select("project_id, project_name, delivery_date, delivery_time")
+  .select("project_id, project_name, delivery_date, delivery_time, po_hours, language")
   .in("project_id", projectIds);
 
 if (error) throw error;

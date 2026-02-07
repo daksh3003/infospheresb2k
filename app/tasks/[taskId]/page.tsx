@@ -18,6 +18,7 @@ import { Comments } from "@/components/Comments";
 import { FooterButtons } from "@/components/FooterButtons";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { DownloadHistory } from "@/components/DownloadHistory";
+import { generateSafeStorageFileName } from "@/lib/file-utils";
 
 // Updated interfaces based on actual database schema
 // interface TaskFromDB {
@@ -73,6 +74,9 @@ interface Task {
   created_at: string;
   status: string;
   feedback: string;
+  file_type: string;
+  file_format: string;
+  custom_file_format: string;
 
   // From projects_test
   project_id: string;
@@ -83,6 +87,7 @@ interface Task {
   reference_file: string;
   delivery_date: string;
   delivery_time: string;
+  language: string;
 
   // Creator information
   created_by: UserProfile;
@@ -141,9 +146,11 @@ export default function TaskDetailPage() {
 
   // Dialog states :
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
+  const [isHandingOver, setIsHandingOver] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showSubmitToButton, setShowSubmitToButton] = useState(false);
   const [SubmitTo, setSubmitTo] = useState("QC");
+  const [submittingFiles, setSubmittingFiles] = useState(false);
 
   // Updated task state with proper typing
   const [task, setTask] = useState<Task>({
@@ -159,6 +166,9 @@ export default function TaskDetailPage() {
     created_at: "",
     status: "pending",
     feedback: "",
+    file_type: "",
+    file_format: "",
+    custom_file_format: "",
     project_id: "",
     project_name: "",
     po_hours: 0,
@@ -168,6 +178,7 @@ export default function TaskDetailPage() {
     delivery_date: "",
     delivery_time: "",
     created_by: { id: "", name: "", email: "", role: "" },
+    language: "",
     priority: "low",
     dueDate: "",
     deliveryTime: "",
@@ -203,6 +214,7 @@ export default function TaskDetailPage() {
     useState<UserProfile | null>(null);
   const [_isAssigning, _setIsAssigning] = useState(false);
   const [_isTaskPickedUp, _setIsTaskPickedUp] = useState(false);
+  const [lastHandoverBy, setLastHandoverBy] = useState<string | null>(null);
 
   // Refresh triggers
   const [downloadHistoryRefresh, setDownloadHistoryRefresh] = useState(0);
@@ -238,7 +250,7 @@ export default function TaskDetailPage() {
       const { data: projectData, error: projectError } = await supabase
         .from("projects_test")
         .select(
-          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by"
+          "project_id, project_name, client_name, po_hours, mail_instruction, reference_file, delivery_date, delivery_time, completion_status, created_by, language"
         )
         .eq("project_id", taskData.project_id)
         .single();
@@ -299,6 +311,9 @@ export default function TaskDetailPage() {
         created_at: taskData.created_at || "",
         status: taskData.status || "pending",
         feedback: taskData.feedback || "",
+        file_type: taskData.file_type || "",
+        file_format: taskData.file_format || "",
+        custom_file_format: taskData.custom_file_format || "",
 
         // From projects_test
         project_id: projectData.project_id,
@@ -309,6 +324,7 @@ export default function TaskDetailPage() {
         reference_file: projectData.reference_file || "",
         delivery_date: projectData.delivery_date || "",
         delivery_time: projectData.delivery_time || "",
+        language: projectData.language || "",
 
         // Creator information
         created_by: creatorData,
@@ -483,7 +499,8 @@ export default function TaskDetailPage() {
       | "download"
       | "upload"
       | "taken_by"
-      | "assigned_to",
+      | "assigned_to"
+      | "handover",
     additionalMetadata?: Record<string, unknown>
   ) => {
     if (!currentUser || !taskId) return;
@@ -697,11 +714,8 @@ export default function TaskDetailPage() {
 
     let overall_completion_status = false;
 
-    if (
-      (currentStage === "Processor" && sentBy === "QA") ||
-      (currentStage === "QA" && sentBy === "QC") ||
-      (currentStage === "QA" && sentBy === "Processor")
-    ) {
+    // Only mark as overall complete when task reaches Delivery stage
+    if (currentStage === "Delivery") {
       overall_completion_status = true;
     }
 
@@ -761,6 +775,42 @@ export default function TaskDetailPage() {
       setShowCompleteDialog(false);
     } catch (error) {
       console.error("Error completing task:", error);
+    }
+  };
+
+  const handleHandoverTask = async () => {
+    console.log("Handover task");
+    if (!taskId || !currentUser) return;
+    console.log("Handover procedure started for task:", taskId);
+    // Show initial feedback
+    toast.info("Handover initiated...");
+    setIsHandingOver(true);
+
+    try {
+      console.log("Logging handover action...");
+      // Log the handover action
+      await logTaskActionHelper("handover", {
+        previous_status: realStatus,
+        handover_stage: currentStage,
+      });
+
+      console.log("Calling handover API...");
+      // Call API to handover task
+      await api.handoverTask(taskId);
+
+      console.log("Handover API successful!");
+      toast.success("Task handed over successfully!");
+      setShowHandoverDialog(false);
+
+      // Redirect to dashboard after a delay
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error handing over task:", error);
+      toast.error(`Handover failed: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsHandingOver(false);
     }
   };
 
@@ -841,6 +891,43 @@ export default function TaskDetailPage() {
       return;
     }
 
+    // If sending to Delivery, update task and project completion status
+    if (next_current_stage === "Delivery") {
+      // Update task completion_status to true
+      const { error: taskUpdateError } = await supabase
+        .from("tasks_test")
+        .update({ completion_status: true })
+        .eq("task_id", taskId);
+
+      if (taskUpdateError) {
+        console.error("Error updating task completion:", taskUpdateError);
+      } else {
+        // Check if all tasks in project are complete
+        const { data: projectTasks, error: projectTasksError } = await supabase
+          .from("tasks_test")
+          .select("completion_status")
+          .eq("project_id", task.project_id);
+
+        if (!projectTasksError && projectTasks) {
+          const isAllTasksCompleted = projectTasks.every(
+            (t) => t.completion_status
+          );
+
+          if (isAllTasksCompleted) {
+            // Update project completion status
+            const { error: projectError } = await supabase
+              .from("projects_test")
+              .update({ completion_status: true })
+              .eq("project_id", task.project_id);
+
+            if (projectError) {
+              console.error("Error updating project:", projectError);
+            }
+          }
+        }
+      }
+    }
+
     if (realStatus !== "completed") {
       toast("Task not completed", {
         type: "error",
@@ -856,17 +943,21 @@ export default function TaskDetailPage() {
         position: "top-right",
       });
 
-      setTimeout(() => {
-        // Redirect based on source
-        if (source === "global") {
-          router.push("/dashboard");
-        } else if (source) {
-          router.push(`/dashboard/${source}`);
-        } else {
-          // Default fallback to PM dashboard if no source
-          router.push("/dashboard");
-        }
-      }, 4000);
+      // Wait for the timeout before resolving, so the button stays disabled
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          // Redirect based on source
+          if (source === "global") {
+            router.push("/dashboard");
+          } else if (source) {
+            router.push(`/dashboard/${source}`);
+          } else {
+            // Default fallback to PM dashboard if no source
+            router.push("/dashboard");
+          }
+          resolve(true);
+        }, 4000);
+      });
     }
   };
 
@@ -1536,11 +1627,13 @@ export default function TaskDetailPage() {
 
     if (current_stage.sent_by !== "PM") {
       // Fetch processor files directly from database instead of storage listing
+      // Filter by folder path to show only files from the current iteration
       const { data: processorFiles, error: processorError } = await supabase
         .from("files_test")
         .select("file_name, page_count, file_path")
         .eq("task_id", taskId)
-        .eq("storage_name", storage_name);
+        .eq("storage_name", storage_name)
+        .ilike("file_path", `${folder_path}/%`); // Filter by folder path to get only current iteration files
 
       if (processorError) {
         console.error("Error fetching processor files:", processorError);
@@ -1583,18 +1676,7 @@ export default function TaskDetailPage() {
     }
   };
 
-  // Helper function to generate safe storage filename (ASCII only)
-  const generateSafeStorageFileName = (fileName: string): string => {
-    // Get file extension
-    const lastDotIndex = fileName.lastIndexOf(".");
-    const extension = lastDotIndex > -1 ? fileName.substring(lastDotIndex) : "";
-
-    // Generate a unique safe filename using timestamp and random string
-    const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(2, 8);
-
-    return `file_${timestamp}_${randomStr}${extension}`;
-  };
+  // No local generateSafeStorageFileName needed anymore as it is imported
 
   const handleSubmitFileUpload = async () => {
     if (!taskId) {
@@ -1617,6 +1699,7 @@ export default function TaskDetailPage() {
       alert("Please select files to upload.");
       return;
     }
+    setSubmittingFiles(true);
     try {
       // Check if all files have page counts
       for (const file of filesToBeUploaded) {
@@ -1718,12 +1801,15 @@ export default function TaskDetailPage() {
       setfilesToBeUploaded([]);
     } catch (error) {
       console.error("Error uploading files:", error);
+    } finally {
+      setSubmittingFiles(false);
     }
   };
 
   // Modified fetchData to handle loading state
   const fetchData = async () => {
     try {
+      // Fetch task iteration data
       const { data, error } = await supabase
         .from("task_iterations")
         .select("sent_by, current_stage, assigned_to_processor_user_id")
@@ -1734,6 +1820,23 @@ export default function TaskDetailPage() {
         console.error("Error fetching 'sent_by' data:", error);
         return;
       }
+
+      // Fetch the absolutely latest action to see if it was a handover
+      // This prevents showing stale handover messages if other actions (like completion) happened after
+      const { data: latestAction } = await supabase
+        .from('task_actions')
+        .select('action_type, metadata')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Only show banner if the LAST thing that happened was a handover
+      const handoverBy = latestAction?.action_type === 'handover'
+        ? latestAction?.metadata?.user_name
+        : null;
+
+      setLastHandoverBy(handoverBy);
 
       setSentBy(data?.sent_by);
       setCurrentStage(data?.current_stage);
@@ -1763,60 +1866,63 @@ export default function TaskDetailPage() {
 
       setPMFiles(pmFilesWithPageCount);
 
-      let storage_name_correction = "";
+      // Fetch QC and QA files and combine them into correctionFiles
+      const { data: qcFilesData, error: qcError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", "qc-files");
 
-      if (sent_by !== "PM") {
-        if (current_stage === "Processor") {
-          if (sent_by === "QC") {
-            storage_name_correction = "qc-files";
-          } else if (sent_by === "QA") {
-            storage_name_correction = "qa-files";
-          }
-        } else if (current_stage === "QA" && sent_by === "Processor") {
-          storage_name_correction = "qc-files";
-        }
+      const { data: qaFilesData, error: qaError } = await supabase
+        .from("files_test")
+        .select("file_name, page_count, file_path")
+        .eq("task_id", taskId)
+        .eq("storage_name", "qa-files");
 
-        // Fetch correction files directly from database instead of storage listing
-        const { data: correctionFiles, error: correctionError } = await supabase
-          .from("files_test")
-          .select("file_name, page_count, file_path")
-          .eq("task_id", taskId)
-          .eq("storage_name", storage_name_correction);
+      // Combine QC and QA files into correctionFiles
+      const combinedCorrectionFiles = [];
 
-        if (correctionError) {
-          console.error("Error fetching correction files:", correctionError);
-          // return;
-        }
-
-        // Map to the expected format using original filename for display
-        const correctionFilesWithPageCount = (correctionFiles || []).map(
-          (file) => ({
-            name: file.file_name, // Use original filename (with Chinese characters)
-            pageCount: file.page_count || null,
-          })
-        );
-
-        setCorrectionFiles(correctionFilesWithPageCount);
-        // }
+      if (!qcError && qcFilesData) {
+        const qcFiles = qcFilesData.map((file) => ({
+          name: file.file_name,
+          pageCount: file.page_count || null,
+        }));
+        combinedCorrectionFiles.push(...qcFiles);
       }
 
+      if (!qaError && qaFilesData) {
+        const qaFiles = qaFilesData.map((file) => ({
+          name: file.file_name,
+          pageCount: file.page_count || null,
+        }));
+        combinedCorrectionFiles.push(...qaFiles);
+      }
+
+      setCorrectionFiles(combinedCorrectionFiles);
+
       let storage_name = "";
+      let folder_path_prefix = "";
 
       if (current_stage === "Processor") {
         storage_name = "processor-files";
+        folder_path_prefix = `${sent_by}_${taskId}`;
       } else if (current_stage === "QC") {
         storage_name = "qc-files";
+        folder_path_prefix = taskId;
       } else if (current_stage === "QA") {
         storage_name = "qa-files";
+        folder_path_prefix = taskId;
       }
 
 
       // Fetch uploaded files directly from database instead of storage listing
+      // Filter by folder path to ensure we only get files from the current iteration
       const { data: uploadedFiles, error: uploadedError } = await supabase
         .from("files_test")
         .select("file_name, page_count, file_path")
         .eq("task_id", taskId)
-        .eq("storage_name", storage_name);
+        .eq("storage_name", storage_name)
+        .ilike("file_path", `${folder_path_prefix}/%`); // Filter by folder path prefix
 
       if (uploadedError) {
         console.error("Error fetching uploaded files:", uploadedError);
@@ -2132,9 +2238,12 @@ export default function TaskDetailPage() {
           progress={progress}
           onAssignTask={handleAssignTask}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
+          lastHandoverBy={lastHandoverBy}
+          onTaskUpdate={fetchProcessorFiles}
+          currentUser={currentUser}
         />
 
-        {/* Footer with buttons */}
+        {/* Footer with primary buttons (no actions) */}
         <FooterButtons
           currentUser={currentUser || { id: "", name: "", email: "", role: "" }}
           currentStage={currentStage}
@@ -2150,8 +2259,20 @@ export default function TaskDetailPage() {
           onAssignTask={handleAssignTask}
           onStatusUpdate={fetchRealStatus}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
+          setShowHandoverDialog={setShowHandoverDialog}
+          hideActionButtons={true}
         />
       </div>
+
+      {/* Handover Dialog */}
+      <Dialog
+        isOpen={showHandoverDialog}
+        onClose={() => setShowHandoverDialog(false)}
+        title="Handover this task?"
+        description="Are you sure you want to hand over this task? This will remove your assignment and make the task available in the handover queue for others to pick up or for the PM to re-assign."
+        confirmText="Confirm Handover"
+        onConfirm={handleHandoverTask}
+      />
 
       {/* Download History */}
       <DownloadHistory
@@ -2218,22 +2339,33 @@ export default function TaskDetailPage() {
               onDeleteUploadedFile={handleDeleteFileFromUploadedSection}
               onReplaceUploadedFile={handleReplaceFileFromUploadedSection}
               fileEdits={fileEdits}
+              extraButtons={
+                <FooterButtons
+                  currentUser={currentUser || { id: "", name: "", email: "", role: "" }}
+                  currentStage={currentStage}
+                  sentBy={sentBy}
+                  taskId={taskId}
+                  handleStartTask={handleStartTask}
+                  handlePauseResumeTask={handlePauseResumeTask}
+                  handleSendTo={handleSendTo}
+                  showSubmitToButton={showSubmitToButton}
+                  setShowCompleteDialog={setShowCompleteDialog}
+                  status={realStatus}
+                  SubmitTo={SubmitTo}
+                  onAssignTask={handleAssignTask}
+                  onStatusUpdate={fetchRealStatus}
+                  assignmentRefreshTrigger={assignmentRefreshTrigger}
+                  setShowHandoverDialog={setShowHandoverDialog}
+                  showOnlyActionButtons={true}
+                />
+              }
+              isSubmitting={submittingFiles}
             />
           </div>
         )
       }
 
       {activeTab === "comments" && <Comments taskId={taskId} />}
-
-      {/* Handover Dialog */}
-      <Dialog
-        isOpen={showHandoverDialog}
-        onClose={() => setShowHandoverDialog(false)}
-        title="Hand over this task?"
-        description="This will transfer ownership of the task to another team member."
-        confirmText="Continue"
-        onConfirm={() => { }}
-      />
 
       {/* Complete Task Dialog */}
       <Dialog

@@ -9,7 +9,7 @@ const calculateStatus = (deliveryDate: string, completionStatus: string) => {
   const delivery = new Date(deliveryDate);
   const diffTime = delivery.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays < 0) return "overdue";
   if (diffDays <= 1) return "urgent";
   if (diffDays <= 3) return "due-soon";
@@ -21,7 +21,7 @@ const calculatePriority = (deliveryDate: string, poHours: number) => {
   const delivery = new Date(deliveryDate);
   const diffTime = delivery.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays < 0 || poHours >= 40) return "high";
   if (diffDays <= 2 || poHours >= 20) return "medium";
   return "low";
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
       const { data: projectNamesData, error: projectNamesError } = await supabase
         .from("projects_test")
-        .select("project_id, project_name, delivery_date, delivery_time")
+        .select("project_id, project_name, delivery_date, delivery_time, language")
         .in("project_id", uniqueProjectIds);
 
       if (projectNamesError) {
@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
               name: string;
               delivery_date: string;
               delivery_time: string;
+              language: string;
             };
           },
           project
@@ -117,6 +118,7 @@ export async function GET(request: NextRequest) {
             name: project.project_name,
             delivery_date: project.delivery_date,
             delivery_time: project.delivery_time,
+            language: project.language,
           };
           return acc;
         },

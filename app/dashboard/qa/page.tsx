@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TaskCard } from "@/components/task-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { fetchBatchTaskAssignments } from "@/utils/taskAssignments";
+import { fetchBatchTaskAssignments, AssignedUser } from "@/utils/taskAssignments";
 import {
   Select,
   SelectContent,
@@ -13,8 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Inbox, Users } from "lucide-react";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { api } from "@/utils/api";
 
 interface QADashboardTask {
   id: string;
@@ -38,6 +40,7 @@ export default function QADashboard() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<QADashboardTask[]>([]);
+  const [workers, setWorkers] = useState<Record<string, AssignedUser[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [projectNames, setProjectNames] = useState<{
     [key: string]: {
@@ -46,12 +49,10 @@ export default function QADashboard() {
       delivery_time: string;
     };
   }>({});
-  const [currentWorkers, setCurrentWorkers] = useState<{
-    [key: string]: {
-      name: string;
-      email?: string;
-    }[];
-  }>({});
+  const [activeTab, setActiveTab] = useState("my-tasks");
+  const [handoverTasks, setHandoverTasks] = useState<QADashboardTask[]>([]);
+  const [isHandoverLoading, setIsHandoverLoading] = useState(false);
+
 
   useEffect(() => {
     setMounted(true);
@@ -99,27 +100,7 @@ export default function QADashboard() {
     }
   };
 
-  const fetchCurrentWorkers = async (taskIds: string[]) => {
-    try {
-      // Use the new utility function instead of individual API calls
-      // const { fetchBatchTaskAssignments } = await import('@/utils/taskAssignments');
-      const result = await fetchBatchTaskAssignments(taskIds);
 
-      // Convert to the format expected by the component
-      const workerMap: { [key: string]: { name: string; email?: string }[] } = {};
-
-      for (const [taskId, assignments] of Object.entries(result)) {
-        workerMap[taskId] = assignments.map(user => ({
-          name: user.name,
-          email: user.email || undefined,
-        }));
-      }
-
-      setCurrentWorkers(workerMap);
-    } catch (error) {
-      console.error("Error fetching current workers:", error);
-    }
-  };
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -142,6 +123,7 @@ export default function QADashboard() {
               task_id: string;
               project_id: string;
             } | null;
+            latest_action: string | null;
           }) => ({
             taskId: item.tasks_test?.task_id || item.task_id || "unknown",
             id: item.id.toString(),
@@ -156,26 +138,71 @@ export default function QADashboard() {
             currentStage: item.current_stage,
             // status: item.status || null,
             iterationNumber: item.iteration_number || 1,
+            latest_action: item.latest_action,
           })
         );
-        setTasks(processedTasks);
 
-        // Get unique project IDs and fetch their names and delivery info
+        // Set tasks immediately to render the UI
+        setTasks(processedTasks);
+        setIsLoading(false);
+
+        // Get unique project IDs and fetch their names and delivery info (non-blocking)
         const uniqueProjectIds = [
           ...new Set(
             processedTasks.map((task: { projectId: string }) => task.projectId)
           ),
         ];
-        await fetchProjectNames(uniqueProjectIds);
+        fetchProjectNames(uniqueProjectIds);
 
-        // Fetch current workers for all tasks
-        await fetchCurrentWorkers(processedTasks.map((task) => task.taskId));
+        // Fetch task assignments (workers) for all tasks
+        const taskIds = processedTasks.map((t: any) => t.taskId);
+        if (taskIds.length > 0) {
+          fetchBatchTaskAssignments(taskIds).then(workersData => {
+            setWorkers(workersData);
+          });
+        }
+      } else {
+        setTasks([]);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error in fetchTasks:", error);
       setTasks([]);
-    } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const fetchHandoverTasks = useCallback(async () => {
+    setIsHandoverLoading(true);
+    try {
+      const data = await api.getHandoverQueue();
+      // Filter for QA stage
+      const filtered = data.filter((t: any) => t.current_stage === "QA");
+
+      const processedTasks = filtered.map((item: any) => ({
+        id: item.task_id,
+        taskId: item.task_id,
+        title: item.task_name || "No Project Name",
+        description: item.client_instruction || "No description",
+        status: "pending",
+        priority: "medium",
+        dueDate: item.delivery_date || "",
+        assignedTo: "Handover Queue",
+        projectId: item.project_id,
+        projectName: item.task_name || "No Project Name",
+        currentStage: "QA",
+        statusFlag: null,
+        iterationNumber: 1,
+      }));
+
+      setHandoverTasks(processedTasks);
+
+      const uniqueProjectIds = [...new Set(processedTasks.map((task: any) => task.projectId))];
+      fetchProjectNames(uniqueProjectIds as string[]);
+    } catch (error) {
+      console.error("Error fetching handover tasks:", error);
+    } finally {
+      setIsHandoverLoading(false);
     }
   }, []);
 
@@ -188,7 +215,10 @@ export default function QADashboard() {
       statusFilter === "all" || task.status === statusFilter;
     const matchesPriority =
       priorityFilter === "all" || task.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+
+    const isHandedOver = (task as any).latest_action === 'handover';
+
+    return matchesSearch && matchesStatus && matchesPriority && !isHandedOver;
   });
 
   if (!mounted) {
@@ -275,34 +305,104 @@ export default function QADashboard() {
       </div>
 
       <div className="mt-6">
-        {isLoading ? (
-          <LoadingScreen variant="inline" message="Loading QA tasks..." />
-        ) : (
-          <div className="flex flex-col space-y-4">
-            {filteredTasks.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">
-                  No tasks found matching your criteria.
-                </p>
-              </div>
+        <Tabs defaultValue="my-tasks" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="my-tasks">
+              <Users className="h-4 w-4 mr-2" />
+              My Tasks
+            </TabsTrigger>
+            <TabsTrigger value="handover" onClick={fetchHandoverTasks}>
+              <Inbox className="h-4 w-4 mr-2" />
+              Handover Queue
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="my-tasks" className="mt-6">
+            {isLoading ? (
+              <LoadingScreen variant="inline" message="Loading QA tasks..." />
             ) : (
-              filteredTasks.map((task, index) => (
-                <TaskCard
-                  key={index}
-                  // id={task.projectId}
-                  taskId={task.taskId}
-                  title={task.title}
-                  description={task.description}
-                  dueDate={projectNames[task.projectId]?.delivery_date || ""}
-                  dueTime={projectNames[task.projectId]?.delivery_time || ""}
-                  status={task.status}
-                  priority={task.priority}
-                  currentWorkers={currentWorkers[task.taskId] || []}
-                />
-              ))
+              <div className="flex flex-col space-y-4">
+                {/* Table Header */}
+                <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
+                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="col-span-2">Task Details</div>
+                    <div className="text-center">Page Count</div>
+                    <div className="text-center">File Type</div>
+                    <div className="text-center">File Format</div>
+                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Status</div>
+                    <div className="text-center">Action</div>
+                  </div>
+                </div>
+
+                {filteredTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">
+                      No tasks found matching your criteria.
+                    </p>
+                  </div>
+                ) : (
+                  filteredTasks.map((task, index) => (
+                    <TaskCard
+                      key={index}
+                      taskId={task.taskId}
+                      title={task.title}
+                      description={task.description}
+                      dueDate={projectNames[task.projectId]?.delivery_date || ""}
+                      dueTime={projectNames[task.projectId]?.delivery_time || ""}
+                      status={task.status}
+                      priority={task.priority}
+                      currentWorkers={workers[task.taskId]?.map(w => ({ name: w.name, email: w.email }))}
+                      disableStatusFetch={true}
+                    />
+                  ))
+                )}
+              </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+
+          <TabsContent value="handover" className="mt-6">
+            {isHandoverLoading ? (
+              <LoadingScreen variant="inline" message="Loading handover queue..." />
+            ) : (
+              <div className="flex flex-col space-y-4">
+                {/* Table Header */}
+                <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
+                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="col-span-2">Task Details</div>
+                    <div className="text-center">Page Count</div>
+                    <div className="text-center">File Type</div>
+                    <div className="text-center">File Format</div>
+                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Status</div>
+                    <div className="text-center">Action</div>
+                  </div>
+                </div>
+
+                {handoverTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Handover queue is empty.</p>
+                  </div>
+                ) : (
+                  handoverTasks.map((task, index) => (
+                    <TaskCard
+                      key={index}
+                      taskId={task.taskId}
+                      title={task.title}
+                      description={task.description}
+                      dueDate={projectNames[task.projectId]?.delivery_date || ""}
+                      dueTime={projectNames[task.projectId]?.delivery_time || ""}
+                      status={task.status}
+                      priority={task.priority}
+                      currentWorkers={[]}
+                      disableStatusFetch={true}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

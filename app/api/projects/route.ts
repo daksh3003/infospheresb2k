@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/server';
 import { requireRole } from '@/app/api/middleware/auth';
 import { AuthorizationService } from '@/app/api/middleware/authorization';
+import { generateSafeStorageFileName } from '@/lib/file-utils';
 
 interface FileFormData {
   file_name: string;
@@ -100,13 +101,38 @@ export async function POST(request: NextRequest) {
 
       // Create task - normalize task_type (empty string to null) and remove processor_type if it doesn't exist in table
       const { processor_type: _processor_type, ...taskDataWithoutProcessorType } = group.taskData;
+      
+      // Ensure task_name is set - use project_name-{index} if empty
+      const taskName = group.taskData.task_name && group.taskData.task_name.trim() !== ''
+        ? group.taskData.task_name
+        : `${projectData.project_name}-${groupIndex + 1}`;
+      
+      // Fallback to project-level values if task-level values are empty
+      const taskType = group.taskData.task_type && group.taskData.task_type.trim() !== ''
+        ? group.taskData.task_type
+        : (projectData.task_type || null);
+      const fileType = group.taskData.file_type && group.taskData.file_type.trim() !== ''
+        ? group.taskData.file_type
+        : (projectData.file_type || null);
+      const fileFormat = group.taskData.file_format && group.taskData.file_format.trim() !== ''
+        ? group.taskData.file_format
+        : (projectData.file_format || null);
+      const customFileFormat = group.taskData.custom_file_format && group.taskData.custom_file_format.trim() !== ''
+        ? group.taskData.custom_file_format
+        : (projectData.custom_file_format || null);
+      const clientInstruction = group.taskData.client_instruction && group.taskData.client_instruction.trim() !== ''
+        ? group.taskData.client_instruction
+        : (projectData.client_instructions || null);
+      
       const taskDataToInsert = {
         ...taskDataWithoutProcessorType,
         project_id: projectId,
-        // Convert empty string to null for task_type
-        task_type: group.taskData.task_type && group.taskData.task_type.trim() !== ''
-          ? group.taskData.task_type
-          : null,
+        task_name: taskName,
+        task_type: taskType,
+        file_type: fileType,
+        file_format: fileFormat,
+        custom_file_format: customFileFormat,
+        client_instruction: clientInstruction,
       };
 
       const { data: taskResult, error: taskError } = await supabase
@@ -166,14 +192,15 @@ export async function POST(request: NextRequest) {
 
       // Upload files to storage with proper file handling
       for (const fileData of group.filesData) {
-        const fileName = fileData.file_name;
-        const filePath = `${taskId}/${fileName}`;
+        const originalFileName = fileData.file_name;
+        const safeStorageFileName = generateSafeStorageFileName(originalFileName);
+        const filePath = `${taskId}/${safeStorageFileName}`;
 
         // Get the actual file from FormData using group and file indices
         let actualFile: File | null = null;
         if (formData) {
           // Find the file index within this group's filesData array
-          const fileIndex = group.filesData.findIndex((f: FileFormData) => f.file_name === fileName);
+          const fileIndex = group.filesData.findIndex((f: FileFormData) => f.file_name === originalFileName);
 
           // Try the new format first: file_group_X_file_Y
           const newFormatKey = `file_group_${groupIndex}_file_${fileIndex}`;
@@ -181,7 +208,7 @@ export async function POST(request: NextRequest) {
 
           // Fallback to old format for backward compatibility
           if (!actualFile) {
-            actualFile = formData.get(`file_${taskId}_${fileName}`) as File;
+            actualFile = formData.get(`file_${taskId}_${originalFileName}`) as File;
           }
         }
 
@@ -192,7 +219,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get file extension and determine file type
-        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        const fileExtension = originalFileName.split('.').pop()?.toLowerCase() || '';
         // Define supported file types (same as in files API)
         // const supportedTypes: Record<string, string[]> = {
         //   documents: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'],
@@ -296,7 +323,7 @@ export async function POST(request: NextRequest) {
 
         if (uploadError) {
           return NextResponse.json(
-            { error: `Failed to upload file ${fileName}` },
+            { error: `Failed to upload file ${originalFileName}` },
             { status: 400 }
           );
         }
@@ -307,7 +334,7 @@ export async function POST(request: NextRequest) {
           .insert([
             {
               task_id: taskId,
-              file_name: fileName,
+              file_name: originalFileName,
               storage_name: "task-files",
               assigned_to: fileData.assigned_to,
               file_path: filePath,
@@ -328,7 +355,7 @@ export async function POST(request: NextRequest) {
 
         if (fileRecordError) {
           return NextResponse.json(
-            { error: `Failed to create file record for ${fileName}` },
+            { error: `Failed to create file record for ${originalFileName}` },
             { status: 400 }
           );
         }
@@ -341,6 +368,52 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    // Require authentication and project manager role
+    const roleResult = await requireRole(request, ['projectManager']);
+    if (roleResult instanceof NextResponse) {
+      return roleResult;
+    }
+    const authenticatedUser = roleResult;
+
+    const { projectId, ...updateData } = await request.json();
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: 'Project ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("projects_test")
+      .update(updateData)
+      .eq("project_id", projectId);
+
+    if (error) {
+      console.error('Project update error:', error);
+      return NextResponse.json(
+        { error: 'Failed to update project', details: error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      message: 'Project updated successfully'
+    });
+
+  } catch (error: unknown) {
+    console.error('Project patch error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

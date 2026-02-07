@@ -40,7 +40,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: data.user.id,
           sessionOnly: true // Flag to indicate we only want session tracking
         }),
@@ -65,60 +65,60 @@ export const api = {
       },
       body: JSON.stringify({ email, password, name, role }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Signup failed');
     }
-    
+
     return response.json();
   },
 
   // Dashboard data
   getPMDashboard: async () => {
     const response = await fetch('/api/dashboard/pm');
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch PM dashboard data');
     }
-    
+
     return response.json();
   },
 
   getProcessorDashboard: async () => {
     const response = await fetch('/api/dashboard/processor');
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch processor dashboard data');
     }
-    
+
     return response.json();
   },
 
   getQCDashboard: async () => {
     const response = await fetch('/api/dashboard/qc');
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch QC dashboard data');
     }
-    
+
     return response.json();
   },
 
   // Task operations
   getTaskDetails: async (taskId: string) => {
     const response = await fetch(`/api/tasks/${taskId}`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch task details');
     }
 
-    
-    
+
+
     return response.json();
   },
 
@@ -130,12 +130,12 @@ export const api = {
       },
       body: JSON.stringify({ action: 'assign', data: selectedUserData }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to assign task');
     }
-    
+
     return response.json();
   },
 
@@ -147,42 +147,85 @@ export const api = {
       },
       body: JSON.stringify({ action: 'pickup', data: currentUser }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to pick up task');
     }
-    
+
+    return response.json();
+  },
+
+  handoverTask: async (taskId: string) => {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'handover' }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to handover task');
+    }
+
+    return response.json();
+  },
+
+  getHandoverQueue: async () => {
+    const response = await fetch('/api/tasks/handover-queue');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch handover queue');
+    }
     return response.json();
   },
 
   // Project operations
   createProject: async (projectData: any, fileGroups: any[], selectedFiles: any[], currentUser: any, files?: { [key: string]: File }) => {
     const formData = new FormData();
-    
+
     // Append JSON data as strings
     formData.append('projectData', JSON.stringify(projectData));
     formData.append('fileGroups', JSON.stringify(fileGroups));
     formData.append('selectedFiles', JSON.stringify(selectedFiles));
     formData.append('currentUser', JSON.stringify(currentUser));
-    
+
     // Append actual files with keys matching the expected format: file_${taskId}_${fileName}
     if (files) {
       for (const [fileKey, file] of Object.entries(files)) {
         formData.append(fileKey, file);
       }
     }
-    
+
     const response = await fetch('/api/projects', {
       method: 'POST',
       body: formData, // No Content-Type header - let browser set it with boundary
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to create project');
     }
-    
+
+    return response.json();
+  },
+
+  updateProject: async (projectId: string, data: any) => {
+    const response = await fetch(`/api/projects`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ projectId, ...data }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update project');
+    }
+
     return response.json();
   },
 
@@ -190,48 +233,48 @@ export const api = {
   getFiles: async (taskId: string, stage?: string) => {
     const params = new URLSearchParams({ taskId });
     if (stage) params.append('stage', stage);
-    
+
     const response = await fetch(`/api/files?${params}`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch files');
     }
-    
+
     return response.json();
   },
 
   uploadFile: async (taskId: string, file: File, stage: string, currentUser: any) => {
     const formData = new FormData();
-    
+
     // Append form data
     formData.append('taskId', taskId);
     formData.append('file', file);
     formData.append('stage', stage);
     formData.append('currentUser', JSON.stringify(currentUser));
-    
+
     const response = await fetch('/api/files', {
       method: 'POST',
       body: formData, // No Content-Type header - let browser set it with boundary
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to upload file');
     }
-    
+
     return response.json();
   },
 
   // Download history
   getDownloadHistory: async (taskId: string) => {
     const response = await fetch(`/api/downloads/history?taskId=${taskId}`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch download history');
     }
-    
+
     return response.json();
   },
 
@@ -243,12 +286,12 @@ export const api = {
       },
       body: JSON.stringify({ taskId, fileId, fileName, storageName, folderPath, downloadDetails }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to track download');
     }
-    
+
     return response.json();
   },
 
@@ -257,7 +300,7 @@ export const api = {
     if (!stage || stage.trim() === '') {
       throw new Error('Stage parameter is required');
     }
-    
+
     // Properly encode the stage parameter
     const encodedStage = encodeURIComponent(stage);
     const response = await fetch(`/api/users/available?stage=${encodedStage}`);
@@ -302,4 +345,56 @@ export const api = {
     return response.json();
   },
 
+
+  // User management
+  updateUser: async (userId: string, data: { name?: string; role?: string; shift?: string | null; shift_start_date?: string | null; shift_end_date?: string | null }) => {
+    const response = await fetch('/api/users', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, ...data }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update user');
+    }
+
+    return response.json();
+  },
+
+  deleteUser: async (userId: string) => {
+    const response = await fetch('/api/users', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete user');
+    }
+
+    return response.json();
+  },
+
+  updateUserPassword: async (userId: string, password: string) => {
+    const response = await fetch('/api/users', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update password');
+    }
+
+    return response.json();
+  },
 };

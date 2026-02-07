@@ -243,8 +243,51 @@ export async function GET(request: NextRequest) {
             const timeB = b.start_time.split(':').map(Number);
             return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
         });
+
+        // Merge consecutive entries with same file_name (same task), regardless of work_type/phases
+        const mergedEntries: any[] = [];
+        const mergeKey = (entry: any) => `${entry.file_name}_${entry.working_date}`;
         
-        return NextResponse.json(reportEntries);
+        const parseTimeToSeconds = (timeStr: string) => {
+            const parts = timeStr.split(':').map(Number);
+            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+        };
+
+        for (let i = 0; i < reportEntries.length; i++) {
+            const current = reportEntries[i];
+            const currentKey = mergeKey(current);
+            
+            if (mergedEntries.length > 0) {
+                const last = mergedEntries[mergedEntries.length - 1];
+                const lastKey = mergeKey(last);
+                
+                if (currentKey === lastKey) {
+                    const lastEndSeconds = parseTimeToSeconds(last.end_time);
+                    const currentStartSeconds = parseTimeToSeconds(current.start_time);
+                    const timeGap = currentStartSeconds - lastEndSeconds;
+                    
+                    if (timeGap >= 0 && timeGap <= 5) {
+                        last.end_time = current.end_time;
+                        const startSeconds = parseTimeToSeconds(last.start_time);
+                        const endSeconds = parseTimeToSeconds(current.end_time);
+                        const totalSeconds = endSeconds - startSeconds;
+                        const hours = Math.floor(totalSeconds / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        const seconds = totalSeconds % 60;
+                        last.total_working_hours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                        last.work_type = current.work_type;
+                        if (current.page_no > 0 && last.page_no !== current.page_no) {
+                            last.page_no = Math.max(last.page_no, current.page_no);
+                        }
+                        continue;
+                    }
+                }
+            }
+            
+            mergedEntries.push({ ...current });
+        }
+        
+        return NextResponse.json(mergedEntries);
     } catch (error) {
         console.error("Error fetching Processor report:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';

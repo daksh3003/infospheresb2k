@@ -15,6 +15,8 @@ export default function Dialog({
   confirmText?: string;
   onConfirm: () => void;
 }) {
+  const [isConfirming, setIsConfirming] = React.useState(false);
+
   if (!isOpen) return null;
 
   return (
@@ -26,17 +28,24 @@ export default function Dialog({
           <button
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            disabled={isConfirming}
           >
             Cancel
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
+            onClick={async () => {
+              setIsConfirming(true);
+              try {
+                await onConfirm();
+                onClose();
+              } finally {
+                setIsConfirming(false);
+              }
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            disabled={isConfirming}
           >
-            {confirmText}
+            {isConfirming ? "Processing..." : confirmText}
           </button>
         </div>
       </div>

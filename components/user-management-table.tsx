@@ -20,8 +20,23 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { AddUserDialog } from "./add-user-dialog";
-import { ChevronLeft, ChevronRight, UserPlus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserPlus, Search, Edit, Trash2, Key } from "lucide-react";
 import LoadingScreen from "./ui/loading-screen";
+import { EditUserDialog } from "./edit-user-dialog";
+import { ChangePasswordDialog } from "./change-password-dialog";
+import { api } from "@/utils/api";
+import { toast } from "react-toastify";
+import { isShiftActive, isShiftExpired } from "@/lib/shifts";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface User {
     id: string;
@@ -29,6 +44,9 @@ interface User {
     email: string;
     role: string;
     created_at: string;
+    shift?: string | null;
+    shift_start_date?: string | null;
+    shift_end_date?: string | null;
 }
 
 interface Pagination {
@@ -47,7 +65,13 @@ export function UserManagementTable() {
         totalPages: 0,
     });
     const [loading, setLoading] = useState(true);
+
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
 
@@ -110,8 +134,39 @@ export function UserManagementTable() {
         fetchUsers(pagination.page, searchQuery, roleFilter);
     };
 
+
     const handleRoleFilterChange = (value: string) => {
         setRoleFilter(value);
+    };
+
+    const handleEditClick = (user: User) => {
+        setSelectedUser(user);
+        setIsEditDialogOpen(true);
+    };
+
+    const handlePasswordClick = (user: User) => {
+        setSelectedUser(user);
+        setIsPasswordDialogOpen(true);
+    };
+
+    const handleDeleteClick = (user: User) => {
+        setDeletingUserId(user.id);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deletingUserId) return;
+        try {
+            await api.deleteUser(deletingUserId);
+            handleUserAdded(); // Refresh list
+            toast.success("User deleted successfully");
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            toast.error("Failed to delete user. They might be assigned to tasks.");
+        } finally {
+            setIsDeleteDialogOpen(false);
+            setDeletingUserId(null);
+        }
     };
 
     const getRoleBadgeVariant = (role: string) => {
@@ -204,13 +259,15 @@ export function UserManagementTable() {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
+                            <TableHead>Shift</TableHead>
                             <TableHead>Created Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <div className="flex justify-center">
                                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                                     </div>
@@ -218,7 +275,7 @@ export function UserManagementTable() {
                             </TableRow>
                         ) : users.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <p className="text-muted-foreground">
                                         No users found matching your criteria.
                                     </p>
@@ -234,8 +291,49 @@ export function UserManagementTable() {
                                             {getRoleDisplayName(user.role)}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell>
+                                        {user.shift ? (
+                                            isShiftActive(user.shift_start_date ?? null, user.shift_end_date ?? null) ? (
+                                                <Badge variant="default">{user.shift}</Badge>
+                                            ) : isShiftExpired(user.shift_end_date ?? null) ? (
+                                                <Badge variant="secondary">{user.shift} (Expired)</Badge>
+                                            ) : (
+                                                <Badge variant="outline">{user.shift} (Upcoming)</Badge>
+                                            )
+                                        ) : (
+                                            <Badge variant="secondary">Unassigned</Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-muted-foreground">
                                         {formatDate(user.created_at)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handlePasswordClick(user)}
+                                                title="Change Password"
+                                            >
+                                                <Key className="h-4 w-4 text-amber-600" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleEditClick(user)}
+                                                title="Edit User"
+                                            >
+                                                <Edit className="h-4 w-4 text-blue-600" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleDeleteClick(user)}
+                                                title="Delete User"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-600" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -278,11 +376,49 @@ export function UserManagementTable() {
                 </div>
             )}
 
+
             <AddUserDialog
                 open={isAddDialogOpen}
                 onOpenChange={setIsAddDialogOpen}
                 onUserAdded={handleUserAdded}
             />
+
+            <EditUserDialog
+                user={selectedUser}
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                onUserUpdated={handleUserAdded}
+            />
+
+            <ChangePasswordDialog
+                userId={selectedUser?.id || null}
+                userEmail={selectedUser?.email || null}
+                open={isPasswordDialogOpen}
+                onOpenChange={setIsPasswordDialogOpen}
+            />
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the user
+                            account and remove their data from our servers.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletingUserId(null)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

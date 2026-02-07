@@ -34,13 +34,15 @@ export const FooterButtons = ({
   handlePauseResumeTask,
   handleSendTo,
   showSubmitToButton,
-  // setShowHandoverDialog,
+  setShowHandoverDialog,
   setShowCompleteDialog,
   status,
   SubmitTo,
   onAssignTask,
   onStatusUpdate,
   assignmentRefreshTrigger,
+  showOnlyActionButtons,
+  hideActionButtons,
 }: {
   currentUser: { id: string; name: string; email: string; role: string };
   currentStage: string;
@@ -50,7 +52,7 @@ export const FooterButtons = ({
   handlePauseResumeTask: () => void;
   handleSendTo: () => void;
   showSubmitToButton: boolean;
-  // setShowHandoverDialog: (value: boolean) => void;
+  setShowHandoverDialog: (value: boolean) => void;
   setShowCompleteDialog: (value: boolean) => void;
   status: string;
   SubmitTo: string;
@@ -62,6 +64,8 @@ export const FooterButtons = ({
   }) => void;
   onStatusUpdate?: () => void;
   assignmentRefreshTrigger?: number;
+  showOnlyActionButtons?: boolean;
+  hideActionButtons?: boolean;
 }) => {
   const [availableUsers, setAvailableUsers] = useState<
     { id: string; name: string; email: string; role: string }[]
@@ -74,6 +78,11 @@ export const FooterButtons = ({
   const [hasAssignedUsers, setHasAssignedUsers] = useState(false);
   const [realStatus, setRealStatus] = useState<string>(status);
   const [_statusLoading, _setStatusLoading] = useState(false);
+  const [isStartingTask, setIsStartingTask] = useState(false);
+  const [isPausingTask, setIsPausingTask] = useState(false);
+  const [isCompletingTask, setIsCompletingTask] = useState(false);
+  const [isSendingTo, setIsSendingTo] = useState(false);
+  const [isHandoverLoading, setIsHandoverLoading] = useState(false);
 
   // Status configuration
   const _statusConfig = {
@@ -262,11 +271,16 @@ export const FooterButtons = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  // Check if assigned to current user
+  const isAssignedToCurrentUser = _assignedTo.some(
+    (user) => user.user_id === currentUser?.id
+  );
+
   return (
     <>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4">
+      <div className={`${showOnlyActionButtons ? 'flex flex-wrap gap-3' : 'px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4'}`}>
         <div className="flex flex-wrap gap-3">
-          {currentUser?.role === "projectManager" && (
+          {!showOnlyActionButtons && currentUser?.role === "projectManager" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="p-5">
@@ -279,7 +293,10 @@ export const FooterButtons = ({
                   availableUsers.map((user) => (
                     <DropdownMenuItem
                       key={user.id}
-                      onClick={() => onAssignTask(user)}
+                      onClick={async () => {
+                        await onAssignTask(user);
+                        window.location.reload();
+                      }}
                       className="cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
@@ -304,7 +321,7 @@ export const FooterButtons = ({
           )}
 
           {/* Pick up task button - shows when no one is assigned and user can pick up */}
-          {!hasAssignedUsers && canPickupTask() && (
+          {!showOnlyActionButtons && !hasAssignedUsers && canPickupTask() && (
             <button
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               onClick={() => setShowPickupDialog(true)}
@@ -315,45 +332,68 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {realStatus === "pending" && (
+          {!showOnlyActionButtons && realStatus === "pending" && isAssignedToCurrentUser && (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               onClick={async () => {
-                await handleStartTask();
-                // await fetchRealStatus(); // Refresh local status
-                onStatusUpdate?.(); // Notify parent component
+                setIsStartingTask(true);
+                try {
+                  await handleStartTask();
+                  onStatusUpdate?.(); // Notify parent component
+                } finally {
+                  setIsStartingTask(false);
+                }
               }}
+              disabled={isStartingTask}
             >
-              <Play className="h-4 w-4" /> Start Task
+              <Play className="h-4 w-4" /> {isStartingTask ? "Starting..." : "Start Task"}
             </button>
           )}
-          {getPauseResumeButton(realStatus, async () => {
-            await handlePauseResumeTask();
-            // await fetchRealStatus(); // Refresh local status
-            onStatusUpdate?.(); // Notify parent component
-          })}
+          {!showOnlyActionButtons && getPauseResumeButton(realStatus, async () => {
+            setIsPausingTask(true);
+            try {
+              await handlePauseResumeTask();
+              onStatusUpdate?.(); // Notify parent component
+            } finally {
+              setIsPausingTask(false);
+            }
+          }, isPausingTask)}
 
-          {/* <button
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-            onClick={() => setShowHandoverDialog(true)}
-          >
-            <Share2 className="h-4 w-4" /> Handover
-          </button> */}
-
-          {realStatus !== "completed" && (
+          {!showOnlyActionButtons && realStatus !== "completed" && hasAssignedUsers && (
             <button
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              onClick={() => setShowHandoverDialog(true)}
+              disabled={isHandoverLoading}
+            >
+              <ArrowBigUpDashIcon className="h-4 w-4 rotate-180" /> {isHandoverLoading ? "Processing..." : "Handover"}
+            </button>
+          )}
+
+          {!hideActionButtons && realStatus !== "completed" && (
+            <button
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
               onClick={() => setShowCompleteDialog(true)}
+              disabled={isCompletingTask}
             >
-              <CheckCircle2 className="h-4 w-4" /> Mark Complete
+              <CheckCircle2 className="h-4 w-4" /> {isCompletingTask ? "Completing..." : "Mark Complete"}
             </button>
           )}
-          {showSubmitToButton && realStatus === "completed" && (
+          {!hideActionButtons && showSubmitToButton && realStatus === "completed" && (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              onClick={() => handleSendTo()}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              onClick={async () => {
+                setIsSendingTo(true);
+                try {
+                  await handleSendTo();
+                  // No resetting setIsSendingTo(false) on success to keep it disabled during redirect
+                } catch (error) {
+                  console.error("Error in handleSendTo:", error);
+                  setIsSendingTo(false);
+                }
+              }}
+              disabled={isSendingTo}
             >
-              <ArrowBigUpDashIcon className="h-4 w-4" /> {SubmitTo}
+              <ArrowBigUpDashIcon className="h-4 w-4" /> {isSendingTo ? "Sending..." : SubmitTo}
             </button>
           )}
         </div>

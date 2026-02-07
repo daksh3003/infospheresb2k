@@ -117,6 +117,7 @@ export async function GET(request: NextRequest) {
             taskGroups.get(taskId)!.push(action);
         });
 
+        // Process each task group and merge consecutive actions
         taskGroups.forEach((actions, taskId) => {
             actions.sort((a, b) => {
                 const timeA = a.metadata?.timestamp || a.created_at; 
@@ -124,105 +125,97 @@ export async function GET(request: NextRequest) {
                 return new Date(timeA).getTime() - new Date(timeB).getTime();
             });
 
-            for(let i=0; i<actions.length; i++) {
-                const action = actions[i];
-                const metadata = action.metadata || {};
-                const timestamp = metadata.timestamp || action.created_at; 
-                const actionDate = new Date(timestamp);
+            // Filter to only relevant actions
+            const relevantActions = actions.filter((action: any) => 
+                ['start', 'complete', 'pause', 'resume', 'upload'].includes(action.action_type)
+            );
 
-                // Process actions that have work information (start, complete, upload, etc.)
-                if (['start', 'complete', 'pause', 'resume', 'upload'].includes(action.action_type)) {
-                    // Get current_stage from metadata - this is the base work_type
-                    const currentStage = metadata.current_stage || metadata.upload_stage || "Unknown";
-                    const sentBy = metadata.sent_by || "";
+            if (relevantActions.length === 0) return;
 
-                    // For Processor entries in User Daily, mirror CXN logic from DTP Tracking:
-                    // If the previous stage (sent_by) was QC/QA and the current stage is Processor,
-                    // then show work type as "QC CXN" or "QA CXN".
-                    let displayWorkType = currentStage;
-                    const currentStageUpper = String(currentStage).toUpperCase();
-                    const sentByUpper = String(sentBy).toUpperCase().trim();
+            // Get common task information
+            const fileId = taskToFileMap.get(taskId) || "N/A";
+            const projectId = taskToProjectMap.get(taskId);
+            const clientName = projectId ? (projectToNameMap.get(projectId) || "N/A") : "N/A";
+            const taskName = taskToNameMap.get(taskId) || "N/A";
+            const projectName = projectToNameMap.get(projectId) || "N/A";
 
-                    if (currentStageUpper === "PROCESSOR") {
-                        if (sentByUpper === "QC") {
-                            displayWorkType = "QC CXN";
-                        } else if (sentByUpper === "QA") {
-                            displayWorkType = "QA CXN";
-                        }
-                    }
-                    
-                    // Get page count from files_info array
-                    let pageCount = 0;
-                    if (metadata.files_info && Array.isArray(metadata.files_info)) {
-                        // Sum page_count from all files
-                        pageCount = metadata.files_info.reduce((sum: number, file: any) => {
-                            return sum + (file.page_count || 0);
-                        }, 0);
-                    }
-                    
-                    const fileId = taskToFileMap.get(taskId) || "N/A";
-                    const projectId = taskToProjectMap.get(taskId);
-                    const clientName = projectId ? (projectToNameMap.get(projectId) || "N/A") : "N/A";
-                    const taskName = taskToNameMap.get(taskId) || "N/A";
-                    const projectName = projectToNameMap.get(projectId) || "N/A";
-                    
-                    // Use user_name from metadata if available, otherwise use profile name
-                    const displayName = metadata.user_name || userName;
+            // Process first action to get initial values
+            const firstAction = relevantActions[0];
+            const firstMetadata = firstAction.metadata || {};
+            const firstTimestamp = firstMetadata.timestamp || firstAction.created_at;
+            const firstDate = new Date(firstTimestamp);
+            
+            // Determine work type from first action
+            const currentStage = firstMetadata.current_stage || firstMetadata.upload_stage || "Unknown";
+            const sentBy = firstMetadata.sent_by || "";
+            let displayWorkType = currentStage;
+            const currentStageUpper = String(currentStage).toUpperCase();
+            const sentByUpper = String(sentBy).toUpperCase().trim();
 
-                    // Find end time (next action or complete)
-                    let endTime = timestamp;
-                    if (i < actions.length - 1) {
-                        const nextAction = actions[i + 1];
-                        endTime = nextAction.metadata?.timestamp || nextAction.created_at;
-                    } else {
-                        endTime = timestamp;
-                    }
-
-                    const startTime = new Date(timestamp);
-                    const endTimeDate = new Date(endTime);
-                    
-                    // Calculate total working time in hours
-                    const timeDifference = endTimeDate.getTime() - startTime.getTime();
-                    const totalWorkingHours = timeDifference / (1000 * 60 * 60); // Convert milliseconds to hours
-                    
-                    // Format as HH:MM
-                    const hours = Math.floor(totalWorkingHours);
-                    const minutes = Math.floor((totalWorkingHours - hours) * 60);
-                    const seconds = Math.floor((totalWorkingHours - hours - minutes / 60) * 3600);
-                    const totalWorkingTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-                    reportEntries.push({
-                        s_no: reportEntries.length + 1,
-                        year: actionDate.getFullYear(),
-                        month: actionDate.toLocaleString('en-US', { month: 'long' }),
-                        working_date: actionDate.toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                        }),
-                        name: displayName,
-                        client_name: clientName,
-                        task_name: taskName,
-                        project_name: projectName,
-                        file_no: fileId,
-                        work_type: displayWorkType, 
-                        no_of_pages: pageCount,
-                        start_time: actionDate.toLocaleTimeString('en-US', {
-                            hour12: false,
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        }),
-                        end_time: new Date(endTime).toLocaleTimeString('en-US', {
-                            hour12: false,
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        }),
-                        total_working_time: totalWorkingTime,
-                    });
+            if (currentStageUpper === "PROCESSOR") {
+                if (sentByUpper === "QC") {
+                    displayWorkType = "QC CXN";
+                } else if (sentByUpper === "QA") {
+                    displayWorkType = "QA CXN";
                 }
             }
+
+            // Get page count from first action (or sum if multiple files)
+            let pageCount = 0;
+            if (firstMetadata.files_info && Array.isArray(firstMetadata.files_info)) {
+                pageCount = firstMetadata.files_info.reduce((sum: number, file: any) => {
+                    return sum + (file.page_count || 0);
+                }, 0);
+            }
+
+            const displayName = firstMetadata.user_name || userName;
+
+            // Use first action's start time and last action's end time
+            const startTime = new Date(firstTimestamp);
+            const lastAction = relevantActions[relevantActions.length - 1];
+            const lastMetadata = lastAction.metadata || {};
+            const lastTimestamp = lastMetadata.timestamp || lastAction.created_at;
+            const endTime = new Date(lastTimestamp);
+
+            // Calculate total working time
+            const timeDifference = endTime.getTime() - startTime.getTime();
+            const totalWorkingHours = timeDifference / (1000 * 60 * 60);
+            const hours = Math.floor(totalWorkingHours);
+            const minutes = Math.floor((totalWorkingHours - hours) * 60);
+            const seconds = Math.floor((timeDifference % (1000 * 60)) / 1000);
+            const totalWorkingTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            // Create a single merged entry for this task
+            reportEntries.push({
+                s_no: reportEntries.length + 1,
+                year: firstDate.getFullYear(),
+                month: firstDate.toLocaleString('en-US', { month: 'long' }),
+                working_date: firstDate.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }),
+                name: displayName,
+                client_name: clientName,
+                task_name: taskName,
+                project_name: projectName,
+                file_no: fileId,
+                work_type: displayWorkType, 
+                no_of_pages: pageCount,
+                start_time: startTime.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
+                end_time: endTime.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
+                total_working_time: totalWorkingTime,
+            });
         });
 
         // Sort by start_time
@@ -238,11 +231,69 @@ export async function GET(request: NextRequest) {
             return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
         });
 
-        reportEntries.forEach((entry, index) => {
+        // Merge consecutive entries with same file_no (same task), regardless of work_type/phases
+        // This ensures one record per task even if it goes through multiple phases (QC → QA → Processor)
+        const mergedEntries: any[] = [];
+        const mergeKey = (entry: any) => `${entry.file_no}_${entry.working_date}`;
+        
+        const parseTimeToSeconds = (timeStr: string) => {
+            const parts = timeStr.split(':').map(Number);
+            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+        };
+
+        for (let i = 0; i < reportEntries.length; i++) {
+            const current = reportEntries[i];
+            const currentKey = mergeKey(current);
+            
+            // Check if we can merge with previous entry
+            if (mergedEntries.length > 0) {
+                const last = mergedEntries[mergedEntries.length - 1];
+                const lastKey = mergeKey(last);
+                
+                // If same file and date, check if times are consecutive (within 5 seconds)
+                // This merges all phases of the same task into one record
+                if (currentKey === lastKey) {
+                    const lastEndSeconds = parseTimeToSeconds(last.end_time);
+                    const currentStartSeconds = parseTimeToSeconds(current.start_time);
+                    const timeGap = currentStartSeconds - lastEndSeconds;
+                    
+                    // Merge if times are consecutive or within 5 seconds (to handle small timing differences)
+                    if (timeGap >= 0 && timeGap <= 5) {
+                        // Merge: update end time and recalculate total working time
+                        last.end_time = current.end_time;
+                        
+                        // Recalculate total working time from start_time and end_time strings
+                        const startSeconds = parseTimeToSeconds(last.start_time);
+                        const endSeconds = parseTimeToSeconds(current.end_time);
+                        const totalSeconds = endSeconds - startSeconds;
+                        
+                        const hours = Math.floor(totalSeconds / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        const seconds = totalSeconds % 60;
+                        last.total_working_time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                        
+                        // Use the most recent work_type (last phase)
+                        last.work_type = current.work_type;
+                        
+                        // Sum page counts if they differ
+                        if (current.no_of_pages > 0 && last.no_of_pages !== current.no_of_pages) {
+                            last.no_of_pages = Math.max(last.no_of_pages, current.no_of_pages);
+                        }
+                        continue;
+                    }
+                }
+            }
+            
+            // Can't merge, add as new entry
+            mergedEntries.push({ ...current });
+        }
+
+        // Update serial numbers
+        mergedEntries.forEach((entry, index) => {
             entry.s_no = index + 1;
         });
 
-        return NextResponse.json(reportEntries);
+        return NextResponse.json(mergedEntries);
     } catch (error) {
         console.error("Error fetching daily user report:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';

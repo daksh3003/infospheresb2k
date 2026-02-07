@@ -3,7 +3,7 @@
 export interface TaskActionPayload {
   user_id: string;
   task_id: string;
-  action_type: 'start' | 'pause' | 'resume' | 'complete' | 'send_to' | 'download' | 'upload' | 'taken_by' | 'assigned_to';
+  action_type: 'start' | 'pause' | 'resume' | 'complete' | 'send_to' | 'download' | 'upload' | 'taken_by' | 'assigned_to' | 'handover';
   metadata?: Record<string, any>;
 }
 
