@@ -46,6 +46,12 @@ interface QCDashboardTask {
   currentFileVersionId: string | null;
   currentFileName: string | null;
 
+  // File metadata
+  fileType: string | null;
+  fileFormat: string | null;
+  customFileFormat: string | null;
+  language: string | null;
+
   calculatedStatus:
   | "pending"
   | "in-progress"
@@ -76,6 +82,7 @@ export default function QCDashboard() {
       name: string;
       delivery_date: string;
       delivery_time: string;
+      language: string | null;
     };
   }>({});
   const [activeTab, setActiveTab] = useState("my-tasks");
@@ -104,6 +111,7 @@ export default function QCDashboard() {
               name: string;
               delivery_date: string;
               delivery_time: string;
+              language: string | null;
             };
           },
           project: {
@@ -111,16 +119,18 @@ export default function QCDashboard() {
             project_name: string;
             delivery_date: string;
             delivery_time: string;
+            language: string | null;
           }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
             delivery_date: project.delivery_date,
             delivery_time: project.delivery_time,
+            language: project.language,
           };
           return acc;
         },
-        {}
+        {} as { [key: string]: { name: string; delivery_date: string; delivery_time: string; language: string | null } }
       );
 
       setProjectNames(projectNameMap);
@@ -151,6 +161,9 @@ export default function QCDashboard() {
               task_name: string;
               task_id: string;
               project_id: string;
+              file_type: string | null;
+              file_format: string | null;
+              custom_file_format: string | null;
             } | null;
             latest_action: string | null;
           }) => ({
@@ -183,6 +196,9 @@ export default function QCDashboard() {
             dueDate: "",
             assignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
             latest_action: item.latest_action,
+            fileType: item.tasks_test?.file_type || null,
+            fileFormat: item.tasks_test?.file_format || null,
+            customFileFormat: item.tasks_test?.custom_file_format || null,
           })
         );
 
@@ -383,7 +399,8 @@ export default function QCDashboard() {
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
-                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Language</div>
+                    <div className="text-center">Working On</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -407,6 +424,10 @@ export default function QCDashboard() {
                       status={task.status}
                       priority={task.priority}
                       currentWorkers={workers[task.taskId]?.map(w => ({ name: w.name, email: w.email }))}
+                      fileType={task.fileType || undefined}
+                      fileFormat={task.fileFormat || undefined}
+                      customFileFormat={task.customFileFormat || undefined}
+                      language={projectNames[task.projectId]?.language || undefined}
                       disableStatusFetch={true}
                     />
                   ))
@@ -427,7 +448,8 @@ export default function QCDashboard() {
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
-                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Language</div>
+                    <div className="text-center">Working On</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -449,6 +471,10 @@ export default function QCDashboard() {
                       status={task.status}
                       priority={task.priority}
                       currentWorkers={[]}
+                      fileType={task.fileType || undefined}
+                      fileFormat={task.fileFormat || undefined}
+                      customFileFormat={task.customFileFormat || undefined}
+                      language={projectNames[task.projectId]?.language || undefined}
                       disableStatusFetch={true}
                     />
                   ))

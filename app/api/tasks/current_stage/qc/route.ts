@@ -12,7 +12,7 @@ export async function GET() {
           status, 
           task_id, 
           iteration_number, 
-          tasks_test ( task_name, task_id, project_id )
+          tasks_test ( task_name, task_id, project_id, file_type, file_format, custom_file_format )
         `
         )
         .eq("current_stage", "QC");

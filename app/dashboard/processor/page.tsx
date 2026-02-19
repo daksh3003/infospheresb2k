@@ -43,6 +43,11 @@ interface PMDashboardTask {
   currentFileVersionId: string | null;
   currentFileName: string | null;
 
+  // File metadata
+  fileType: string | null;
+  fileFormat: string | null;
+  customFileFormat: string | null;
+
   calculatedStatus:
   | "pending"
   | "in-progress"
@@ -71,6 +76,7 @@ export default function ProcessorDashboard() {
       name: string;
       delivery_date: string;
       delivery_time: string;
+      language: string | null;
     };
   }>({});
   const [activeTab, setActiveTab] = useState("my-tasks");
@@ -100,6 +106,7 @@ export default function ProcessorDashboard() {
               name: string;
               delivery_date: string;
               delivery_time: string;
+              language: string | null;
             };
           },
           project: {
@@ -107,16 +114,18 @@ export default function ProcessorDashboard() {
             project_name: string;
             delivery_date: string;
             delivery_time: string;
+            language: string | null;
           }
         ) => {
           acc[project.project_id] = {
             name: project.project_name,
             delivery_date: project.delivery_date,
             delivery_time: project.delivery_time,
+            language: project.language,
           };
           return acc;
         },
-        {}
+        {} as { [key: string]: { name: string; delivery_date: string; delivery_time: string; language: string | null } }
       );
 
       setProjectNames(projectNameMap);
@@ -146,6 +155,9 @@ export default function ProcessorDashboard() {
               task_name: string;
               task_id: string;
               project_id: string;
+              file_type: string | null;
+              file_format: string | null;
+              custom_file_format: string | null;
             } | null;
             latest_action: string | null;
           }) => ({
@@ -165,6 +177,9 @@ export default function ProcessorDashboard() {
             iterationNotes: null,
             currentFileVersionId: null,
             currentFileName: null,
+            fileType: item.tasks_test?.file_type || null,
+            fileFormat: item.tasks_test?.file_format || null,
+            customFileFormat: item.tasks_test?.custom_file_format || null,
             calculatedStatus: "pending",
             calculatedPriority: "medium",
             displayId: item.id.toString(),
@@ -383,7 +398,8 @@ export default function ProcessorDashboard() {
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
-                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Language</div>
+                    <div className="text-center">Working On</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -407,6 +423,10 @@ export default function ProcessorDashboard() {
                       status={task.calculatedStatus}
                       priority={task.calculatedPriority}
                       currentWorkers={workers[task.taskId]?.map(w => ({ name: w.name, email: w.email }))}
+                      fileType={task.fileType || undefined}
+                      fileFormat={task.fileFormat || undefined}
+                      customFileFormat={task.customFileFormat || undefined}
+                      language={projectNames[task.projectId]?.language || undefined}
                       disableStatusFetch={true}
                     />
                   ))
@@ -427,7 +447,8 @@ export default function ProcessorDashboard() {
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
-                    <div className="text-center col-span-2">Working On</div>
+                    <div className="text-center">Language</div>
+                    <div className="text-center">Working On</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -449,6 +470,10 @@ export default function ProcessorDashboard() {
                       status={task.calculatedStatus}
                       priority={task.calculatedPriority}
                       currentWorkers={[]}
+                      fileType={task.fileType || undefined}
+                      fileFormat={task.fileFormat || undefined}
+                      customFileFormat={task.customFileFormat || undefined}
+                      language={projectNames[task.projectId]?.language || undefined}
                       disableStatusFetch={true}
                     />
                   ))
