@@ -44,6 +44,9 @@ export const FooterButtons = ({
   showOnlyActionButtons,
   hideActionButtons,
   isAssigning,
+  onPrepareToDeliver,
+  showPrepareToDeliver,
+  isPreparingToDeliver,
 }: {
   currentUser: { id: string; name: string; email: string; role: string };
   currentStage: string;
@@ -68,6 +71,9 @@ export const FooterButtons = ({
   showOnlyActionButtons?: boolean;
   hideActionButtons?: boolean;
   isAssigning?: boolean;
+  onPrepareToDeliver?: () => void;
+  showPrepareToDeliver?: boolean;
+  isPreparingToDeliver?: boolean;
 }) => {
   const [availableUsers, setAvailableUsers] = useState<
     { id: string; name: string; email: string; role: string }[]
@@ -280,7 +286,14 @@ export const FooterButtons = ({
 
   return (
     <>
-      <div className={`${showOnlyActionButtons ? 'flex flex-wrap gap-3' : 'px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4'}`}>
+      <div
+        className={`${
+          showOnlyActionButtons
+            ? "flex flex-wrap gap-3"
+            : "px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-between gap-4"
+        }`}
+      >
+        {/* Left side actions: assign, pickup, start, pause/resume, handover */}
         <div className="flex flex-wrap gap-3">
           {!showOnlyActionButtons && currentUser?.role === "projectManager" && (
             <DropdownMenu>
@@ -380,34 +393,58 @@ export const FooterButtons = ({
             </button>
           )}
 
-          {!hideActionButtons && realStatus !== "completed" && (
-            <button
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              onClick={() => setShowCompleteDialog(true)}
-              disabled={isCompletingTask}
-            >
-              <CheckCircle2 className="h-4 w-4" /> {isCompletingTask ? "Completing..." : "Mark Complete"}
-            </button>
-          )}
-          {!hideActionButtons && showSubmitToButton && realStatus === "completed" && (
-            <button
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-              onClick={async () => {
-                setIsSendingTo(true);
-                try {
-                  await handleSendTo();
-                  // No resetting setIsSendingTo(false) on success to keep it disabled during redirect
-                } catch (error) {
-                  console.error("Error in handleSendTo:", error);
-                  setIsSendingTo(false);
-                }
-              }}
-              disabled={isSendingTo}
-            >
-              <ArrowBigUpDashIcon className="h-4 w-4" /> {isSendingTo ? "Sending..." : SubmitTo}
-            </button>
-          )}
         </div>
+
+        {/* Right side actions: complete, send to, prepare to deliver */}
+        {!showOnlyActionButtons && (
+          <div className="flex flex-wrap gap-3 ml-auto">
+            {!hideActionButtons && realStatus !== "completed" && (
+              <button
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => setShowCompleteDialog(true)}
+                disabled={isCompletingTask}
+              >
+                <CheckCircle2 className="h-4 w-4" />{" "}
+                {isCompletingTask ? "Completing..." : "Mark Complete"}
+              </button>
+            )}
+            {!hideActionButtons &&
+              showSubmitToButton &&
+              realStatus === "completed" && (
+                <button
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  onClick={async () => {
+                    setIsSendingTo(true);
+                    try {
+                      await handleSendTo();
+                      // No resetting setIsSendingTo(false) on success to keep it disabled during redirect
+                    } catch (error) {
+                      console.error("Error in handleSendTo:", error);
+                      setIsSendingTo(false);
+                    }
+                  }}
+                  disabled={isSendingTo}
+                >
+                  <ArrowBigUpDashIcon className="h-4 w-4" />{" "}
+                  {isSendingTo ? "Sending..." : SubmitTo}
+                </button>
+              )}
+            {!hideActionButtons &&
+              showPrepareToDeliver &&
+              typeof onPrepareToDeliver === "function" &&
+              currentStage === "Delivery" &&
+              realStatus === "completed" && (
+                <button
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  onClick={onPrepareToDeliver}
+                  disabled={isPreparingToDeliver}
+                >
+                  <CheckCircle2 className="h-4 w-4" />{" "}
+                  {isPreparingToDeliver ? "Preparing..." : "Prepare to deliver"}
+                </button>
+              )}
+          </div>
+        )}
       </div>
 
       {/* Pick up task confirmation dialog */}

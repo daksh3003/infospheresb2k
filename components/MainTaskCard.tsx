@@ -95,6 +95,7 @@ export const MainTaskCard = ({
   lastHandoverBy,
   onTaskUpdate,
   currentUser,
+  deliveredBy,
 }: {
   task: Task;
   status: string;
@@ -109,6 +110,7 @@ export const MainTaskCard = ({
   lastHandoverBy?: string | null;
   onTaskUpdate?: () => void;
   currentUser?: UserProfile | null;
+  deliveredBy?: string | null;
 }) => {
   const [assignedTo, setAssignedTo] = useState<
     {
@@ -598,6 +600,15 @@ export const MainTaskCard = ({
                   {task.overall_completion_status ? "Completed" : "Pending"}
                 </p>
               </div>
+              {typeof deliveredBy === "string" &&
+                deliveredBy.trim().length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-1">
+                      Delivered By
+                    </h3>
+                    <p className="text-gray-900">{deliveredBy}</p>
+                  </div>
+                )}
             </div>
 
             {task.reference_file && (

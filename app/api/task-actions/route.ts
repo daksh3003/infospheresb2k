@@ -27,8 +27,17 @@ export async function POST(request: NextRequest) {
 
     // Validate action_type against allowed values
     const allowedActions = [
-      'start', 'pause', 'resume', 'complete',
-      'send_to', 'download', 'upload', 'taken_by', 'assigned_to', 'handover'
+      'start',
+      'pause',
+      'resume',
+      'complete',
+      'send_to',
+      'download',
+      'upload',
+      'taken_by',
+      'assigned_to',
+      'handover',
+      'prepare_to_deliver',
     ];
 
     if (!allowedActions.includes(action_type)) {

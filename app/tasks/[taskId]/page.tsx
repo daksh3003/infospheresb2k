@@ -143,6 +143,7 @@ export default function TaskDetailPage() {
   const [currentStage, setCurrentStage] = useState<string>("");
   const [sentBy, setSentBy] = useState<string>("");
   const [completionStatus, setCompletionStatus] = useState<boolean>(false);
+  const [deliveredBy, setDeliveredBy] = useState<string | null>(null);
 
   // Dialog states :
   const [showHandoverDialog, setShowHandoverDialog] = useState(false);
@@ -223,6 +224,7 @@ export default function TaskDetailPage() {
   // File edits state
 
   const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
+  const [isPreparingToDeliver, setIsPreparingToDeliver] = useState(false);
 
   const supabase = createClient();
 
@@ -500,7 +502,8 @@ export default function TaskDetailPage() {
       | "upload"
       | "taken_by"
       | "assigned_to"
-      | "handover",
+      | "handover"
+      | "prepare_to_deliver",
     additionalMetadata?: Record<string, unknown>
   ) => {
     if (!currentUser || !taskId) return;
@@ -811,6 +814,83 @@ export default function TaskDetailPage() {
       toast.error(`Handover failed: ${error.message || "Unknown error"}`);
     } finally {
       setIsHandingOver(false);
+    }
+  };
+
+  const fetchDeliveredBy = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("task_actions")
+        .select("metadata")
+        .eq("task_id", taskId)
+        .eq("action_type", "prepare_to_deliver")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data?.metadata?.user_name) {
+        setDeliveredBy(data.metadata.user_name as string);
+      }
+    } catch (error) {
+      console.error("Error fetching deliveredBy info:", error);
+    }
+  };
+
+  const handlePrepareToDeliver = async () => {
+    if (!currentUser) {
+      toast("User information not available", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    if (
+      !processorFiles ||
+      processorFiles.length === 0 ||
+      !storage_name ||
+      !folder_path
+    ) {
+      toast("No processor files found for this task", {
+        type: "error",
+        position: "top-right",
+      });
+      return;
+    }
+
+    setIsPreparingToDeliver(true);
+    try {
+      // Download all processor files from the latest iteration
+      for (let i = 0; i < processorFiles.length; i++) {
+        const file = processorFiles[i];
+        await handleDownload(
+          file.name,
+          storage_name,
+          folder_path,
+          i
+        );
+      }
+
+      // Log prepare_to_deliver action
+      await logTaskActionHelper("prepare_to_deliver", {
+        delivery_version: version,
+        processor_files_count: processorFiles.length,
+      });
+
+      setDeliveredBy(currentUser.name || currentUser.email || "Unknown User");
+
+      toast("Prepared to deliver. Latest processor files downloaded.", {
+        type: "success",
+        position: "top-right",
+      });
+    } catch (error) {
+      console.error("Error in handlePrepareToDeliver:", error);
+      toast("Failed to prepare for delivery", {
+        type: "error",
+        position: "top-right",
+      });
+    } finally {
+      setIsPreparingToDeliver(false);
     }
   };
 
@@ -2097,6 +2177,7 @@ export default function TaskDetailPage() {
           fetchData(),
           fetchRealStatus(),
           fetchFileEdits(),
+          fetchDeliveredBy(),
         ]);
 
         // After all data is loaded, check if submit button should be shown
@@ -2241,6 +2322,7 @@ export default function TaskDetailPage() {
           lastHandoverBy={lastHandoverBy}
           onTaskUpdate={fetchProcessorFiles}
           currentUser={currentUser}
+          deliveredBy={deliveredBy || undefined}
         />
 
         {/* Footer with primary buttons (no actions) */}
@@ -2260,8 +2342,10 @@ export default function TaskDetailPage() {
           onStatusUpdate={fetchRealStatus}
           assignmentRefreshTrigger={assignmentRefreshTrigger}
           setShowHandoverDialog={setShowHandoverDialog}
-          hideActionButtons={true}
           isAssigning={_isAssigning}
+          onPrepareToDeliver={handlePrepareToDeliver}
+          showPrepareToDeliver={currentStage === "Delivery" && realStatus === "completed"}
+          isPreparingToDeliver={isPreparingToDeliver}
         />
       </div>
 
@@ -2359,6 +2443,11 @@ export default function TaskDetailPage() {
                   setShowHandoverDialog={setShowHandoverDialog}
                   showOnlyActionButtons={true}
                   isAssigning={_isAssigning}
+                  onPrepareToDeliver={handlePrepareToDeliver}
+                  showPrepareToDeliver={
+                    currentStage === "Delivery" && realStatus === "completed"
+                  }
+                  isPreparingToDeliver={isPreparingToDeliver}
                 />
               }
               isSubmitting={submittingFiles}
