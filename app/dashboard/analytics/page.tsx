@@ -33,7 +33,8 @@ import { ChevronDownIcon, Box, House, PanelsTopLeft, Users, ClipboardCheck, Shie
 import * as XLSX from "xlsx"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format, parse } from "date-fns"
+import { format, parse, isWithinInterval, startOfDay, endOfDay } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import {
@@ -150,7 +151,10 @@ function AttendanceTable() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [selectedUser, setSelectedUser] = useState<string | null>(null)
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: new Date(),
+        to: new Date(),
+    })
     const [searchQuery, setSearchQuery] = useState("")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(10)
@@ -219,15 +223,17 @@ function AttendanceTable() {
 
     useEffect(() => {
         fetchAttendanceData()
-    }, [selectedDate])
+    }, [dateRange])
 
     const fetchAttendanceData = async () => {
+        if (!dateRange?.from) return
         try {
             setIsLoading(true)
             setError(null)
 
-            const formattedDate = format(selectedDate, "yyyy-MM-dd")
-            const response = await fetch(`/api/analytics/attendance?date=${formattedDate}`)
+            const fromDate = format(dateRange.from, "yyyy-MM-dd")
+            const toDate = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : fromDate
+            const response = await fetch(`/api/analytics/attendance?from=${fromDate}&to=${toDate}`)
             if (!response.ok) throw new Error("Failed to fetch attendance data")
 
             const data = await response.json()
@@ -248,8 +254,14 @@ function AttendanceTable() {
     // - If a user is selected, we restrict to that user; otherwise we show all users for that date.
     // - Search matches name, ID, or department.
     const filteredData = attendanceData.filter((r) => {
-        const selectedDateStr = format(selectedDate, "dd/MM/yyyy")
-        const matchesDate = r.attendance_date === selectedDateStr
+        // Date range filtering
+        let matchesDate = true
+        if (dateRange?.from) {
+            const recordDate = parse(r.attendance_date, "dd/MM/yyyy", new Date())
+            const from = startOfDay(dateRange.from)
+            const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from)
+            matchesDate = isWithinInterval(recordDate, { start: from, end: to })
+        }
         const matchesUser = !selectedUser || r.employee_name === selectedUser
         const matchesSearch =
             !searchQuery ||
@@ -260,7 +272,28 @@ function AttendanceTable() {
         return matchesDate && matchesUser && matchesSearch
     })
 
-    // Summary stats now come directly from the API (already in HH:MM:SS format)
+    // Helper to parse HH:MM:SS into total minutes
+    const parseHHMMSSToMinutes = (time: string | null | undefined) => {
+        if (!time || typeof time !== "string" || time === "N/A") return 0
+        const parts = time.split(":").map(Number)
+        if (parts.length < 2 || parts.some(isNaN)) return 0
+        const [hours, minutes, seconds] = [parts[0], parts[1], parts[2] ?? 0]
+        return hours * 60 + minutes + Math.floor(seconds / 60)
+    }
+
+    // Helper to convert minutes back to HH:MM:SS
+    const minutesToHHMMSS = (totalMinutes: number) => {
+        const hours = Math.floor(totalMinutes / 60)
+        const mins = totalMinutes % 60
+        return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`
+    }
+
+    // Summary stats aggregated across all days in the date range for the selected user
+    // Per day:
+    //   Total Working = sum of (out_time - in_time) for each session that day
+    //   Total Time    = last out_time - first in_time for that day
+    //   Idle Time     = Total Time - Total Working
+    // Across days: sum each day's values.
     const summaryStats = (() => {
         if (!selectedUser || filteredData.length === 0) {
             return {
@@ -270,12 +303,48 @@ function AttendanceTable() {
             }
         }
 
-        // All rows for a user+date share the same day-level totals; read from first row
-        const first = filteredData[0] as any
+        // Group sessions by employee+date
+        // Use full ISO timestamps (login_timestamp/logout_timestamp) for accurate cross-day calculations
+        const dayMap = new Map<string, { workingMins: number; firstInMs: number | null; lastOutMs: number | null }>()
+
+        filteredData.forEach((row: any) => {
+            const dayKey = `${row.employee_id || row.employee_name}_${row.attendance_date}`
+            if (!dayMap.has(dayKey)) {
+                dayMap.set(dayKey, { workingMins: 0, firstInMs: null, lastOutMs: null })
+            }
+            const day = dayMap.get(dayKey)!
+
+            // Working time per session from total_duration (computed from full timestamps, handles cross-day)
+            day.workingMins += parseHHMMSSToMinutes(row.total_duration)
+
+            // Track earliest login and latest logout using full timestamps (includes date)
+            const loginMs = row.login_timestamp ? new Date(row.login_timestamp).getTime() : null
+            const logoutMs = row.logout_timestamp ? new Date(row.logout_timestamp).getTime() : null
+            if (loginMs && !isNaN(loginMs)) {
+                day.firstInMs = day.firstInMs === null ? loginMs : Math.min(day.firstInMs, loginMs)
+            }
+            if (logoutMs && !isNaN(logoutMs)) {
+                day.lastOutMs = day.lastOutMs === null ? logoutMs : Math.max(day.lastOutMs, logoutMs)
+            }
+        })
+
+        let totalWorkingMins = 0
+        let totalTimeMins = 0
+        let totalIdleMins = 0
+
+        dayMap.forEach((day) => {
+            totalWorkingMins += day.workingMins
+            const dayTotalTime = (day.firstInMs !== null && day.lastOutMs !== null && day.lastOutMs > day.firstInMs)
+                ? Math.floor((day.lastOutMs - day.firstInMs) / (1000 * 60))
+                : 0
+            totalTimeMins += dayTotalTime
+            totalIdleMins += Math.max(dayTotalTime - day.workingMins, 0)
+        })
+
         return {
-            totalWorking: first.total_working_time || "00:00:00",
-            totalTimeSpent: first.total_time_spent || "00:00:00",
-            idleTime: first.idle_time || "00:00:00",
+            totalWorking: minutesToHHMMSS(totalWorkingMins),
+            totalTimeSpent: minutesToHHMMSS(totalTimeMins),
+            idleTime: minutesToHHMMSS(totalIdleMins),
         }
     })()
 
@@ -288,7 +357,7 @@ function AttendanceTable() {
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1)
-    }, [selectedUser, searchQuery, selectedDate])
+    }, [selectedUser, searchQuery, dateRange])
 
     // Handle category selection
     const handleCategoryToggle = (categoryKey: string, checked: boolean) => {
@@ -349,7 +418,9 @@ function AttendanceTable() {
         const ws = XLSX.utils.json_to_sheet(exportData)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, "Attendance Report")
-        XLSX.writeFile(wb, `Attendance_Report_${format(selectedDate, "yyyy-MM-dd")}.xlsx`)
+        const fromStr = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : "unknown"
+        const toStr = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : fromStr
+        XLSX.writeFile(wb, `Attendance_Report_${fromStr}_to_${toStr}.xlsx`)
     }
 
     const selectedColumnsCount = Object.values(selectedColumns).filter(Boolean).length
@@ -513,23 +584,34 @@ function AttendanceTable() {
                             </SelectContent>
                         </Select>
 
-                        {/* Date Picker */}
+                        {/* Date Range Picker */}
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className="w-full lg:w-[240px] justify-start text-left font-normal"
+                                    className="w-full lg:w-[300px] justify-start text-left font-normal"
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")}
+                                    {dateRange?.from ? (
+                                        dateRange.to ? (
+                                            <>
+                                                {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")}
+                                            </>
+                                        ) : (
+                                            format(dateRange.from, "MMM dd, yyyy")
+                                        )
+                                    ) : (
+                                        <span>Pick a date range</span>
+                                    )}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
                                 <Calendar
-                                    mode="single"
-                                    selected={selectedDate}
-                                    onSelect={(date) => date && setSelectedDate(date)}
-                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRange?.from}
+                                    selected={dateRange}
+                                    onSelect={setDateRange}
+                                    numberOfMonths={2}
                                 />
                             </PopoverContent>
                         </Popover>
@@ -689,7 +771,7 @@ function AttendanceTable() {
                             <div>
                                 <CardTitle>Timeline View</CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
+                                    {dateRange?.from ? (dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}` : format(dateRange.from, "EEEE, MMMM dd, yyyy")) : "No date selected"} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
                                 </p>
                             </div>
                         </div>
@@ -782,7 +864,7 @@ function AttendanceTable() {
                             <div>
                                 <CardTitle>Attendance Records</CardTitle>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    {format(selectedDate, "EEEE, MMMM dd, yyyy")} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
+                                    {dateRange?.from ? (dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}` : format(dateRange.from, "EEEE, MMMM dd, yyyy")) : "No date selected"} · {filteredData.length} record{filteredData.length !== 1 ? "s" : ""}
                                 </p>
                             </div>
                         </div>

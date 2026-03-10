@@ -206,14 +206,30 @@ function getShiftFromProfile(profile: any, loginTime: string | null): { shift: s
     return { shift, shiftInTime, shiftOutTime };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
-        // Fetch user_sessions data
-        const { data: sessions, error: sessionsError } = await supabase
+        const { searchParams } = new URL(request.url);
+        const fromDate = searchParams.get("from");
+        const toDate = searchParams.get("to");
+        // Legacy single-date support
+        const singleDate = searchParams.get("date");
+
+        // Fetch user_sessions data with optional date range filter
+        let query = supabase
             .from("user_sessions")
             .select("id, user_id, login_time, logout_time, session_date")
             .order("session_date", { ascending: false })
             .order("login_time", { ascending: false });
+
+        if (fromDate && toDate) {
+            query = query.gte("session_date", fromDate).lte("session_date", toDate);
+        } else if (fromDate) {
+            query = query.eq("session_date", fromDate);
+        } else if (singleDate) {
+            query = query.eq("session_date", singleDate);
+        }
+
+        const { data: sessions, error: sessionsError } = await query;
 
         if (sessionsError) {
             console.error("Error fetching user_sessions:", sessionsError);
@@ -389,6 +405,8 @@ export async function GET() {
                 early_going_by: earlyBy,
                 status: status,
                 punch_records: punchRecordsStr,
+                login_timestamp: loginTime || null,
+                logout_timestamp: logoutTime || null,
             };
         });
 
