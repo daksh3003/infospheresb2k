@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         const projectIds = [...new Set(Array.from(taskToProjectMap.values()))].filter(Boolean);
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name")
+            .select("project_id, project_name, client_name")
             .in("project_id", projectIds);
             
         if(projectsError) {
@@ -95,9 +95,11 @@ export async function GET(request: NextRequest) {
         }
         
         const projectToNameMap = new Map();
+        const projectToClientNameMap = new Map();
         if(projects) {
             projects.forEach((project: any) => {
                 projectToNameMap.set(project.project_id, project.project_name);
+                projectToClientNameMap.set(project.project_id, project.client_name || "N/A");
             });
         }
         
@@ -174,7 +176,7 @@ export async function GET(request: NextRequest) {
                     }
                     
                     const projectId = taskToProjectMap.get(taskId);
-                    const clientName = "N/A";
+                    const clientName = projectId ? (projectToClientNameMap.get(projectId) || "N/A") : "N/A";
                     const filename = taskToFileMap.get(taskId) || "N/A";
                     const poHours = taskToEstimatedHoursMap.get(taskId) ?? 0;
                     const username = metadata.user_name || userIdToNameMap.get(action.user_id) || "N/A";

@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
 
         const taskIds = [...new Set(taskActions.map((action: any) => action.task_id))]; // Fixed: task_id instead of taskid
 
-        // Updated: task_test table (correct name)
+        // Fetch tasks for these IDs from tasks_test table
         const { data: tasks, error: tasksError } = await supabase
-            .from("task_test")
+            .from("tasks_test")
             .select("task_id, project_id, task_name")
             .in("task_id", taskIds);
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         // Updated: projecttest table with correct column names
         const { data: projects, error: projectsError } = await supabase
             .from("projects_test")
-            .select("project_id, project_name")
+            .select("project_id, project_name, client_name")
             .in("project_id", projectIds);
 
         if(projectsError) {
@@ -75,9 +75,11 @@ export async function GET(request: NextRequest) {
         }
         
         const projectToNameMap = new Map();
+        const projectToClientNameMap = new Map();
         if(projects) {
             projects.forEach((project: any) => {
                 projectToNameMap.set(project.project_id, project.project_name); // Fixed: project_id and project_name
+                projectToClientNameMap.set(project.project_id, project.client_name || "N/A");
             });
         }
         
@@ -94,7 +96,10 @@ export async function GET(request: NextRequest) {
         const taskToFileMap = new Map();
         if(files) {
             files.forEach((file: any) => {
-                taskToFileMap.set(file.task_id, file.file_id); // Fixed: task_id and file_id
+                // Map task_id to human-readable file_name for daily user report
+                if (!taskToFileMap.has(file.task_id)) {
+                    taskToFileMap.set(file.task_id, file.file_name || file.file_id || "N/A");
+                }
             });
         }
 
@@ -135,7 +140,7 @@ export async function GET(request: NextRequest) {
             // Get common task information
             const fileId = taskToFileMap.get(taskId) || "N/A";
             const projectId = taskToProjectMap.get(taskId);
-            const clientName = projectId ? (projectToNameMap.get(projectId) || "N/A") : "N/A";
+            const clientName = projectId ? (projectToClientNameMap.get(projectId) || "N/A") : "N/A";
             const taskName = taskToNameMap.get(taskId) || "N/A";
             const projectName = projectToNameMap.get(projectId) || "N/A";
 
