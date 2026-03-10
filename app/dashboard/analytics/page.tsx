@@ -1996,7 +1996,7 @@ function UserMonthlyReport() {
                         
                         // Format specific fields
                         if (col.key === "total_hours") {
-                            value = parseFloat(value || 0).toFixed(2);
+                            value = Math.round(Number(value || 0));
                         } else if (col.key === "total_pages") {
                             value = value || 0;
                         }
@@ -2383,7 +2383,7 @@ function UserMonthlyReport() {
                                         <TableCell className="text-center">{entry.s_no}</TableCell>
                                         <TableCell className="text-center font-medium">{entry.name}</TableCell>
                                         <TableCell className="text-center">{entry.total_pages || 0}</TableCell>
-                                        <TableCell className="text-center">{parseFloat(entry.total_hours || 0).toFixed(2)}</TableCell>
+                                        <TableCell className="text-center">{Math.round(Number(entry.total_hours || 0))}</TableCell>
                                     </TableRow>
                                 ))
                             )}
