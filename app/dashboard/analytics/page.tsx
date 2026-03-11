@@ -243,21 +243,22 @@ function AttendanceTable() {
         new Set(attendanceData.map((r) => r.employee_name))
     ).filter(Boolean)
 
-    // Filter data based on selected user, date, and search query.
-    // We always filter by the chosen date; we only show rows once an employee is selected.
-    const filteredData = selectedUser
-        ? attendanceData.filter((r) => {
-            const selectedDateStr = format(selectedDate, "dd/MM/yyyy")
-            const matchesDate = r.attendance_date === selectedDateStr
-            const matchesUser = r.employee_name === selectedUser
-            const matchesSearch = !searchQuery ||
-                r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                r.department?.toLowerCase().includes(searchQuery.toLowerCase())
-            
-            return matchesDate && matchesUser && matchesSearch
-        })
-        : []
+    // Filter data based on selected date, optional user, and search query.
+    // - Date is always applied.
+    // - If a user is selected, we restrict to that user; otherwise we show all users for that date.
+    // - Search matches name, ID, or department.
+    const filteredData = attendanceData.filter((r) => {
+        const selectedDateStr = format(selectedDate, "dd/MM/yyyy")
+        const matchesDate = r.attendance_date === selectedDateStr
+        const matchesUser = !selectedUser || r.employee_name === selectedUser
+        const matchesSearch =
+            !searchQuery ||
+            r.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.employee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.department?.toLowerCase().includes(searchQuery.toLowerCase())
+
+        return matchesDate && matchesUser && matchesSearch
+    })
 
     // Summary stats now come directly from the API (already in HH:MM:SS format)
     const summaryStats = (() => {
@@ -1033,7 +1034,7 @@ function UserDailyReport() {
                 { key: "client_name", label: "Client Name" },
                 { key: "task_name", label: "Task Name" },
                 { key: "project_name", label: "Project Name" },
-                { key: "file_no", label: "File No" },
+                { key: "file_no", label: "File Name" },
             ],
         },
         workDetails: {
@@ -1106,9 +1107,13 @@ function UserDailyReport() {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await fetch(
-                `/api/analytics/daily-user?userId=${selectedUserId}&date=${selectedDate}`
-            );
+
+            // Build URL: date is optional (if empty, backend returns all dates for that user)
+            const params = new URLSearchParams({ userId: selectedUserId });
+            if (selectedDate) {
+                params.append("date", selectedDate);
+            }
+            const response = await fetch(`/api/analytics/daily-user?${params.toString()}`);
 
             if (!response.ok) {
                 let errorMessage = `HTTP error! status: ${response.status}`;
@@ -1135,13 +1140,15 @@ function UserDailyReport() {
         }
     };
 
-    // Filter data based on search query
+    // Filter data based on search query (name, client, task, project, file name, work type)
     const filteredData = reportData.filter((entry) => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return (
             entry.name?.toLowerCase().includes(query) ||
             entry.client_name?.toLowerCase().includes(query) ||
+            entry.task_name?.toLowerCase().includes(query) ||
+            entry.project_name?.toLowerCase().includes(query) ||
             entry.file_no?.toLowerCase().includes(query) ||
             entry.work_type?.toLowerCase().includes(query)
         );
@@ -1259,7 +1266,7 @@ function UserDailyReport() {
         );
     };
 
-    // Filter users for dropdown search
+    // Filter users for dropdown search (by name only)
     const filteredUsers = availableUsers.filter((user) =>
         user.name.toLowerCase().includes(userSearchQuery.toLowerCase())
     );
@@ -1288,12 +1295,12 @@ function UserDailyReport() {
             <Card>
                 <CardContent className="pt-6">
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                        {/* Search Bar */}
+                        {/* Search Bar (filters existing results) */}
                         <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
-                                placeholder="Search by name, client, file no..."
+                                placeholder="Search by name, client, file name..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9"
@@ -1312,16 +1319,19 @@ function UserDailyReport() {
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={selectedDate ? parse(selectedDate, 'yyyy-MM-dd', new Date()) : undefined}
-                                    onSelect={(date) => {
-                                        if (date) {
-                                            setSelectedDate(format(date, 'yyyy-MM-dd'));
-                                        }
-                                    }}
-                                    initialFocus
-                                />
+                                    <Calendar
+                                        mode="single"
+                                        selected={selectedDate ? parse(selectedDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                setSelectedDate(format(date, 'yyyy-MM-dd'));
+                                            } else {
+                                                // Allow clearing the date to show all records
+                                                setSelectedDate("");
+                                            }
+                                        }}
+                                        initialFocus
+                                    />
                             </PopoverContent>
                         </Popover>
 
@@ -1348,7 +1358,7 @@ function UserDailyReport() {
                             </SelectContent>
                         </Select>
 
-                        {/* Refresh Button */}
+                        {/* Search Button (fetch daily report) */}
                         <Button
                             onClick={fetchDailyReport}
                             disabled={!selectedUserId || isLoading}
@@ -1498,7 +1508,7 @@ function UserDailyReport() {
                                 <TableHead className="text-center">Client Name</TableHead>
                                 <TableHead className="text-center">Task Name</TableHead>
                                 <TableHead className="text-center">Project Name</TableHead>
-                                <TableHead className="text-center">File No</TableHead>
+                                <TableHead className="text-center">File Name</TableHead>
                                 <TableHead className="text-center">Work Type</TableHead>
                                 <TableHead className="text-center">No of Pages</TableHead>
                                 <TableHead className="text-center">Start Time</TableHead>
@@ -1529,7 +1539,13 @@ function UserDailyReport() {
                                         <TableCell className="text-center">{entry.client_name}</TableCell>
                                         <TableCell className="text-center">{entry.task_name}</TableCell>
                                         <TableCell className="text-center">{entry.project_name}</TableCell>
-                                        <TableCell className="text-center">{entry.file_no}</TableCell>
+                                        <TableCell className="text-center max-w-[250px]">
+                                            <Tooltip content={entry.file_no || "N/A"}>
+                                                <span className="block truncate cursor-default">
+                                                    {entry.file_no || "N/A"}
+                                                </span>
+                                            </Tooltip>
+                                        </TableCell>
                                         <TableCell className="text-center">{entry.work_type}</TableCell>
                                         <TableCell className="text-center">{entry.no_of_pages}</TableCell>
                                         <TableCell className="text-center">{entry.start_time}</TableCell>
