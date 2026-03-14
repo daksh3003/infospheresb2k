@@ -2495,7 +2495,6 @@ function POReport() {
         delivery_date: true,
         status: true,
         po_status: true,
-        po_number: true,
     });
 
     const COLUMN_CATEGORIES = {
@@ -2504,7 +2503,6 @@ function POReport() {
             columns: [
                 { key: "s_no", label: "S. No" },
                 { key: "project_name", label: "Project Name" },
-                { key: "po_number", label: "PO Number" },
             ],
         },
         workDetails: {
@@ -2577,8 +2575,7 @@ function POReport() {
         const query = searchQuery.toLowerCase();
         return (
             entry.project_name?.toLowerCase().includes(query) ||
-            entry.status?.toLowerCase().includes(query) ||
-            entry.po_number?.toLowerCase().includes(query)
+            entry.status?.toLowerCase().includes(query)
         );
     });
 
@@ -2935,7 +2932,6 @@ function POReport() {
                                 <TableHead className="text-center">Delivery Date</TableHead>
                                 <TableHead className="text-center">Status</TableHead>
                                 <TableHead className="text-center">PO Status</TableHead>
-                                <TableHead className="text-center">PO Number</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2978,7 +2974,6 @@ function POReport() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-center">{entry.po_status}</TableCell>
-                                        <TableCell className="text-center">{entry.po_number}</TableCell>
                                     </TableRow>
                                 ))
                             )}

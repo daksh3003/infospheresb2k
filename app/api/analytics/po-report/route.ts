@@ -215,12 +215,11 @@ export async function GET(request: NextRequest) {
                         delivery_date: deliveryDate,
                         status: status,
                         po_status: poStatus,
-                        po_number: project.po_number || project.poNumber || 'N/A',
                     });
                 });
             } else {
                 // If no process types found, create one record with 'N/A'
-                reportEntries.push({ 
+                reportEntries.push({
                     s_no: serialNumber++,
                     received_date: receivedDate,
                     project_name: project.project_name || 'N/A',
@@ -231,7 +230,6 @@ export async function GET(request: NextRequest) {
                     delivery_date: deliveryDate,
                     status: status,
                     po_status: poStatus,
-                    po_number: project.po_number || project.poNumber || 'N/A',
                 });
             }
         });
