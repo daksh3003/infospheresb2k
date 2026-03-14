@@ -188,12 +188,20 @@ export async function GET(request: NextRequest) {
 
             const status = project.completion_status ? 'Delivered' : 'In Progress';
 
-            // Derive PO status from the latest task action across all tasks
+            // Derive PO status from the most advanced stage across all tasks
+            const stageOrder = ['Processor', 'QC', 'QA', 'Delivery'];
             let poStatus = 'N/A';
+            let maxStageIndex = -1;
             projectTasks.forEach((task: any) => {
                 const latestAction = taskToLatestActionMap.get(task.task_id);
                 if (latestAction) {
-                    poStatus = latestAction;
+                    const stageIndex = stageOrder.indexOf(latestAction);
+                    if (stageIndex > maxStageIndex) {
+                        maxStageIndex = stageIndex;
+                        poStatus = latestAction;
+                    } else if (stageIndex === -1 && maxStageIndex === -1) {
+                        poStatus = latestAction;
+                    }
                 }
             });
 
