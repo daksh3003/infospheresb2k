@@ -96,6 +96,9 @@ export const MainTaskCard = ({
   onTaskUpdate,
   currentUser,
   deliveredBy,
+  openEditDialogFromParent,
+  onEditDialogClose,
+  onPrepareToDeliverClick,
 }: {
   task: Task;
   status: string;
@@ -111,6 +114,9 @@ export const MainTaskCard = ({
   onTaskUpdate?: () => void;
   currentUser?: UserProfile | null;
   deliveredBy?: string | null;
+  openEditDialogFromParent?: boolean;
+  onEditDialogClose?: () => void;
+  onPrepareToDeliverClick?: () => void;
 }) => {
   const [assignedTo, setAssignedTo] = useState<
     {
@@ -177,7 +183,14 @@ export const MainTaskCard = ({
     });
   }, [task]);
 
-  const handleSaveEdit = async () => {
+  // Open edit dialog when parent requests it (e.g. from "Prepare to deliver")
+  useEffect(() => {
+    if (openEditDialogFromParent) {
+      setIsEditDialogOpen(true);
+    }
+  }, [openEditDialogFromParent]);
+
+  const handleSaveEdit = async (): Promise<boolean> => {
     setIsSaving(true);
     try {
       const response = await fetch(`/api/tasks/${task.task_id}`, {
@@ -192,18 +205,29 @@ export const MainTaskCard = ({
       if (response.ok) {
         toast.success("Task updated successfully");
         setIsEditDialogOpen(false);
+        onEditDialogClose?.();
         if (onTaskUpdate) {
           onTaskUpdate();
         }
+        return true;
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to update task");
+        return false;
       }
     } catch (error) {
       console.error("Error saving task:", error);
       toast.error("An unexpected error occurred");
+      return false;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveAndPrepareToDeliver = async () => {
+    const success = await handleSaveEdit();
+    if (success && onPrepareToDeliverClick) {
+      onPrepareToDeliverClick();
     }
   };
 
@@ -647,7 +671,13 @@ export const MainTaskCard = ({
         </div>
       </div>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) onEditDialogClose?.();
+        }}
+      >
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Task Details</DialogTitle>
@@ -792,13 +822,33 @@ export const MainTaskCard = ({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                onEditDialogClose?.();
+              }}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save changes
-            </Button>
+            {onPrepareToDeliverClick ? (
+              <>
+                <Button variant="outline" onClick={handleSaveEdit} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save changes
+                </Button>
+                <Button onClick={handleSaveAndPrepareToDeliver} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save & prepare to deliver
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => handleSaveEdit()} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

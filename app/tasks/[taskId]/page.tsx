@@ -225,6 +225,7 @@ export default function TaskDetailPage() {
 
   const [fileEdits, setFileEdits] = useState<Record<string, FileEditInfo>>({});
   const [isPreparingToDeliver, setIsPreparingToDeliver] = useState(false);
+  const [openEditDetailsForDeliver, setOpenEditDetailsForDeliver] = useState(false);
 
   const supabase = createClient();
 
@@ -2325,6 +2326,9 @@ export default function TaskDetailPage() {
           onTaskUpdate={fetchProcessorFiles}
           currentUser={currentUser}
           deliveredBy={deliveredBy || undefined}
+          openEditDialogFromParent={openEditDetailsForDeliver}
+          onEditDialogClose={() => setOpenEditDetailsForDeliver(false)}
+          onPrepareToDeliverClick={currentStage === "Delivery" && realStatus === "completed" ? handlePrepareToDeliver : undefined}
         />
 
         {/* Footer with primary buttons (no actions) */}
@@ -2345,7 +2349,7 @@ export default function TaskDetailPage() {
           assignmentRefreshTrigger={assignmentRefreshTrigger}
           setShowHandoverDialog={setShowHandoverDialog}
           isAssigning={_isAssigning}
-          onPrepareToDeliver={handlePrepareToDeliver}
+          onPrepareToDeliver={() => setOpenEditDetailsForDeliver(true)}
           showPrepareToDeliver={currentStage === "Delivery" && realStatus === "completed"}
           isPreparingToDeliver={isPreparingToDeliver}
         />
@@ -2445,7 +2449,7 @@ export default function TaskDetailPage() {
                   setShowHandoverDialog={setShowHandoverDialog}
                   showOnlyActionButtons={true}
                   isAssigning={_isAssigning}
-                  onPrepareToDeliver={handlePrepareToDeliver}
+                  onPrepareToDeliver={() => setOpenEditDetailsForDeliver(true)}
                   showPrepareToDeliver={
                     currentStage === "Delivery" && realStatus === "completed"
                   }
