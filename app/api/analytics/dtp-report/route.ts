@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
                     reportEntries.push({
                         date: date,
                         name: username,
-                        client: clientName,
+                        client_name: clientName,
                         job_no: jobNo,
                         process: currentStage,
                         page_count: pageCount,
