@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
         const { data: tasks, error: tasksError } = await supabase
             .from("tasks_test")
-            .select("task_id, project_id, processor_type")
+            .select("task_id, project_id")
             .in("project_id", projectIds);
 
         if(tasksError) {
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
         const { data: files, error: filesError } = await supabase
             .from("files_test")
-            .select("file_id, task_id, page_count")
+            .select("file_id, task_id, page_count, storage_name")
             .in("task_id", tasks?.map((task: any) => task.task_id) || []);
 
         if(filesError) {
@@ -108,6 +108,30 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        // Fetch task_actions to determine PO status (latest action per task)
+        const { data: taskActions, error: actionsError } = await supabase
+            .from("task_actions")
+            .select("task_id, metadata, created_at")
+            .in("task_id", taskIds)
+            .order("created_at", { ascending: false });
+
+        if(actionsError) {
+            console.error("Error fetching task actions:", actionsError);
+        }
+
+        // Map task_id → latest current_stage from metadata (first occurrence since sorted desc)
+        const taskToLatestActionMap = new Map<string, string>();
+        if(taskActions) {
+            taskActions.forEach((action: any) => {
+                if(!taskToLatestActionMap.has(action.task_id)) {
+                    const stage = action.metadata?.current_stage;
+                    if(stage) {
+                        taskToLatestActionMap.set(action.task_id, stage);
+                    }
+                }
+            });
+        }
+
         
         const reportEntries: any[] = [];
         let serialNumber = 1;
@@ -129,8 +153,14 @@ export async function GET(request: NextRequest) {
                 const taskFiles = taskToFileMap.get(task.task_id) || [];
                 taskFiles.forEach((file: any) => {
                     const pageCount = file.page_count || 0;
-                    receivedPages += pageCount;
-                    outputPages += pageCount;
+                    // Client files (uploaded by PM) → received pages
+                    if (file.storage_name === "task-files") {
+                        receivedPages += pageCount;
+                    }
+                    // Processor output files → output pages
+                    if (file.storage_name === "processor-files") {
+                        outputPages += pageCount;
+                    }
                 });
             });
 
@@ -154,9 +184,26 @@ export async function GET(request: NextRequest) {
                 })()
                 : 'N/A';
 
-            const pohours = project.po_hours || project.pohours || project.poHours || 0;
+            const pohours = Math.round(Number(project.po_hours || project.pohours || project.poHours || 0));
 
             const status = project.completion_status ? 'Delivered' : 'In Progress';
+
+            // Derive PO status from the most advanced stage across all tasks
+            const stageOrder = ['Processor', 'QC', 'QA', 'Delivery'];
+            let poStatus = 'N/A';
+            let maxStageIndex = -1;
+            projectTasks.forEach((task: any) => {
+                const latestAction = taskToLatestActionMap.get(task.task_id);
+                if (latestAction) {
+                    const stageIndex = stageOrder.indexOf(latestAction);
+                    if (stageIndex > maxStageIndex) {
+                        maxStageIndex = stageIndex;
+                        poStatus = latestAction;
+                    } else if (stageIndex === -1 && maxStageIndex === -1) {
+                        poStatus = latestAction;
+                    }
+                }
+            });
 
             // Sort process types: OCR, QC, QA, Delivery
             const processTypes = Array.from(processTypeSet);
@@ -175,13 +222,12 @@ export async function GET(request: NextRequest) {
                         output_pages: outputPages,
                         delivery_date: deliveryDate,
                         status: status,
-                        po_status: project.po_status || 'N/A',
-                        po_number: project.po_number || project.poNumber || 'N/A',
+                        po_status: poStatus,
                     });
                 });
             } else {
                 // If no process types found, create one record with 'N/A'
-                reportEntries.push({ 
+                reportEntries.push({
                     s_no: serialNumber++,
                     received_date: receivedDate,
                     project_name: project.project_name || 'N/A',
@@ -191,8 +237,7 @@ export async function GET(request: NextRequest) {
                     output_pages: outputPages,
                     delivery_date: deliveryDate,
                     status: status,
-                    po_status: project.po_status || 'N/A',
-                    po_number: project.po_number || project.poNumber || 'N/A',
+                    po_status: poStatus,
                 });
             }
         });
