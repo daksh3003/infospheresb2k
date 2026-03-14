@@ -860,14 +860,15 @@ export default function TaskDetailPage() {
 
     setIsPreparingToDeliver(true);
     try {
-      // Download all processor files from the latest iteration
+      // Download all processor files from the latest iteration (no prefix for delivery)
       for (let i = 0; i < processorFiles.length; i++) {
         const file = processorFiles[i];
         await handleDownload(
           file.name,
           storage_name,
           folder_path,
-          i
+          i,
+          { skipPrefix: true }
         );
       }
 
@@ -1453,7 +1454,8 @@ export default function TaskDetailPage() {
     fileName: string,
     storage_name: string,
     folder_path: string,
-    index: number
+    index: number,
+    options?: { skipPrefix?: boolean }
   ) => {
 
     try {
@@ -1496,7 +1498,7 @@ export default function TaskDetailPage() {
 
       let new_file_name = "";
 
-      if (storage_name === "processor-files") {
+      if (!options?.skipPrefix && storage_name === "processor-files") {
         if (folder_path.includes("PM_")) {
           new_file_name = "processor_file_v1_" + fileName;
         } else if (folder_path.includes("QC_")) {

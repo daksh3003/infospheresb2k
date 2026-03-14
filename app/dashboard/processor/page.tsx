@@ -36,6 +36,7 @@ interface PMDashboardTask {
   taskIterationId: string;
   iterationNumber: number;
   currentStage: string;
+  previousStage: string | null;
   statusFlag: string | null;
   iterationNotes: string | null;
 
@@ -151,6 +152,7 @@ export default function ProcessorDashboard() {
             status: string | null;
             task_id: string;
             iteration_number: number | null;
+            previous_stage?: string | null;
             tasks_test: {
               task_name: string;
               task_id: string;
@@ -189,6 +191,7 @@ export default function ProcessorDashboard() {
             displayAssignedTo: `Iteration: ${item.iteration_number || "N/A"}`,
             taskId: item.task_id,
             latest_action: item.latest_action,
+            previousStage: item.previous_stage ?? null,
           })
         );
 
@@ -241,6 +244,7 @@ export default function ProcessorDashboard() {
         taskIterationId: "", // Not directly available here easily
         iterationNumber: 1,
         currentStage: "Processor",
+        previousStage: null,
         status: "pending",
         calculatedStatus: "pending",
         calculatedPriority: "medium",
@@ -393,13 +397,15 @@ export default function ProcessorDashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -427,6 +433,8 @@ export default function ProcessorDashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))
@@ -442,13 +450,15 @@ export default function ProcessorDashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -474,6 +484,8 @@ export default function ProcessorDashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))

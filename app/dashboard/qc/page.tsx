@@ -39,6 +39,7 @@ interface QCDashboardTask {
   taskIterationId: string;
   iterationNumber: number;
   currentStage: string;
+  previousStage: string | null;
   statusFlag: string | null;
   iterationNotes: string | null;
 
@@ -166,6 +167,7 @@ export default function QCDashboard() {
               custom_file_format: string | null;
             } | null;
             latest_action: string | null;
+            previous_stage?: string | null;
           }) => ({
             taskId: item.task_id,
             projectId: item.tasks_test?.project_id || item.task_id || "unknown",
@@ -179,6 +181,7 @@ export default function QCDashboard() {
             taskIterationId: item.id,
             iterationNumber: item.iteration_number || 1,
             currentStage: item.current_stage,
+            previousStage: item.previous_stage ?? null,
             status: (item.status as any) || "pending",
             iterationNotes: null,
             currentFileVersionId: null,
@@ -250,6 +253,7 @@ export default function QCDashboard() {
         taskIterationId: "", // Not directly available
         iterationNumber: 1,
         currentStage: "QC",
+        previousStage: item.previous_stage ?? null,
         status: "pending",
         calculatedStatus: "pending",
         calculatedPriority: "medium",
@@ -394,13 +398,15 @@ export default function QCDashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -428,6 +434,8 @@ export default function QCDashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))
@@ -443,13 +451,15 @@ export default function QCDashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -475,6 +485,8 @@ export default function QCDashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))

@@ -50,6 +50,7 @@ interface TaskCardProps {
   hideViewButton?: boolean; // Optional: Whether to hide the view button
   disableStatusFetch?: boolean; // Optional: Disable internal status fetching (for lists)
   currentStage?: string; // Optional: Current stage of the task (Processor, QC, QA)
+  previousStage?: string | null; // Optional: Stage the task came from before current
   language?: string; // Optional: Language of the project
 }
 
@@ -74,6 +75,7 @@ export function TaskCard({
   hideViewButton = false,
   disableStatusFetch = false,
   currentStage,
+  previousStage,
   language,
 }: TaskCardProps) {
   const router = useRouter();
@@ -212,7 +214,7 @@ export function TaskCard({
       onClick={handleViewDetails}
     >
       <div className="px-6 py-4">
-        <div className="grid grid-cols-9 gap-4 items-center">
+        <div className="grid grid-cols-10 gap-4 items-center">
           {/* Left side - Title and Description */}
           <div className="col-span-2 min-w-0">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-0.5">
@@ -295,7 +297,19 @@ export function TaskCard({
             )}
           </div>
 
-          {/* Current Stage Column (Col 7) */}
+          {/* Previous Stage Column - only show when task has more than one stage */}
+          <div className="flex items-center justify-center">
+            {previousStage ? (
+              <Badge
+                variant="outline"
+                className="px-2 py-0.5 text-[9px] font-medium rounded-full uppercase tracking-wider bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700"
+              >
+                {previousStage}
+              </Badge>
+            ) : null}
+          </div>
+
+          {/* Current Stage Column */}
           <div className="flex items-center justify-center">
             {currentStage ? (
               <Badge
@@ -316,7 +330,7 @@ export function TaskCard({
             )}
           </div>
 
-          {/* Status Column (Col 8) */}
+          {/* Status Column */}
           <div className="flex items-center justify-center">
             <Badge
               variant="outline"

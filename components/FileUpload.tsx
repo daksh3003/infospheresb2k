@@ -1,4 +1,6 @@
+"use client";
 import { Paperclip, DownloadCloud, Upload, X, Pencil, Trash2 } from "lucide-react";
+import { useState, useCallback } from "react";
 
 interface FileWithPageCount extends File {
   pageCount?: number;
@@ -94,6 +96,36 @@ export const FileUpload = ({
       </div>
     );
   };
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      const files = e.dataTransfer.files;
+      if (files?.length) {
+        const syntheticEvent = {
+          target: { files },
+        } as React.ChangeEvent<HTMLInputElement>;
+        handleFileUpload(syntheticEvent);
+      }
+    },
+    [handleFileUpload]
+  );
+
   return (
     <div className="border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden">
       <div className="p-6 pb-2">
@@ -106,7 +138,14 @@ export const FileUpload = ({
         <div className="flex-row items-center justify-center w-full">
           <label
             htmlFor="dropzone-file"
-            className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+            className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+              isDragging
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               <Upload className="w-8 h-8 mb-2 text-gray-500" />

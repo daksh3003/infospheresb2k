@@ -59,10 +59,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Then get the current stage for each project
+    // Then get the current stage and stages history for each project
     const { data: iterationsData, error: iterationsError } = await supabase
       .from("task_iterations")
-      .select("task_id, current_stage");
+      .select("task_id, current_stage, stages");
 
     if (iterationsError) {
       return NextResponse.json(
@@ -71,11 +71,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create a map of project_id to current_stage
+    // Create maps for current_stage and previous_stage
     const stageMap = iterationsData.reduce((acc: Record<string, string>, curr) => {
       acc[curr.task_id] = curr.current_stage;
       return acc;
     }, {});
+    const previousStageMap = iterationsData.reduce((acc: Record<string, string | null>, curr) => {
+      const stages = (curr as { stages?: string[] }).stages;
+      const currentStage = curr.current_stage;
+      acc[curr.task_id] = stages && stages.length >= 1
+        ? (currentStage === "Delivery" && stages.length >= 2 ? stages[stages.length - 2] : stages[stages.length - 1])
+        : null;
+      return acc;
+    }, {});
+
+    console.log(stageMap);
+    console.log(previousStageMap);
 
     if (projectsData) {
       const processedTasks = projectsData.map((task) => {
@@ -85,6 +96,7 @@ export async function GET(request: NextRequest) {
           priority: calculatePriority(task.delivery_date, task.po_hours),
           type: getTaskType(task.process_type),
           current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
+          previous_stage: previousStageMap[task.task_id] ?? null,
         };
       });
 

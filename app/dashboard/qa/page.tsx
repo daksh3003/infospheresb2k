@@ -30,6 +30,7 @@ interface QADashboardTask {
   projectId: string;
   projectName: string;
   currentStage: string;
+  previousStage: string | null;
   statusFlag: string | null;
   iterationNumber: number;
   // File metadata
@@ -127,6 +128,7 @@ export default function QADashboard() {
             status: string | null;
             task_id: string;
             iteration_number: number | null;
+            previous_stage?: string | null;
             tasks_test: {
               task_name: string;
               task_id: string;
@@ -148,7 +150,7 @@ export default function QADashboard() {
             projectId: item.tasks_test?.project_id || item.task_id || "unknown",
             projectName: item.tasks_test?.task_name || "No Project Name",
             currentStage: item.current_stage,
-            // status: item.status || null,
+            previousStage: item.previous_stage ?? null,
             iterationNumber: item.iteration_number || 1,
             latest_action: item.latest_action,
             fileType: item.tasks_test?.file_type || null,
@@ -206,6 +208,7 @@ export default function QADashboard() {
         projectId: item.project_id,
         projectName: item.task_name || "No Project Name",
         currentStage: "QA",
+        previousStage: item.previous_stage ?? null,
         statusFlag: null,
         iterationNumber: 1,
       }));
@@ -339,13 +342,15 @@ export default function QADashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -373,6 +378,8 @@ export default function QADashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))
@@ -388,13 +395,15 @@ export default function QADashboard() {
               <div className="flex flex-col space-y-4">
                 {/* Table Header */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border rounded-t-xl border-gray-200 dark:border-gray-700 -mb-4">
-                  <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <div className="col-span-2">Task Details</div>
                     <div className="text-center">Page Count</div>
                     <div className="text-center">File Type</div>
                     <div className="text-center">File Format</div>
                     <div className="text-center">Language</div>
                     <div className="text-center">Working On</div>
+                    <div className="text-center">Previous Stage</div>
+                    <div className="text-center">Current Stage</div>
                     <div className="text-center">Status</div>
                     <div className="text-center">Action</div>
                   </div>
@@ -420,6 +429,8 @@ export default function QADashboard() {
                       fileFormat={task.fileFormat || undefined}
                       customFileFormat={task.customFileFormat || undefined}
                       language={projectNames[task.projectId]?.language || undefined}
+                      currentStage={task.currentStage}
+                      previousStage={task.previousStage}
                       disableStatusFetch={true}
                     />
                   ))

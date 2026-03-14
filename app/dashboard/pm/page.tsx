@@ -57,6 +57,7 @@ interface ProjectTask {
   status?: "pending" | "in-progress" | "completed" | "overdue";
   priority?: "low" | "medium" | "high" | "critical";
   current_stage?: "Processor" | "QC" | "QA";
+  previous_stage?: string | null;
   type: "pm" | "qc" | "qa";
   project_delivery_date?: string;
   project_delivery_time?: string;
@@ -177,13 +178,23 @@ export default function DashboardPage() {
       });
       const iterationsData = await iterationsResponse.json();
 
-      // Create a map of project_id to current_stage
+      // Create maps for current_stage and previous_stage
       const stageMap = iterationsData.reduce(
         (
           acc: Record<string, string>,
           curr: { task_id: string; current_stage: string }
         ) => {
           acc[curr.task_id] = curr.current_stage;
+          return acc;
+        },
+        {}
+      );
+      const previousStageMap = iterationsData.reduce(
+        (
+          acc: Record<string, string | null>,
+          curr: { task_id: string; previous_stage?: string | null }
+        ) => {
+          acc[curr.task_id] = curr.previous_stage ?? null;
           return acc;
         },
         {}
@@ -229,6 +240,7 @@ export default function DashboardPage() {
               priority: calculatePriority(task.delivery_date, task.po_hours),
               type: getTaskType(task.process_type),
               current_stage: stageMap[task.task_id] || "Processor", // Default to Processor if no stage found
+              previous_stage: previousStageMap[task.task_id] ?? null,
               page_count: pageCountMap[task.task_id] || null, // Add page count
               latest_action: (task as any).latest_action || null,
             };
@@ -692,13 +704,14 @@ export default function DashboardPage() {
             <div>
               {/* Table Header */}
               <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-9 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="grid grid-cols-10 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <div className="col-span-2">Task Details</div>
                   <div className="text-center">Page Count</div>
                   <div className="text-center">File Type</div>
                   <div className="text-center">File Format</div>
                   <div className="text-center">Language</div>
                   <div className="text-center">Working On</div>
+                  <div className="text-center">Previous Stage</div>
                   <div className="text-center">Current Stage</div>
                   <div className="text-center">Status</div>
                 </div>
@@ -725,6 +738,7 @@ export default function DashboardPage() {
                     hideViewButton={group.tasks.length === 1}
                     currentWorkers={workers[task.task_id]?.map(w => ({ name: w.name, email: w.email }))}
                     currentStage={task.current_stage}
+                    previousStage={task.previous_stage ?? undefined}
                     disableStatusFetch={true}
                     language={task.language || projectNames[task.project_id]?.language}
                   />

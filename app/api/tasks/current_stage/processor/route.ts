@@ -12,6 +12,7 @@ export async function GET() {
           status, 
           task_id, 
           iteration_number, 
+          stages,
           tasks_test ( task_name, task_id, project_id, file_type, file_format, custom_file_format )
         `
         )
@@ -40,10 +41,19 @@ export async function GET() {
         }
     });
 
-    const dataWithActions = iterations.map(item => ({
-        ...item,
-        latest_action: latestActionMap.get(item.task_id) || null
-    }));
+    const dataWithActions = iterations.map(item => {
+        const stages = (item as { stages?: string[] }).stages;
+        const curr = item.current_stage;
+        // For non-Delivery we only push the stage we're leaving, so last element = previous. For Delivery we push both, so use length-2.
+        const previous_stage = stages && stages.length >= 1
+            ? (curr === "Delivery" && stages.length >= 2 ? stages[stages.length - 2] : stages[stages.length - 1])
+            : null;
+        return {
+            ...item,
+            latest_action: latestActionMap.get(item.task_id) || null,
+            previous_stage,
+        };
+    });
 
     return NextResponse.json(dataWithActions);
 }   
